@@ -1,0 +1,23 @@
+{
+  "rewrites": [
+    { "source": "/about", "destination": "/about.html" },
+    { "source": "/workshop", "destination": "/workshop/index.html" },
+    { "source": "/workshop/(.*)", "destination": "/workshop/index.html" },
+    { "source": "/facilitator", "destination": "/facilitator/index.html" },
+    { "source": "/facilitator/(.*)", "destination": "/facilitator/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'sha256-xrzY3HHmVF+OMzFz9y3/xJHSl341SBIXpuJwZEUlSC0=' 'sha256-Pqm3HVyv6doxDam+qXvJa909V1c5OSoZX6LdZn2xbuQ=' 'sha256-ZG96tioXjEmOqVWumGz1FwDPS5SLzteo0cFUU1RmhTE=' 'sha256-cJaTZ/T7o5oD7pKt+o9bg7xTN6hIt6OJKB5HeIMsB4M='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "0" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "microphone=(self), camera=(), geolocation=()" }
+      ]
+    }
+  ]
+}

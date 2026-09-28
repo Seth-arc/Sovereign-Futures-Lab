@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About · Sovereign Room</title>
+    <link rel="preload" as="image" href="assets/AidData Logo full_color.png">
+    <link rel="preload" as="image" href="assets/AidData Logo.png">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            /* --- Semantic Color System — Light (default) --- */
+            --bg-color: #f5f4f0;
+            --surface-color: #eceae4;
+            --surface-raised: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: rgba(26, 26, 26, 0.72);
+            --text-muted: #8a8a8a;
+            --accent: #5a7a80;
+            --grid-line: rgba(0, 0, 0, 0.06);
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-interactive: rgba(0, 0, 0, 0.18);
+
+            /* --- Canvas --- */
+            --canvas-bg: #f5f4f0;
+            --canvas-stroke: 90, 122, 128;
+
+            --text-caption: 1rem;
+            --text-body-sm: 0.75rem;
+            --text-body: 0.9rem;
+            --text-body-lg: 1.1rem;
+            --text-heading-sm: 0.75rem;
+            --text-heading: clamp(1.6rem, 4.375vw, 2.6rem);
+            --text-display: clamp(2.4rem, 7.5vw, 5rem);
+
+            --motion-fast: 120ms;
+            --motion-standard: 300ms;
+            --motion-deliberate: 500ms;
+            --motion-cinematic: 800ms;
+
+            --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+            --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);
+
+            --radius-none: 0;
+        }
+
+        /* --- Dark Theme --- */
+        [data-theme="dark"] {
+            --bg-color: #030303;
+            --surface-color: #0a0a0a;
+            --surface-raised: #111111;
+            --text-primary: #f0f0f0;
+            --text-secondary: rgba(240, 240, 240, 0.72);
+            --text-muted: #7a7a7a;
+            --accent: #90a4a8;
+            --grid-line: rgba(255, 255, 255, 0.04);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-interactive: rgba(255, 255, 255, 0.15);
+            --canvas-bg: #030303;
+            --canvas-stroke: 144, 164, 168;
+        }
+
+        @view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: 420ms var(--ease-fluid) both route-out;
+        }
+
+        ::view-transition-new(root) {
+            animation: 620ms var(--ease-out-expo) both route-in;
+        }
+
+        @keyframes route-out {
+            to {
+                opacity: 0;
+                transform: scale(1.01);
+            }
+        }
+
+        @keyframes route-in {
+            from {
+                opacity: 0;
+                transform: scale(0.995);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: #004E38;
+            color: #fff;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            font-size: 125%;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .page-transition-shield {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: var(--bg-color);
+            opacity: 1;
+            pointer-events: none;
+            will-change: opacity;
+            transition: opacity 700ms var(--ease-fluid);
+        }
+
+        body.is-exiting .page-transition-shield {
+            opacity: 1 !important;
+        }
+
+        body.is-exiting .slides-viewport,
+        body.is-exiting .hud-top-bar,
+        body.is-exiting .slide-nav,
+        body.is-exiting .slide-footer {
+            opacity: 0;
+            transform: translateY(18px);
+            transition: opacity 500ms ease, transform 650ms var(--ease-fluid);
+        }
+
+        /* --- Canvas Background (dimmed, slower) --- */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 3s ease;
+        }
+
+        body.is-loaded #canvas-container {
+            opacity: 0.35;
+        }
+
+        .grain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* --- HUD Frame --- */
+        .hud-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+            border: 1px solid var(--grid-line);
+        }
+
+        .hud-top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 60;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem 2.5rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 1s ease 0.15s;
+        }
+
+        body.is-loaded .hud-top-bar {
+            opacity: 1;
+        }
+
+        .hud-logo {
+            width: 175px;
+            height: auto;
+            opacity: 0.85;
+        }
+
+        .back-link {
+            pointer-events: auto;
+            cursor: pointer;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: transparent;
+            border: 1px solid var(--border-interactive);
+            border-radius: var(--radius-none);
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color var(--motion-standard) ease, border-color var(--motion-standard) ease;
+        }
+
+        .back-link:hover {
+            color: #fff;
+            border-color: #004E38;
+            background: #004E38;
+        }
+
+        .back-link:active {
+            background: #004E38;
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .back-link:focus-visible {
+            outline: 1px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        /* --- Slide Container --- */
+        .slides-viewport {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            z-index: 10;
+            overflow: hidden;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 6rem 2.5rem 5rem;
+
+            opacity: 0;
+            transform: translateY(30px);
+            pointer-events: none;
+            transition:
+                opacity var(--motion-cinematic) var(--ease-fluid),
+                transform var(--motion-cinematic) var(--ease-out-expo);
+        }
+
+        .slide.is-active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .slide.is-exiting {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+
+        .slide-inner {
+            width: 100%;
+            min-width: 0;
+            max-width: 975px;
+            margin-left: clamp(2rem, 10vw, 10rem);
+        }
+
+        /* --- Slide Typography --- */
+        .slide-label {
+            font-size: var(--text-caption);
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            margin-bottom: 2rem;
+            display: block;
+        }
+
+        .slide-title {
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-display);
+            font-weight: 400;
+            line-height: 0.95;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
+            margin-bottom: 2.5rem;
+            overflow-wrap: anywhere;
+        }
+
+        .slide-heading {
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-heading);
+            font-weight: 400;
+            line-height: 1.35;
+            letter-spacing: -0.01em;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            max-width: min(30ch, 100%);
+            overflow-wrap: anywhere;
+        }
+
+        .slide-body {
+            font-size: var(--text-body);
+            line-height: 1.9;
+            color: var(--text-secondary);
+            max-width: 60ch;
+        }
+
+        .slide-body p {
+            margin-bottom: 1.6em;
+        }
+
+        .slide-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .slide-body strong {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        /* --- Stat Row --- */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            margin-top: 3rem;
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .stat-item {
+            padding: 1.2rem 0;
+        }
+
+        .stat-item:not(:first-child) {
+            padding-left: 1.5rem;
+            border-left: 1px solid var(--border-subtle);
+        }
+
+        .stat-value {
+            font-family: 'Inter', sans-serif;
+            font-size: clamp(1.2rem, 3.125vw, 1.8rem);
+            font-weight: 400;
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 0.4rem;
+        }
+
+        .stat-label {
+            font-size: var(--text-caption);
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            line-height: 1.4;
+        }
+
+        /* --- Research Cards --- */
+        .research-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            margin-top: 2.5rem;
+            background: var(--border-subtle);
+        }
+
+        .research-card {
+            background: var(--bg-color);
+            padding: 1.8rem;
+        }
+
+        .research-card-year {
+            font-size: var(--text-caption);
+            color: var(--accent);
+            letter-spacing: 0.1em;
+            display: block;
+            margin-bottom: 0.8rem;
+        }
+
+        .research-card-title {
+            font-size: var(--text-body);
+            font-weight: 700;
+            line-height: 1.4;
+            margin-bottom: 0.8rem;
+            max-width: 28ch;
+        }
+
+        .research-card-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* --- Role List --- */
+        .role-list {
+            margin-top: 2rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .role-item {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 1.5rem;
+            padding: 0.9rem 0;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.82rem;
+        }
+
+        .role-name {
+            color: var(--accent);
+            letter-spacing: 0.05em;
+        }
+
+        .role-desc {
+            color: var(--text-secondary);
+        }
+
+        /* --- Spec Row (audience slide) --- */
+        .spec-row {
+            display: grid;
+            grid-template-columns: 163px 1fr;
+            gap: 1.5rem;
+            padding: 0.9rem 0;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.85rem;
+        }
+
+        .spec-row:first-child {
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .spec-label {
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            font-size: var(--text-caption);
+        }
+
+        .spec-value {
+            color: var(--text-secondary);
+        }
+
+        .spec-value strong {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        /* --- Creator Slide --- */
+        .creator-name {
+            font-family: 'Inter', sans-serif;
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.3rem;
+        }
+
+        .creator-title {
+            font-size: var(--text-body-sm);
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            margin-bottom: 2rem;
+        }
+
+        .project-link {
+            display: inline-block;
+            margin-top: 2rem;
+            color: var(--text-primary);
+            font-size: var(--text-body-sm);
+            letter-spacing: 0.08em;
+            text-decoration: none;
+            border-bottom: 1px solid var(--border-interactive);
+            padding-bottom: 0.35rem;
+            transition: color var(--motion-standard) ease, border-color var(--motion-standard) ease;
+        }
+
+        .project-link:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .project-link:focus-visible {
+            outline: 1px solid var(--accent);
+            outline-offset: 4px;
+        }
+
+        /* --- Navigation --- */
+        .slide-nav {
+            position: fixed;
+            bottom: 2.5rem;
+            right: 2.5rem;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            opacity: 0;
+            transition: opacity 1s ease 2s;
+        }
+
+        body.is-loaded .slide-nav {
+            opacity: 1;
+        }
+
+        .slide-counter {
+            font-size: var(--text-caption);
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+            min-width: 3.5rem;
+            text-align: center;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--border-interactive);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-body-sm);
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-none);
+            transition:
+                color var(--motion-standard) ease,
+                border-color var(--motion-standard) ease,
+                background var(--motion-standard) ease;
+        }
+
+        .nav-btn:hover {
+            background: #004E38;
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .nav-btn:focus-visible {
+            outline: 1px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        .nav-btn[disabled] {
+            opacity: 0.2;
+            pointer-events: none;
+        }
+
+        /* --- Progress Bar --- */
+        .slide-progress {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: var(--grid-line);
+            z-index: 60;
+        }
+
+        .slide-progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width var(--motion-cinematic) var(--ease-out-expo);
+        }
+
+        /* --- Footer line --- */
+        .slide-footer {
+            position: fixed;
+            bottom: 2.5rem;
+            left: 2.5rem;
+            z-index: 60;
+            font-size: var(--text-caption);
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            opacity: 0;
+            transition: opacity 1s ease 2s;
+        }
+
+        body.is-loaded .slide-footer {
+            opacity: 1;
+        }
+
+        /* --- Theme Toggle --- */
+        .theme-toggle {
+            pointer-events: auto;
+            background: transparent;
+            border: 1px solid var(--border-interactive);
+            color: var(--text-muted);
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-none);
+            transition: color var(--motion-standard) ease, border-color var(--motion-standard) ease;
+        }
+
+        .theme-toggle:hover {
+            color: #fff;
+            border-color: #004E38;
+            background: #004E38;
+        }
+
+        .theme-toggle:active {
+            background: #004E38;
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .theme-toggle:focus-visible {
+            outline: 1px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        .theme-toggle .icon-sun,
+        .theme-toggle .icon-moon {
+            width: 18px;
+            height: 18px;
+        }
+
+        .theme-toggle .icon-sun {
+            display: none;
+        }
+
+        .theme-toggle .icon-moon {
+            display: block;
+        }
+
+        [data-theme="dark"] .theme-toggle .icon-sun {
+            display: block;
+        }
+
+        [data-theme="dark"] .theme-toggle .icon-moon {
+            display: none;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 800px) {
+            .slide {
+                padding: 5rem 1.5rem 5rem;
+                align-items: flex-start;
+                padding-top: 7rem;
+            }
+
+            .slide-inner {
+                margin-left: 0;
+            }
+
+            .stat-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .stat-item:not(:first-child) {
+                padding-left: 0;
+                border-left: none;
+                border-top: 1px solid var(--border-subtle);
+            }
+
+            .research-pair {
+                grid-template-columns: 1fr;
+            }
+
+            .role-item {
+                grid-template-columns: 1fr;
+                gap: 0.3rem;
+            }
+
+            .spec-row {
+                grid-template-columns: 1fr;
+                gap: 0.3rem;
+            }
+
+            .hud-top-bar {
+                padding: 1.5rem;
+            }
+
+            .slide-nav {
+                bottom: 1.5rem;
+                right: 1.5rem;
+            }
+
+            .slide-footer {
+                bottom: 1.5rem;
+                left: 1.5rem;
+                max-width: 45%;
+            }
+        }
+
+        /* --- Reduced Motion --- */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            .slide {
+                transition: none;
+            }
+
+            .page-transition-shield {
+                transition: none;
+            }
+        }
+    
+    /* === UNIVERSAL MODAL ANIMATIONS === */
+    .comm-overlay, .advisor-overlay, .ref-overlay, .learning-overlay {
+      display: flex !important;
+      opacity: 1 !important;
+      visibility: hidden;
+      background-color: transparent !important;
+      backdrop-filter: blur(0px) !important;
+      transition: background-color 300ms var(--ease), backdrop-filter 300ms var(--ease), visibility 600ms !important;
+      pointer-events: none;
+    }
+
+    .comm-overlay.open, .advisor-overlay.open, .ref-overlay.open, .learning-overlay.open, #onboardingModal.open {
+      visibility: visible !important;
+      background-color: rgba(0, 0, 0, .72) !important;
+      backdrop-filter: blur(8px) !important;
+      transition: background-color 300ms var(--ease), backdrop-filter 300ms var(--ease), visibility 0s !important;
+      pointer-events: auto;
+    }
+
+    /* Base panel transition */
+    .comm-panel, .advisor-panel, .ref-panel, .learning-panel {
+      transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1), opacity 450ms var(--ease) !important;
+    }
+
+    /* Top-Right Origin (Case File, Communications) */
+    .ref-overlay:not(.open) .ref-panel,
+    .comm-overlay:not(.open) .comm-panel {
+      transform: translate(calc(50vw - 60px), calc(-50vh + 60px)) scale(0.05) !important;
+      opacity: 0 !important;
+    }
+
+    /* Bottom-Left Origin (AI Advisors List, Learning Bridge, Orientation) */
+    #advisorsListOverlay:not(.open) .ref-panel,
+    #learningBridge:not(.open) .learning-panel,
+    #onboardingModal:not(.open) .learning-panel {
+      transform: translate(calc(-50vw + 60px), calc(50vh - 60px)) scale(0.05) !important;
+      opacity: 0 !important;
+    }
+
+    /* Center Origin (Advisor Chat) */
+    .advisor-overlay:not(.open) .advisor-panel {
+      transform: scale(0.05) !important;
+      opacity: 0 !important;
+    }
+
+    /* Open States */
+    .ref-overlay.open .ref-panel,
+    .comm-overlay.open .comm-panel,
+    .advisor-overlay.open .advisor-panel,
+    .learning-overlay.open .learning-panel,
+    #onboardingModal.open .learning-panel {
+      transform: none !important;
+      opacity: 1 !important;
+    }
+    
+  
+    /* === ONBOARDING HIGHLIGHTS === */
+    .onboarding-highlight {
+      position: relative !important;
+      z-index: 130 !important;
+      box-shadow: 0 0 0 4px rgba(169, 198, 183, 0.4), 0 0 40px rgba(169, 198, 183, 0.25) !important;
+      border-radius: 4px !important;
+      background-color: var(--surface) !important;
+      transition: all 300ms ease !important;
+    }
+    aside.process.onboarding-highlight {
+      background-color: rgba(12, 15, 14, 0.95) !important;
+    }
+
+  
+    .lift-stacking {
+      z-index: 130 !important;
+    }
+
+  
+    /* === HAMBURGER MENU === */
+    .user-menu-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: rgba(10, 11, 11, 0.98);
+      border: 1px solid var(--edge2);
+      border-radius: 4px;
+      padding: 6px 0;
+      min-width: 170px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(14px);
+      z-index: 200;
+      display: none;
+    }
+    .user-menu-dropdown.open {
+      display: block;
+    }
+    .menu-item {
+      appearance: none;
+      border: none;
+      background: transparent;
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 18px;
+      font: 12px var(--sans);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+    .menu-item:hover {
+      background: var(--surface2);
+    }
+    .menu-divider {
+      height: 1px;
+      background: var(--edge);
+      margin: 6px 0;
+    }
+    .text-bad {
+      color: var(--bad) !important;
+    }
+
+  </style>
+</head>
+
+<body>
+
+    <div class="page-transition-shield" aria-hidden="true"></div>
+
+    <!-- Background -->
+    <div id="canvas-container" aria-hidden="true">
+        <canvas id="topography-canvas"></canvas>
+    </div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="hud-frame" aria-hidden="true"></div>
+
+    <!-- Top Bar -->
+    <div class="hud-top-bar">
+        <img src="assets/AidData Logo full_color.png" alt="AidData Logo" class="hud-logo" id="hud-logo-img">
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <a href="index.html" class="back-link" id="back-link" aria-label="Home">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+            </a>
+            <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Slides -->
+    <div class="slides-viewport" id="slides-viewport">
+
+        <!-- 01 · Hero -->
+        <div class="slide is-active" data-slide="0" role="group" aria-roledescription="slide" aria-label="1 of 6">
+            <div class="slide-inner">
+                <span class="slide-label">Training and Professional Development</span>
+                <h1 class="slide-title">Bridging research and institutional reality</h1>
+                <div class="slide-body">
+                    <p>A research-to-decision simulation platform that translates AidData's empirical research into
+                        practitioner decision environments.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 02 · The Problem -->
+        <div class="slide" data-slide="1" role="group" aria-roledescription="slide" aria-label="2 of 6"
+            aria-hidden="true">
+            <div class="slide-inner">
+                <h2 class="slide-heading">Research insights rarely survive translation into practice</h2>
+                <div class="slide-body">
+                    <p>The architecture loses coherence when research, mechanics, learning objectives and assessment
+                        evidence collapse into a single layer. Findings are reduced to content, while the decisions,
+                        constraints and causal mechanisms embedded in the research disappear.</p>
+                    <p>Practitioners may understand what the evidence says without rehearsing how to interpret it, act
+                        on it or defend a decision under institutional pressure.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 03 · The Framework -->
+        <div class="slide" data-slide="2" role="group" aria-roledescription="slide" aria-label="3 of 6"
+            aria-hidden="true">
+            <div class="slide-inner">
+                <h2 class="slide-heading">RTLF preserves the evidence</h2>
+                <div class="slide-body">
+                    <p>RTLF is the translation layer between research evidence and executable scenario design.It
+                        converts a bounded research claim into a causal mechanism, a consequential decision, a playable
+                        constraint and an observable professional performance.</p>
+                    <p>Explicit validity gates preserve the claim's scope, prevent unsupported inference and maintain
+                        traceability from source evidence through assessment and debrief.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 04 · The Engine -->
+        <div class="slide" data-slide="3" role="group" aria-roledescription="slide" aria-label="4 of 6"
+            aria-hidden="true">
+            <div class="slide-inner">
+                <h2 class="slide-heading">The Decision Engine makes causality executable</h2>
+                <div class="slide-body">
+                    <p>The Decision Engine is the authoritative causal runtime between scenario definition and the
+                        user-facing platform.It validates what an actor can authorize, resolves the submitted decision
+                        against explicit rules and writes the resulting consequence into canonical state.</p>
+                    <p>Because inputs, rules and scenario versions are frozen, every material outcome can be replayed
+                        and traced to the evidence, authority and timing that produced it.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 05 · The Platform -->
+        <div class="slide" data-slide="4" role="group" aria-roledescription="slide" aria-label="5 of 6"
+            aria-hidden="true">
+            <div class="slide-inner">
+                <h2 class="slide-heading">Sovereign turns the architecture into practice</h2>
+                <div class="slide-body">
+                    <p>Sovereign is the user-facing workflow layer built on the RTLF, versioned scenario packages and
+                        the Decision Engine. Its role-specific workspaces require participants to interpret evidence,
+                        negotiate within institutional mandates and distinguish proposals from authorized commitments.
+                    </p>
+                    <p>The platform records the decision process and its consequences as one canonical history that
+                        supports simulation, learning assessment and decision research.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 06 · The Proposition -->
+        <div class="slide" data-slide="5" role="group" aria-roledescription="slide" aria-label="6 of 6"
+            aria-hidden="true">
+            <div class="slide-inner">
+                <h2 class="slide-heading">One system. Three outputs.</h2>
+                <div class="slide-body">
+                    <p>Together, the framework, engine and platform form a single research-to-decision architecture.The
+                        system strengthens practitioner capability by making institutional judgment visible,
+                        consequential and open to structured reflection. The same decision history reveals recurring
+                        institutional friction and creates reproducible evidence for decision research.</p>
+                </div>
+                <a class="project-link" href="https://github.com/Seth-arc/Sovereign-Room" target="_blank"
+                    rel="noopener noreferrer">View the
+                    project on GitHub &#8599;</a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Navigation -->
+    <div class="slide-nav" id="slide-nav">
+        <button class="nav-btn" id="nav-prev" aria-label="Previous section" disabled>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 2L4 7L9 12" />
+            </svg>
+        </button>
+        <span class="slide-counter" id="slide-counter" aria-live="polite">1 / 6</span>
+        <button class="nav-btn" id="nav-next" aria-label="Next section">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M5 2L10 7L5 12" />
+            </svg>
+        </button>
+    </div>
+
+
+    <!-- Progress -->
+    <div class="slide-progress" role="progressbar" aria-label="Section progress" aria-valuemin="1" aria-valuemax="6"
+        aria-valuenow="1">
+        <div class="slide-progress-fill" id="progress-fill"></div>
+    </div>
+
+    <script>
+        /**
+         * Theme Management
+         */
+        var LOGO_LIGHT = 'assets/AidData Logo full_color.png';
+        var LOGO_DARK = 'assets/AidData Logo.png';
+        var logoImg = document.getElementById('hud-logo-img');
+        var themeToggle = document.getElementById('theme-toggle');
+
+        function getThemeColors() {
+            var style = getComputedStyle(document.documentElement);
+            return {
+                bg: style.getPropertyValue('--canvas-bg').trim(),
+                stroke: style.getPropertyValue('--canvas-stroke').trim()
+            };
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                logoImg.src = LOGO_DARK;
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                logoImg.src = LOGO_LIGHT;
+            }
+            localStorage.setItem('sovereign-theme', theme);
+        }
+
+        // Initialize theme from localStorage
+        var savedTheme = localStorage.getItem('sovereign-theme') || 'light';
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', function () {
+            var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+
+        /**
+         * Page Init
+         */
+        window.addEventListener('load', function () {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    document.body.classList.add('is-loaded');
+                    document.querySelector('.page-transition-shield').style.opacity = '0';
+                });
+            });
+        });
+
+        window.addEventListener('pageshow', function () {
+            document.body.classList.remove('is-exiting');
+            document.body.classList.add('is-loaded');
+            document.querySelector('.page-transition-shield').style.opacity = '0';
+        });
+
+        var backLink = document.getElementById('back-link');
+        backLink.addEventListener('click', function (e) {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            if (CSS.supports('view-transition-name: root')) {
+                window.location.href = backLink.href;
+                return;
+            }
+            document.body.classList.add('is-exiting');
+            document.querySelector('.page-transition-shield').style.opacity = '1';
+            setTimeout(function () {
+                window.location.href = backLink.href;
+            }, 550);
+        });
+
+        /**
+         * Slide Navigation
+         */
+        var slides = document.querySelectorAll('.slide');
+        var total = slides.length;
+        var current = 0;
+        var isTransitioning = false;
+
+        var prevBtn = document.getElementById('nav-prev');
+        var nextBtn = document.getElementById('nav-next');
+        var counter = document.getElementById('slide-counter');
+        var progressFill = document.getElementById('progress-fill');
+        var progressBar = document.querySelector('.slide-progress');
+
+        function goTo(index) {
+            if (isTransitioning || index === current || index < 0 || index >= total) return;
+            isTransitioning = true;
+
+            var direction = index > current ? 1 : -1;
+            var outgoing = slides[current];
+            var incoming = slides[index];
+
+            // Exit current slide
+            outgoing.classList.remove('is-active');
+            outgoing.classList.add('is-exiting');
+            outgoing.setAttribute('aria-hidden', 'true');
+
+            // Prepare incoming slide's initial position
+            incoming.style.transition = 'none';
+            incoming.style.opacity = '0';
+            incoming.style.transform = 'translateY(' + (direction * 30) + 'px)';
+
+            // Force reflow before applying transition
+            incoming.offsetHeight;
+
+            // Enter new slide
+            incoming.style.transition = '';
+            incoming.classList.add('is-active');
+            incoming.style.opacity = '';
+            incoming.style.transform = '';
+            incoming.removeAttribute('aria-hidden');
+
+            current = index;
+            updateControls();
+
+            setTimeout(function () {
+                outgoing.classList.remove('is-exiting');
+                isTransitioning = false;
+            }, 800);
+        }
+
+        function updateControls() {
+            prevBtn.disabled = current === 0;
+            nextBtn.disabled = current === total - 1;
+            counter.textContent = (current + 1) + ' / ' + total;
+            progressFill.style.width = (((current + 1) / total) * 100) + '%';
+            progressBar.setAttribute('aria-valuenow', current + 1);
+        }
+
+        prevBtn.addEventListener('click', function () { goTo(current - 1); });
+        nextBtn.addEventListener('click', function () { goTo(current + 1); });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                goTo(current + 1);
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                goTo(current - 1);
+            }
+        });
+
+        // Touch/swipe support
+        var touchStartY = 0;
+        var touchStartX = 0;
+        document.addEventListener('touchstart', function (e) {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+
+        document.addEventListener('touchend', function (e) {
+            var dy = e.changedTouches[0].clientY - touchStartY;
+            var dx = e.changedTouches[0].clientX - touchStartX;
+            // Only act on vertical swipes that are more vertical than horizontal
+            if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx)) {
+                if (dy < 0) goTo(current + 1);
+                else goTo(current - 1);
+            }
+        }, { passive: true });
+
+        // Mouse wheel navigation (throttled)
+        var wheelTimeout = null;
+        document.addEventListener('wheel', function (e) {
+            if (wheelTimeout) return;
+            wheelTimeout = setTimeout(function () { wheelTimeout = null; }, 1000);
+            if (e.deltaY > 30) goTo(current + 1);
+            else if (e.deltaY < -30) goTo(current - 1);
+        }, { passive: true });
+
+        updateControls();
+
+        /**
+         * Topography Engine — slower, quieter variant
+         */
+        var canvas = document.getElementById('topography-canvas');
+        var ctx = canvas.getContext('2d');
+
+        var width, height;
+        var time = 0;
+        var speed = 0.0012;
+
+        var lineCount = 45;
+        var segCount = 100;
+        var amp = 160;
+        var freq = 0.0015;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawTopography() {
+            var colors = getThemeColors();
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, width, height);
+
+            time += speed;
+            ctx.lineWidth = 1;
+
+            for (var i = 0; i < lineCount; i++) {
+                var norm = i / lineCount;
+                var depthScale = 0.2 + (norm * 0.8);
+                var yOffset = (height * 0.25) + (norm * height * 0.55);
+
+                var alpha = Math.max(0.02, 0.3 * norm);
+                ctx.strokeStyle = 'rgba(' + colors.stroke + ', ' + alpha + ')';
+
+                ctx.beginPath();
+
+                for (var j = 0; j <= segCount; j++) {
+                    var xNorm = j / segCount;
+                    var x = xNorm * width;
+
+                    var wave1 = Math.sin(x * freq * 1.5 + time * 2 + norm * 5);
+                    var wave2 = Math.cos(x * freq * 0.8 - time + norm * 8);
+                    var wave3 = Math.sin(x * freq * 3 + time * 0.5);
+
+                    var centerBias = Math.sin(xNorm * Math.PI);
+
+                    var y = yOffset + ((wave1 + wave2 * 0.5 + wave3 * 0.2) * amp * depthScale * centerBias);
+
+                    if (j === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(drawTopography);
+        }
+
+        drawTopography();
+    </script>
+
+
+  <script>
+    (function () {
+      var btn = document.getElementById('userMenuBtn');
+      var menu = document.getElementById('userMenuDropdown');
+      if(btn && menu) {
+        btn.addEventListener('click', function(e) {
+          menu.classList.toggle('open');
+          e.stopPropagation();
+        });
+        document.addEventListener('click', function(e) {
+          if (!e.target.closest('.user-menu-container')) {
+            menu.classList.remove('open');
+          }
+        });
+      }
+    
+        var themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', function(e) {
+                var current = document.documentElement.getAttribute('data-theme');
+                if (current === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('sovereign-theme', 'light');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('sovereign-theme', 'dark');
+                }
+            });
+        }
+        })();
+  </script>
+</body>
+
+</html>

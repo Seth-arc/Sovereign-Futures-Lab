@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sovereign Room — Facilitator Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap">
+  <style>
+    :root {
+      --void: #0C0F0E;
+      --lift-1: rgba(255, 255, 255, .026);
+      --lift-2: rgba(255, 255, 255, .048);
+      --lift-3: rgba(255, 255, 255, .07);
+      --edge: rgba(255, 255, 255, .075);
+      --edge-lit: rgba(255, 255, 255, .145);
+      --text-1: rgba(236, 240, 238, .90);
+      --text-2: rgba(236, 240, 238, .56);
+      --text-3: rgba(236, 240, 238, .30);
+      --recorded: #A9C6B7;
+      --attention: #C9A468;
+      --blocking: #BE6B6B;
+      --team: #7C9CB8;
+      --shell: rgba(12, 15, 14, .91);
+      --scrim: rgba(6, 8, 7, .68);
+      --gap: 24px;
+      --radius: 10px;
+      --pill: 999px;
+      --dur: 160ms;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    ::selection {
+      background: #004E38;
+      color: #fff;
+    }
+
+    html {
+      background: var(--void);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--void);
+      color: var(--text-1);
+      font-size: 15px;
+      line-height: 1.55
+    }
+
+    body:before {
+      content: "";
+      position: fixed;
+      inset: -20vh -15vw auto -15vw;
+      height: 80vh;
+      pointer-events: none;
+      background: radial-gradient(50% 60% at 20% 0%, rgba(169, 198, 183, .07), transparent 72%)
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit
+    }
+
+    button {
+      cursor: pointer
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: 3px solid var(--recorded);
+      outline-offset: 2px
+    }
+
+    .micro {
+      font-size: .62rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--text-3)
+    }
+
+    .figure {
+      font-variant-numeric: tabular-nums
+    }
+
+    .shell {
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--edge);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: var(--shell);
+      backdrop-filter: blur(18px)
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--lift-2);
+      box-shadow: inset 0 0 0 1px var(--edge-lit);
+      font-size: .72rem;
+      font-weight: 600
+    }
+
+    .brand-copy .name {
+      font-size: .88rem;
+      font-weight: 600
+    }
+
+    .brand-copy .sub {
+      font-size: .68rem;
+      color: var(--text-3);
+      margin-top: 2px
+    }
+
+    .shell-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .status-pill,
+    .persona-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border-radius: var(--pill);
+      box-shadow: inset 0 0 0 1px var(--edge);
+      background: var(--lift-1);
+      font-size: .72rem;
+      color: var(--text-2)
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor
+    }
+
+    .tone-ok {
+      color: var(--recorded)
+    }
+
+    .tone-warn {
+      color: var(--attention)
+    }
+
+    .tone-bad {
+      color: var(--blocking)
+    }
+
+    .tone-team {
+      color: var(--team)
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--edge);
+      color: var(--text-2);
+      transition: .16s ease
+    }
+
+    .btn:hover {
+      background: var(--lift-1);
+      box-shadow: inset 0 0 0 1px var(--edge-lit);
+      color: var(--text-1)
+    }
+
+    .btn.primary {
+      background: var(--text-1);
+      color: var(--void);
+      box-shadow: none
+    }
+
+    .btn.primary:hover {
+      opacity: .88
+    }
+
+    .btn.warn {
+      color: var(--attention);
+      box-shadow: inset 0 0 0 1px rgba(201, 164, 104, .35)
+    }
+
+    .btn.danger {
+      color: var(--blocking);
+      box-shadow: inset 0 0 0 1px rgba(190, 107, 107, .35)
+    }
+
+    .btn.small {
+      padding: 8px 11px;
+      font-size: .72rem
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: calc(100vh - 68px)
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--edge);
+      padding: 22px 12px;
+      position: sticky;
+      top: 68px;
+      height: calc(100vh - 68px);
+      overflow: auto;
+      background: rgba(255, 255, 255, .008)
+    }
+
+    .nav {
+      display: grid;
+      gap: 4px
+    }
+
+    .nav .nav-label {
+      padding: 0 10px 9px
+    }
+
+    .nav button {
+      border: 0;
+      background: transparent;
+      color: var(--text-2);
+      text-align: left;
+      padding: 11px 12px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px
+    }
+
+    .nav button:hover {
+      background: var(--lift-1);
+      color: var(--text-1)
+    }
+
+    .nav button[aria-current="true"] {
+      background: var(--lift-2);
+      color: var(--text-1);
+      font-weight: 500
+    }
+
+    .badge-count {
+      font-size: .62rem;
+      color: var(--attention);
+      min-width: 18px;
+      text-align: right
+    }
+
+    .main {
+      padding: 34px clamp(20px, 4vw, 52px);
+      max-width: 1500px;
+      width: 100%;
+      margin: 0 auto
+    }
+
+    .view {
+      display: none
+    }
+
+    .view.active {
+      display: block
+    }
+
+    .view-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-end;
+      margin-bottom: 24px
+    }
+
+    .view-head h1 {
+      font-size: clamp(1.6rem, 3vw, 2.35rem);
+      font-weight: 250;
+      letter-spacing: -.035em;
+      margin: 0
+    }
+
+    .view-head p {
+      margin: 8px 0 0;
+      color: var(--text-2);
+      max-width: 72ch
+    }
+
+    .head-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end
+    }
+
+    .grid {
+      display: grid;
+      gap: var(--gap)
+    }
+
+    .grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr))
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr))
+    }
+
+    .grid.cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .card {
+      background: var(--lift-1);
+      box-shadow: inset 0 1px 0 var(--edge-lit);
+      border-radius: 8px;
+      padding: 18px 20px;
+      min-width: 0
+    }
+
+    .card.solid {
+      background: var(--lift-2)
+    }
+
+    .metric .label {
+      font-size: .65rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-3)
+    }
+
+    .metric .value {
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: -.035em;
+      margin-top: 8px
+    }
+
+    .metric .detail {
+      font-size: .78rem;
+      color: var(--text-2);
+      margin-top: 6px
+    }
+
+    .section {
+      margin-top: 28px
+    }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: .72rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      font-weight: 500
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 8px;
+      box-shadow: inset 0 0 0 1px var(--edge)
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 840px;
+      background: rgba(0, 0, 0, .08)
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--edge);
+      text-align: left;
+      vertical-align: middle
+    }
+
+    th {
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text-3);
+      font-weight: 500;
+      background: rgba(255, 255, 255, .018);
+      position: sticky;
+      top: 0
+    }
+
+    td {
+      font-size: .82rem;
+      color: var(--text-2)
+    }
+
+    td strong {
+      color: var(--text-1);
+      font-weight: 500
+    }
+
+    .progress {
+      height: 6px;
+      border-radius: 999px;
+      background: var(--edge);
+      overflow: hidden;
+      min-width: 110px
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      background: var(--recorded);
+      transform-origin: left
+    }
+
+    .state {
+      font-size: .65rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .state.online {
+      color: var(--recorded)
+    }
+
+    .state.away {
+      color: var(--attention)
+    }
+
+    .state.offline {
+      color: var(--text-3)
+    }
+
+    .state.issue {
+      color: var(--blocking)
+    }
+
+    .activity-list {
+      display: grid;
+      gap: 1px;
+      background: var(--edge);
+      border-radius: 8px;
+      overflow: hidden
+    }
+
+    .activity {
+      background: var(--void);
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: 96px 1fr auto;
+      gap: 12px;
+      align-items: start
+    }
+
+    .activity .time {
+      font-size: .68rem;
+      color: var(--text-3)
+    }
+
+    .activity .text {
+      font-size: .82rem
+    }
+
+    .activity .meta {
+      font-size: .66rem;
+      color: var(--text-3);
+      white-space: nowrap
+    }
+
+    .analytics-note {
+      padding: 12px 14px;
+      border-left: 2px solid var(--attention);
+      background: rgba(201, 164, 104, .05);
+      color: var(--text-2);
+      font-size: .78rem;
+      margin-top: 16px
+    }
+
+    .barlist {
+      display: grid;
+      gap: 12px
+    }
+
+    .barrow {
+      display: grid;
+      grid-template-columns: 180px 1fr 52px;
+      gap: 12px;
+      align-items: center
+    }
+
+    .barrow .name {
+      font-size: .78rem;
+      color: var(--text-2)
+    }
+
+    .bar {
+      height: 8px;
+      background: var(--edge);
+      border-radius: 999px;
+      overflow: hidden
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      background: var(--team)
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 1px;
+      background: var(--edge);
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 610px
+    }
+
+    .channel-list {
+      background: var(--void);
+      padding: 12px;
+      overflow: auto
+    }
+
+    .channel-group {
+      margin-bottom: 18px
+    }
+
+    .channel-group .micro {
+      display: block;
+      padding: 4px 8px 8px
+    }
+
+    .channel {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text-2);
+      text-align: left;
+      padding: 10px;
+      border-radius: 7px;
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
+      gap: 10px;
+      align-items: center
+    }
+
+    .channel:hover {
+      background: var(--lift-1)
+    }
+
+    .channel.active {
+      background: var(--lift-2);
+      color: var(--text-1)
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--lift-2);
+      box-shadow: inset 0 0 0 1px var(--edge-lit);
+      font-size: .67rem;
+      font-weight: 600
+    }
+
+    .channel .nm {
+      font-size: .8rem
+    }
+
+    .channel .sub {
+      font-size: .63rem;
+      color: var(--text-3);
+      margin-top: 2px
+    }
+
+    .unread {
+      font-size: .62rem;
+      color: var(--attention)
+    }
+
+    .comms-pane {
+      background: var(--void);
+      display: flex;
+      flex-direction: column;
+      min-width: 0
+    }
+
+    .comms-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--edge);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center
+    }
+
+    .comms-head h3 {
+      margin: 0;
+      font-size: .94rem;
+      font-weight: 500
+    }
+
+    .comms-head .sub {
+      font-size: .68rem;
+      color: var(--text-3);
+      margin-top: 3px
+    }
+
+    .message-list {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: auto;
+      min-height: 360px;
+      max-height: 440px
+    }
+
+    .message {
+      max-width: 76%;
+      padding: 11px 13px;
+      border-radius: 10px;
+      background: var(--lift-1);
+      box-shadow: inset 0 0 0 1px var(--edge)
+    }
+
+    .message.out {
+      margin-left: auto;
+      background: rgba(124, 156, 184, .08)
+    }
+
+    .message .who {
+      font-size: .68rem;
+      color: var(--text-3);
+      margin-bottom: 4px
+    }
+
+    .message .body {
+      font-size: .82rem;
+      color: var(--text-1)
+    }
+
+    .message .stamp {
+      font-size: .62rem;
+      color: var(--text-3);
+      margin-top: 6px
+    }
+
+    .composer {
+      border-top: 1px solid var(--edge);
+      padding: 14px 16px;
+      display: grid;
+      gap: 10px
+    }
+
+    .composer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px
+    }
+
+    .field label {
+      display: block;
+      font-size: .6rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text-3);
+      margin-bottom: 5px
+    }
+
+    .field select,
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 0;
+      border-radius: 7px;
+      background: var(--lift-1);
+      box-shadow: inset 0 0 0 1px var(--edge);
+      color: var(--text-1);
+      padding: 10px 11px;
+      outline: none
+    }
+
+    .field textarea {
+      min-height: 82px;
+      resize: vertical
+    }
+
+    .composer-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .audit-note {
+      font-size: .67rem;
+      color: var(--text-3);
+      max-width: 70ch
+    }
+
+    .inject-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(340px, .9fr);
+      gap: var(--gap)
+    }
+
+    .inject-presets {
+      display: grid;
+      gap: 8px
+    }
+
+    .preset {
+      border: 0;
+      background: var(--lift-1);
+      box-shadow: inset 0 0 0 1px var(--edge);
+      border-radius: 8px;
+      padding: 12px 14px;
+      text-align: left;
+      color: var(--text-2)
+    }
+
+    .preset:hover {
+      background: var(--lift-2);
+      color: var(--text-1)
+    }
+
+    .preset .title {
+      font-size: .82rem;
+      color: var(--text-1)
+    }
+
+    .preset .desc {
+      font-size: .7rem;
+      color: var(--text-3);
+      margin-top: 4px
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px
+    }
+
+    .form-grid .span-2 {
+      grid-column: 1/-1
+    }
+
+    .inject-preview {
+      padding: 14px;
+      border-left: 2px solid var(--attention);
+      background: rgba(201, 164, 104, .05);
+      font-size: .8rem;
+      color: var(--text-2);
+      margin-top: 14px
+    }
+
+    .timeline {
+      display: grid;
+      gap: 0
+    }
+
+    .tl {
+      display: grid;
+      grid-template-columns: 76px 14px 1fr;
+      gap: 10px;
+      align-items: start
+    }
+
+    .tl .line {
+      position: relative;
+      min-height: 64px
+    }
+
+    .tl .line:before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 7px;
+      bottom: -7px;
+      width: 1px;
+      background: var(--edge-lit)
+    }
+
+    .tl:last-child .line:before {
+      display: none
+    }
+
+    .tl .line:after {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 7px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--recorded)
+    }
+
+    .tl .time {
+      font-size: .66rem;
+      color: var(--text-3);
+      padding-top: 2px
+    }
+
+    .tl .content {
+      padding-bottom: 18px
+    }
+
+    .tl .title {
+      font-size: .8rem;
+      color: var(--text-1)
+    }
+
+    .tl .desc {
+      font-size: .7rem;
+      color: var(--text-2);
+      margin-top: 3px
+    }
+
+    .control-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .control-banner {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: var(--lift-1);
+      box-shadow: inset 0 0 0 1px var(--edge);
+      margin-bottom: 18px
+    }
+
+    .control-banner .title {
+      font-size: .82rem
+    }
+
+    .control-banner .detail {
+      font-size: .7rem;
+      color: var(--text-3);
+      margin-top: 3px
+    }
+
+    .modal-scrim {
+      position: fixed;
+      inset: 0;
+      background: var(--scrim);
+      z-index: 40;
+      display: none;
+      place-items: center;
+      padding: 20px
+    }
+
+    .modal-scrim.open {
+      display: grid
+    }
+
+    .modal {
+      width: min(600px, 96vw);
+      background: var(--void);
+      box-shadow: inset 0 0 0 1px var(--edge-lit), 0 24px 70px rgba(0, 0, 0, .35);
+      border-radius: 10px;
+      padding: 22px
+    }
+
+    .modal h3 {
+      margin: 0;
+      font-size: 1.1rem
+    }
+
+    .modal p {
+      color: var(--text-2);
+      font-size: .82rem
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 18px
+    }
+
+    @media(max-width:1150px) {
+      .grid.cols-4 {
+        grid-template-columns: repeat(2, 1fr)
+      }
+
+      .grid.cols-3 {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .inject-layout {
+        grid-template-columns: 1fr
+      }
+    }
+
+    @media(max-width:900px) {
+      .layout {
+        display: block
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 68px;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--edge);
+        z-index: 10;
+        padding: 8px 12px;
+        background: var(--shell);
+        overflow: auto
+      }
+
+      .nav {
+        display: flex;
+        min-width: max-content
+      }
+
+      .nav .nav-label {
+        display: none
+      }
+
+      .split {
+        grid-template-columns: 1fr
+      }
+
+      .channel-list {
+        max-height: 230px
+      }
+
+      .grid.cols-2,
+      .grid.cols-3 {
+        grid-template-columns: 1fr
+      }
+
+      .barrow {
+        grid-template-columns: 130px 1fr 46px
+      }
+    }
+
+    @media(max-width:620px) {
+      .shell {
+        padding: 0 14px
+      }
+
+      .brand-copy .sub {
+        display: none
+      }
+
+      .shell-actions .persona-pill {
+        display: none
+      }
+
+      .main {
+        padding: 24px 14px
+      }
+
+      .grid.cols-4 {
+        grid-template-columns: 1fr
+      }
+
+      .view-head {
+        display: block
+      }
+
+      .head-actions {
+        justify-content: flex-start;
+        margin-top: 14px
+      }
+
+      .composer-grid,
+      .form-grid {
+        grid-template-columns: 1fr
+      }
+
+      .form-grid .span-2 {
+        grid-column: auto
+      }
+
+      .activity {
+        grid-template-columns: 72px 1fr
+      }
+
+      .activity .meta {
+        grid-column: 2
+      }
+
+      .message {
+        max-width: 92%
+      }
+    }
+  
+    /* === UNIVERSAL MODAL ANIMATIONS === */
+    .comm-overlay, .advisor-overlay, .ref-overlay, .learning-overlay {
+      display: flex !important;
+      opacity: 1 !important;
+      visibility: hidden;
+      background-color: transparent !important;
+      backdrop-filter: blur(0px) !important;
+      transition: background-color 300ms var(--ease), backdrop-filter 300ms var(--ease), visibility 600ms !important;
+      pointer-events: none;
+    }
+
+    .comm-overlay.open, .advisor-overlay.open, .ref-overlay.open, .learning-overlay.open, #onboardingModal.open {
+      visibility: visible !important;
+      background-color: rgba(0, 0, 0, .72) !important;
+      backdrop-filter: blur(8px) !important;
+      transition: background-color 300ms var(--ease), backdrop-filter 300ms var(--ease), visibility 0s !important;
+      pointer-events: auto;
+    }
+
+    /* Base panel transition */
+    .comm-panel, .advisor-panel, .ref-panel, .learning-panel {
+      transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1), opacity 450ms var(--ease) !important;
+    }
+
+    /* Top-Right Origin (Case File, Communications) */
+    .ref-overlay:not(.open) .ref-panel,
+    .comm-overlay:not(.open) .comm-panel {
+      transform: translate(calc(50vw - 60px), calc(-50vh + 60px)) scale(0.05) !important;
+      opacity: 0 !important;
+    }
+
+    /* Bottom-Left Origin (AI Advisors List, Learning Bridge, Orientation) */
+    #advisorsListOverlay:not(.open) .ref-panel,
+    #learningBridge:not(.open) .learning-panel,
+    #onboardingModal:not(.open) .learning-panel {
+      transform: translate(calc(-50vw + 60px), calc(50vh - 60px)) scale(0.05) !important;
+      opacity: 0 !important;
+    }
+
+    /* Center Origin (Advisor Chat) */
+    .advisor-overlay:not(.open) .advisor-panel {
+      transform: scale(0.05) !important;
+      opacity: 0 !important;
+    }
+
+    /* Open States */
+    .ref-overlay.open .ref-panel,
+    .comm-overlay.open .comm-panel,
+    .advisor-overlay.open .advisor-panel,
+    .learning-overlay.open .learning-panel,
+    #onboardingModal.open .learning-panel {
+      transform: none !important;
+      opacity: 1 !important;
+    }
+    
+  
+    /* === ONBOARDING HIGHLIGHTS === */
+    .onboarding-highlight {
+      position: relative !important;
+      z-index: 130 !important;
+      box-shadow: 0 0 0 4px rgba(169, 198, 183, 0.4), 0 0 40px rgba(169, 198, 183, 0.25) !important;
+      border-radius: 4px !important;
+      background-color: var(--surface) !important;
+      transition: all 300ms ease !important;
+    }
+    aside.process.onboarding-highlight {
+      background-color: rgba(12, 15, 14, 0.95) !important;
+    }
+
+  
+    .lift-stacking {
+      z-index: 130 !important;
+    }
+
+  
+    /* === HAMBURGER MENU === */
+    .user-menu-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: rgba(10, 11, 11, 0.98);
+      border: 1px solid var(--edge2);
+      border-radius: 4px;
+      padding: 6px 0;
+      min-width: 170px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(14px);
+      z-index: 200;
+      display: none;
+    }
+    .user-menu-dropdown.open {
+      display: block;
+    }
+    .menu-item {
+      appearance: none;
+      border: none;
+      background: transparent;
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 18px;
+      font: 12px var(--sans);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+    .menu-item:hover {
+      background: var(--surface2);
+    }
+    .menu-divider {
+      height: 1px;
+      background: var(--edge);
+      margin: 6px 0;
+    }
+    .text-bad {
+      color: var(--bad) !important;
+    }
+
+  </style>
+</head>
+
+<body>
+  <header class="shell">
+    <div class="brand">
+      <div class="brand-mark">FC</div>
+      <div class="brand-copy">
+        <div class="name">Sovereign · Facilitator</div>
+        <div class="sub">Kuvera financing assurances · Conference demonstration session</div>
+      </div>
+    </div>
+    <div class="shell-actions">
+      <span class="persona-pill tone-ok"><span class="dot"></span><span id="sessionState">Session live</span></span>
+      <span class="status-pill"><span class="micro" style="color:inherit">Clock</span><strong class="figure"
+          id="clockValue">38:24</strong></span>
+      <button class="btn small" id="participantPreview">Exit</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <nav class="nav" aria-label="Facilitator workspace">
+        <span class="micro nav-label">Session control</span>
+        <button data-view="overview" aria-current="true">Live overview <span class="badge-count"></span></button>
+        <button data-view="participants">Participants <span class="badge-count" id="participantCount">13</span></button>
+        <button data-view="communications">Communications <span class="badge-count" id="unreadCount">6</span></button>
+        <button data-view="injects">Injects & updates <span class="badge-count"></span></button>
+        <button data-view="analytics">Platform analytics <span class="badge-count"></span></button>
+        <button data-view="replay">Replay & debrief <span class="badge-count"></span></button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section class="view active" id="view-overview">
+        <div class="view-head">
+          <div>
+            <div class="micro">Live session</div>
+            <h1>Facilitator operating picture</h1>
+            <p>Manage session health, workflow position, institutional communications and timed interventions without
+              turning operational traces into competence scores.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn warn" id="pauseClock">Pause clock</button>
+            <button class="btn" id="addTime">+5 min</button>
+            <button class="btn" id="openClarification">Issue clarification</button>
+            <button class="btn danger" id="openDebrief">Initiate debrief</button>
+          </div>
+        </div>
+
+        <div class="control-banner">
+          <div>
+            <div class="title">Current phase · Concrete experience</div>
+            <div class="detail">Teams are verifying liquidity, discovering dependencies and preparing
+              financing-assurance positions. Facilitator guidance should remain procedural, not substantive.</div>
+          </div>
+          <span class="state online"><span class="dot"></span>Engine healthy</span>
+        </div>
+
+        <div class="grid cols-4">
+          <div class="card metric">
+            <div class="label">Connected participants</div>
+            <div class="value figure">12 / 13</div>
+            <div class="detail">1 participant reconnecting</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Teams active</div>
+            <div class="value figure">6 / 6</div>
+            <div class="detail">All institutional channels online</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Pending requests</div>
+            <div class="value figure">7</div>
+            <div class="detail">3 information · 2 authority · 2 clarification</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Recorded interventions</div>
+            <div class="value figure" id="interventionMetric">2</div>
+            <div class="detail">Visible in replay and audit log</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Institutional workflow position</h2><span class="micro">Descriptive · not a score</span>
+          </div>
+          <div class="grid cols-3">
+            <div class="card">
+              <div class="micro">Debtor Finance Ministry</div>
+              <div style="font-size:1.05rem;margin-top:6px">Verify usable liquidity</div>
+              <div class="progress" style="margin-top:14px"><span style="width:47%"></span></div>
+              <div style="font-size:.7rem;color:var(--text-3);margin-top:8px">3 participants · RA-01 verification
+                request outstanding</div>
+            </div>
+            <div class="card">
+              <div class="micro">OCC Secretariat</div>
+              <div style="font-size:1.05rem;margin-top:6px">Define treatment parameters</div>
+              <div class="progress" style="margin-top:14px"><span style="width:58%"></span></div>
+              <div style="font-size:.7rem;color:var(--text-3);margin-top:8px">2 participants · waiting on collateral
+                disclosure</div>
+            </div>
+            <div class="card">
+              <div class="micro">Creditor groups</div>
+              <div style="font-size:1.05rem;margin-top:6px">Form assurance positions</div>
+              <div class="progress" style="margin-top:14px"><span style="width:41%"></span></div>
+              <div style="font-size:.7rem;color:var(--text-3);margin-top:8px">Paris Club, China creditor and private
+                committee</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Live activity</h2><button class="btn small" data-jump="replay">Open full event log</button>
+          </div>
+          <div class="activity-list" id="overviewActivity">
+            <div class="activity">
+              <div class="time figure">14:41:28</div>
+              <div class="text">Kuvera DMO requested verification of Copper Revenue Account RA-01.</div>
+              <div class="meta">information_request</div>
+            </div>
+            <div class="activity">
+              <div class="time figure">14:40:51</div>
+              <div class="text">OCC Secretariat opened CoT workspace v2.</div>
+              <div class="meta">artifact_opened</div>
+            </div>
+            <div class="activity">
+              <div class="time figure">14:39:17</div>
+              <div class="text">China creditor marked internal approval dependency as pending.</div>
+              <div class="meta">dependency_changed</div>
+            </div>
+            <div class="activity">
+              <div class="time figure">14:37:06</div>
+              <div class="text">Facilitator sent a procedural clock clarification to all teams.</div>
+              <div class="meta">facilitator_intervention</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-participants">
+        <div class="view-head">
+          <div>
+            <div class="micro">Participant management</div>
+            <h1>Logins, roles and workflow position</h1>
+            <p>Track connectivity and where participants are in the simulation. Login time, navigation and speed are
+              operational traces only; they are not evidence of understanding or competence.</p>
+          </div>
+          <div class="head-actions"><button class="btn">Export roster</button><button class="btn">Send reconnection
+              notice</button></div>
+        </div>
+        <div class="grid cols-4">
+          <div class="card metric">
+            <div class="label">Online</div>
+            <div class="value figure">11</div>
+            <div class="detail">Active websocket connection</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Away</div>
+            <div class="value figure">1</div>
+            <div class="detail">No client action in 5 min</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Reconnecting</div>
+            <div class="value figure">1</div>
+            <div class="detail">Accepted actions preserved</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Role readiness complete</div>
+            <div class="value figure">13</div>
+            <div class="detail">All participants acknowledged mandate</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <h2>Participant roster</h2><span class="micro">Demo fixture data</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Participant</th>
+                  <th>Institution / role</th>
+                  <th>Connection</th>
+                  <th>Current workspace</th>
+                  <th>Workflow position</th>
+                  <th>Last event</th>
+                </tr>
+              </thead>
+              <tbody id="participantRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-communications">
+        <div class="view-head">
+          <div>
+            <div class="micro">Communications</div>
+            <h1>Institutional messaging desk</h1>
+            <p>Observe authorized communications and send facilitator-authored messages as an institutional counterpart.
+              Every intervention is timestamped and marked in replay.</p>
+          </div>
+          <div class="head-actions"><button class="btn" id="markAllRead">Mark all read</button></div>
+        </div>
+        <div class="split">
+          <aside class="channel-list" id="channelList"></aside>
+          <div class="comms-pane">
+            <div class="comms-head">
+              <div>
+                <h3 id="channelTitle">OCC Secretariat</h3>
+                <div class="sub" id="channelSub">Official Creditor Committee coordination channel</div>
+              </div>
+              <span class="state online"><span class="dot"></span>Available</span>
+            </div>
+            <div class="message-list" id="messageList"></div>
+            <div class="composer">
+              <div class="composer-grid">
+                <div class="field"><label for="sendAs">Send as</label><select id="sendAs"></select></div>
+                <div class="field"><label for="sendTo">Audience</label><select id="sendTo"></select></div>
+                <div class="field"><label for="messageType">Message type</label><select id="messageType">
+                    <option>Request for clarification</option>
+                    <option>Process update</option>
+                    <option>Position / condition</option>
+                    <option>Deadline notice</option>
+                    <option>Procedural clarification</option>
+                  </select></div>
+              </div>
+              <div class="field"><label for="messageBody">Message</label><textarea id="messageBody"
+                  placeholder="Write the institutional communication…"></textarea></div>
+              <div class="composer-actions">
+                <div class="audit-note">Participant-facing sender can be an institution; the facilitator console retains
+                  an explicit <strong>facilitator-authored</strong> marker and replay event.</div>
+                <button class="btn primary" id="sendMessage">Send message</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-injects">
+        <div class="view-head">
+          <div>
+            <div class="micro">Scenario interventions</div>
+            <h1>Injects and live updates</h1>
+            <p>Release authored events, institutional requests and clock-linked updates. Use interventions to execute
+              the scenario—not to improvise around a mechanic that failed design or validity review.</p>
+          </div>
+        </div>
+        <div class="inject-layout">
+          <div>
+            <div class="section-head">
+              <h2>Preset injects</h2><span class="micro">Editable before release</span>
+            </div>
+            <div class="inject-presets" id="presetList"></div>
+          </div>
+          <div class="card solid">
+            <div class="section-head">
+              <h2>Inject composer</h2><span class="micro">Audit required</span>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label for="injectSender">Institution</label><select id="injectSender"></select></div>
+              <div class="field"><label for="injectAudience">Target</label><select id="injectAudience">
+                  <option>Kuvera Finance Ministry</option>
+                  <option>All creditor teams</option>
+                  <option>All participants</option>
+                  <option>OCC Secretariat</option>
+                </select></div>
+              <div class="field"><label for="injectTiming">Release</label><select id="injectTiming">
+                  <option>Now</option>
+                  <option>In 2 minutes</option>
+                  <option>At next milestone</option>
+                </select></div>
+              <div class="field"><label for="injectSeverity">Presentation</label><select id="injectSeverity">
+                  <option>Information</option>
+                  <option>Attention</option>
+                  <option>Blocking dependency</option>
+                </select></div>
+              <div class="field span-2"><label for="injectTitle">Title</label><input id="injectTitle"
+                  value="Clarification requested on collateral treatment perimeter"></div>
+              <div class="field span-2"><label for="injectBody">Body</label><textarea
+                  id="injectBody">Please clarify whether both policy-bank facilities draw on the same revenue account and how the arrangement is treated in the current CoT analysis.</textarea>
+              </div>
+              <div class="field span-2"><label for="injectReason">Facilitator reason / scenario trigger</label><input
+                  id="injectReason" value="Authored OCC clarification inject · DP2/DP3 pressure"></div>
+            </div>
+            <div class="inject-preview" id="injectPreview"><strong>Participant-facing preview.</strong><br>Please
+              clarify whether both policy-bank facilities draw on the same revenue account and how the arrangement is
+              treated in the current CoT analysis.</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn primary"
+                id="releaseInject">Release inject</button></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <h2>Released / scheduled interventions</h2><span class="micro">Replay markers</span>
+          </div>
+          <div class="activity-list" id="injectLog"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-analytics">
+        <div class="view-head">
+          <div>
+            <div class="micro">Platform analytics</div>
+            <h1>Operational and process telemetry</h1>
+            <p>Session analytics are separated into operational health and descriptive process activity. The console
+              does not convert clicks, message volume, login time, speed or favorable outcomes into competence scores.
+            </p>
+          </div>
+          <div class="head-actions"><button class="btn">Export operational log</button><button class="btn">Export
+              approved process data</button></div>
+        </div>
+        <div class="grid cols-4">
+          <div class="card metric">
+            <div class="label">Event throughput</div>
+            <div class="value figure">18.4/min</div>
+            <div class="detail">Accepted engine events</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Median action validation</div>
+            <div class="value figure">84 ms</div>
+            <div class="detail">p95 173 ms</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Client reconnects</div>
+            <div class="value figure">3</div>
+            <div class="detail">0 accepted actions lost</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Clock drift</div>
+            <div class="value figure">12 ms</div>
+            <div class="detail">Server authoritative</div>
+          </div>
+        </div>
+        <div class="section grid cols-2">
+          <div class="card">
+            <div class="section-head">
+              <h2>Process activity by institution</h2><span class="micro">Counts only</span>
+            </div>
+            <div class="barlist">
+              <div class="barrow">
+                <div class="name">Kuvera Finance Ministry</div>
+                <div class="bar"><span style="width:78%"></span></div>
+                <div class="figure">31</div>
+              </div>
+              <div class="barrow">
+                <div class="name">OCC Secretariat</div>
+                <div class="bar"><span style="width:55%"></span></div>
+                <div class="figure">22</div>
+              </div>
+              <div class="barrow">
+                <div class="name">China creditor</div>
+                <div class="bar"><span style="width:43%"></span></div>
+                <div class="figure">17</div>
+              </div>
+              <div class="barrow">
+                <div class="name">Paris Club</div>
+                <div class="bar"><span style="width:38%"></span></div>
+                <div class="figure">15</div>
+              </div>
+              <div class="barrow">
+                <div class="name">Private committee</div>
+                <div class="bar"><span style="width:35%"></span></div>
+                <div class="figure">14</div>
+              </div>
+              <div class="barrow">
+                <div class="name">IMF Technical Staff</div>
+                <div class="bar"><span style="width:30%"></span></div>
+                <div class="figure">12</div>
+              </div>
+            </div>
+            <div class="analytics-note">These counts describe event activity. They should not be interpreted as
+              participation quality, engagement, expertise or institutional performance.</div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <h2>High-value process traces</h2><span class="micro">Evidence candidates</span>
+            </div>
+            <div class="activity-list">
+              <div class="activity">
+                <div class="time figure">9</div>
+                <div class="text">Information requests initiated</div>
+                <div class="meta">7 fulfilled</div>
+              </div>
+              <div class="activity">
+                <div class="time figure">4</div>
+                <div class="text">Verification actions recorded</div>
+                <div class="meta">2 revised state</div>
+              </div>
+              <div class="activity">
+                <div class="time figure">3</div>
+                <div class="text">Proposal revisions</div>
+                <div class="meta">v1 → v3</div>
+              </div>
+              <div class="activity">
+                <div class="time figure">2</div>
+                <div class="text">Authority requests</div>
+                <div class="meta">1 pending</div>
+              </div>
+              <div class="activity">
+                <div class="time figure">1</div>
+                <div class="text">Formal dissent records</div>
+                <div class="meta">retained</div>
+              </div>
+            </div>
+            <div class="analytics-note">Assessment requires converging evidence bundles and contextual review. A single
+              trace does not establish cognition or competence.</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <h2>Service health</h2><span class="micro">Last 5 min</span>
+          </div>
+          <div class="table-wrap">
+            <table style="min-width:700px">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Status</th>
+                  <th>Latency</th>
+                  <th>Errors</th>
+                  <th>Last checkpoint</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Decision engine</strong></td>
+                  <td><span class="state online"><span class="dot"></span>Healthy</span></td>
+                  <td>84 ms</td>
+                  <td>0</td>
+                  <td>14:41:00</td>
+                </tr>
+                <tr>
+                  <td><strong>Session gateway</strong></td>
+                  <td><span class="state online"><span class="dot"></span>Healthy</span></td>
+                  <td>46 ms</td>
+                  <td>0</td>
+                  <td>14:41:00</td>
+                </tr>
+                <tr>
+                  <td><strong>Communication service</strong></td>
+                  <td><span class="state online"><span class="dot"></span>Healthy</span></td>
+                  <td>71 ms</td>
+                  <td>0</td>
+                  <td>14:40:59</td>
+                </tr>
+                <tr>
+                  <td><strong>Participant P-11 connection</strong></td>
+                  <td><span class="state away"><span class="dot"></span>Reconnecting</span></td>
+                  <td>—</td>
+                  <td>1 transient</td>
+                  <td>14:40:54</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-replay">
+        <div class="view-head">
+          <div>
+            <div class="micro">Replay and debrief</div>
+            <h1>Intervention and event record</h1>
+            <p>Reconstruct authorized state, role-visible information, communications, facilitator interventions and
+              implementation states at selected decision points.</p>
+          </div>
+          <div class="head-actions"><button class="btn" id="checkpointBtn">Create checkpoint</button><button
+              class="btn danger" id="debriefFromReplay">Initiate debrief</button></div>
+        </div>
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="section-head">
+              <h2>Decision points</h2><span class="micro">Current run</span>
+            </div>
+            <div class="timeline">
+              <div class="tl">
+                <div class="time">T+04</div>
+                <div class="line"></div>
+                <div class="content">
+                  <div class="title">DP1 · Verify usable liquidity</div>
+                  <div class="desc">Kuvera requested account verification. Result pending.</div>
+                </div>
+              </div>
+              <div class="tl">
+                <div class="time">T+12</div>
+                <div class="line"></div>
+                <div class="content">
+                  <div class="title">DP2 · Define treatment perimeter</div>
+                  <div class="desc">OCC workspace opened; shared-pool linkage unresolved.</div>
+                </div>
+              </div>
+              <div class="tl">
+                <div class="time">T+19</div>
+                <div class="line"></div>
+                <div class="content">
+                  <div class="title">DP3 · Disclose sensitive information</div>
+                  <div class="desc">Not yet reached.</div>
+                </div>
+              </div>
+              <div class="tl">
+                <div class="time">—</div>
+                <div class="line"></div>
+                <div class="content">
+                  <div class="title">DP5 · Issue or reject assurance</div>
+                  <div class="desc">Locked until current dependencies resolve.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-head">
+              <h2>Facilitator intervention log</h2><span class="micro">Auditable</span>
+            </div>
+            <div class="activity-list" id="facilitatorLog">
+              <div class="activity">
+                <div class="time figure">14:37:06</div>
+                <div class="text">Procedural clarification: master clock continues during information requests.</div>
+                <div class="meta">All teams</div>
+              </div>
+              <div class="activity">
+                <div class="time figure">14:29:42</div>
+                <div class="text">Session clock paused for facilitator audio failure; resumed after 01:12.</div>
+                <div class="meta">Operational</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section card">
+          <div class="section-head">
+            <h2>Debrief controls</h2><span class="micro">Ground-truth permissions apply</span>
+          </div>
+          <p style="color:var(--text-2);font-size:.82rem;margin:0 0 16px">Debrief should present process evidence,
+            implementation evidence, outcome evidence and interpretive claims separately. Ground-truth reveals remain
+            permission-bound.</p>
+          <div class="control-strip">
+            <button class="btn">Open canonical vs perceived state</button>
+            <button class="btn">Open decision trace</button>
+            <button class="btn">Open implementation chain</button>
+            <button class="btn">Prepare counterfactual</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-scrim" id="modalScrim">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h3 id="modalTitle">Facilitator action</h3>
+      <p id="modalText"></p>
+      <div id="modalFields"></div>
+      <div class="modal-actions"><button class="btn" id="modalCancel">Cancel</button><button class="btn primary"
+          id="modalConfirm">Confirm</button></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+      var currentView = "overview", paused = false, clockSeconds = 38 * 60 + 24, timer = null, interventionCount = 2;
+      var participantData = [
+        ["P-01", "Kuvera Finance Ministry · Lead", "online", "Escrow account", "DP1 · verification", "14:41:28"],
+        ["P-02", "Kuvera Finance Ministry · DMO", "online", "Communications", "DP1 · verification", "14:41:22"],
+        ["P-03", "Kuvera Finance Ministry · Legal", "online", "Case file", "DP3 prep · disclosure", "14:40:48"],
+        ["P-04", "OCC Secretariat · Chair", "online", "CoT workspace", "DP2 · perimeter", "14:40:51"],
+        ["P-05", "OCC Secretariat · Secretariat", "online", "Communications", "DP2 · perimeter", "14:40:33"],
+        ["P-06", "IMF Technical Staff · DSA", "online", "Case file", "Monitoring", "14:39:44"],
+        ["P-07", "IMF Technical Staff · Program", "away", "Communications", "Monitoring", "14:35:10"],
+        ["P-08", "China policy-bank creditor · Lead", "online", "Authority", "Internal approval", "14:39:17"],
+        ["P-09", "China policy-bank creditor · Legal", "online", "Contracts", "Internal approval", "14:38:52"],
+        ["P-10", "Paris Club delegation · Lead", "online", "CoT workspace", "Treatment analysis", "14:39:04"],
+        ["P-11", "Paris Club delegation · Analyst", "issue", "Reconnecting", "Treatment analysis", "14:38:31"],
+        ["P-12", "Private Creditor Committee · Lead", "online", "Communications", "Position forming", "14:39:42"],
+        ["P-13", "Private Creditor Committee · Counsel", "online", "Evidence", "Position forming", "14:39:25"]
+      ];
+      var channels = [
+        { id: "team", group: "Internal rooms", initials: "KF", name: "Kuvera Finance Ministry Team", sub: "3 participants · internal", unread: 1 },
+        { id: "occ", group: "Institutional channels", initials: "OC", name: "OCC Secretariat", sub: "Official Creditor Committee", unread: 2 },
+        { id: "imf", group: "Institutional channels", initials: "IM", name: "IMF Technical Staff", sub: "DSA and program parameters", unread: 1 },
+        { id: "china", group: "Institutional channels", initials: "CN", name: "China policy-bank creditor", sub: "Non-Paris bilateral creditor", unread: 1 },
+        { id: "paris", group: "Institutional channels", initials: "PC", name: "Paris Club delegation", sub: "Official bilateral creditor", unread: 0 },
+        { id: "private", group: "Institutional channels", initials: "PR", name: "Private Creditor Committee", sub: "Bondholder coordination", unread: 1 }
+      ];
+      var messages = {
+        team: [
+          { who: "Kuvera DMO", body: "We have requested account-control confirmation from Treasury. Facility B linkage is still not mapped.", time: "14:39", out: false },
+          { who: "Kuvera Legal", body: "Confidentiality wording appears broad. I recommend we separate what can be summarized from what would require consent.", time: "14:40", out: false }
+        ],
+        occ: [
+          { who: "OCC Secretariat", body: "Please provide the current basis for usable liquidity and identify any restrictions that may affect the treatment perimeter.", time: "14:36", out: false },
+          { who: "Kuvera Finance Ministry", body: "Verification is in progress. We will distinguish reported from usable liquidity in the next package revision.", time: "14:38", out: true }
+        ],
+        imf: [
+          { who: "IMF Technical Staff", body: "For the financing-assurances assessment, please keep the distinction between indicative positions and commitments explicit in the package.", time: "14:34", out: false }
+        ],
+        china: [
+          { who: "China policy-bank creditor", body: "Any treatment proposal remains subject to internal approval and preservation of the account-control arrangement or equivalent compensation.", time: "14:35", out: false }
+        ],
+        paris: [
+          { who: "Paris Club delegation", body: "Our delegation is preparing a treatment comparison. We will need the same CoT dimensions applied across creditor classes.", time: "14:33", out: false }
+        ],
+        private: [
+          { who: "Private Creditor Committee", body: "Please clarify whether the official-sector perimeter assumptions affect the treatment requested from bondholders.", time: "14:37", out: false }
+        ]
+      };
+      var personas = ["OCC Secretariat", "IMF Technical Staff", "China policy-bank creditor / non-Paris bilateral creditor", "Paris Club delegation", "Private Creditor Committee", "Facilitator · procedural"];
+      var presets = [
+        { sender: "OCC Secretariat", title: "Clarify collateral treatment perimeter", body: "Please clarify whether both policy-bank facilities draw on the same revenue account and how the arrangement is treated in the current CoT analysis.", target: "Kuvera Finance Ministry" },
+        { sender: "IMF Technical Staff", title: "Financing-assurances timing update", body: "The program timetable now requires a consolidated financing-assurances package before the next technical checkpoint. Please distinguish stated intent from recorded commitment.", target: "All participants" },
+        { sender: "China policy-bank creditor / non-Paris bilateral creditor", title: "Internal approval dependency", body: "Our position remains subject to internal authorization and preservation of the account-control arrangement or equivalent compensation.", target: "OCC Secretariat" },
+        { sender: "Paris Club delegation", title: "Comparability information request", body: "Please provide the current comparison across nominal debt service, NPV debt-stock change and duration for each creditor class.", target: "OCC Secretariat" },
+        { sender: "Private Creditor Committee", title: "Private-sector perimeter clarification", body: "Please clarify the requested treatment perimeter and the assumptions being used to assess comparability with official creditors.", target: "Kuvera Finance Ministry" }
+      ];
+
+      function q(s) { return document.querySelector(s) }
+      function qa(s) { return Array.prototype.slice.call(document.querySelectorAll(s)) }
+      function stamp() { var d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0") }
+      function showView(v) { currentView = v; qa(".view").forEach(function (x) { x.classList.remove("active") }); q("#view-" + v).classList.add("active"); qa(".nav button[data-view]").forEach(function (b) { b.setAttribute("aria-current", b.getAttribute("data-view") === v ? "true" : "false") }); window.scrollTo({ top: 0, behavior: "auto" }) }
+      qa(".nav button[data-view]").forEach(function (b) { b.addEventListener("click", function () { showView(b.getAttribute("data-view")) }) });
+      qa("[data-jump]").forEach(function (b) { b.addEventListener("click", function () { showView(b.getAttribute("data-jump")) }) });
+
+      function renderParticipants() {
+        var t = q("#participantRows"); t.innerHTML = "";
+        participantData.forEach(function (p) {
+          var cls = p[2] === "online" ? "online" : p[2] === "away" ? "away" : p[2] === "issue" ? "issue" : "offline";
+          var label = p[2] === "issue" ? "reconnecting" : p[2];
+          var tr = document.createElement("tr");
+          tr.innerHTML = "<td><strong>" + p[0] + "</strong></td><td>" + p[1] + "</td><td><span class='state " + cls + "'><span class='dot'></span>" + label + "</span></td><td>" + p[3] + "</td><td>" + p[4] + "</td><td class='figure'>" + p[5] + "</td>";
+          t.appendChild(tr);
+        });
+      }
+      function renderChannels() {
+        var host = q("#channelList"); host.innerHTML = "";
+        var groups = [];
+        channels.forEach(function (c) { if (groups.indexOf(c.group) < 0) groups.push(c.group) });
+        groups.forEach(function (g) {
+          var wrap = document.createElement("div"); wrap.className = "channel-group";
+          wrap.innerHTML = "<span class='micro'>" + g + "</span>";
+          channels.filter(function (c) { return c.group === g }).forEach(function (c) {
+            var b = document.createElement("button"); b.className = "channel" + (c.id === "occ" ? " active" : ""); b.setAttribute("data-channel", c.id);
+            b.innerHTML = "<span class='avatar'>" + c.initials + "</span><span><span class='nm'>" + c.name + "</span><span class='sub'>" + c.sub + "</span></span><span class='unread'>" + (c.unread ? c.unread : "") + "</span>";
+            b.addEventListener("click", function () { selectChannel(c.id) });
+            wrap.appendChild(b);
+          });
+          host.appendChild(wrap);
+        });
+        updateUnread();
+      }
+      function selectChannel(id) {
+        qa(".channel").forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-channel") === id) });
+        var c = channels.find(function (x) { return x.id === id }); if (!c) return;
+        c.unread = 0; q("#channelTitle").textContent = c.name; q("#channelSub").textContent = c.sub; renderMessages(id); updateUnread();
+      }
+      function renderMessages(id) {
+        var host = q("#messageList"); host.innerHTML = "";
+        (messages[id] || []).forEach(function (m) {
+          var d = document.createElement("div"); d.className = "message" + (m.out ? " out" : "");
+          d.innerHTML = "<div class='who'>" + m.who + "</div><div class='body'>" + m.body + "</div><div class='stamp'>" + m.time + (m.audit ? " · facilitator-authored" : "") + "</div>";
+          host.appendChild(d);
+        });
+        host.scrollTop = host.scrollHeight;
+      }
+      function updateUnread() {
+        var n = channels.reduce(function (a, c) { return a + c.unread }, 0); q("#unreadCount").textContent = String(n);
+        qa(".channel").forEach(function (b) { var c = channels.find(function (x) { return x.id === b.getAttribute("data-channel") }); var u = b.querySelector(".unread"); if (u && c) u.textContent = c.unread ? c.unread : "" });
+      }
+      function fillPersonas() {
+        ["#sendAs", "#injectSender"].forEach(function (sel) { var s = q(sel); s.innerHTML = ""; personas.forEach(function (p) { var o = document.createElement("option"); o.textContent = p; s.appendChild(o) }) });
+        var to = q("#sendTo"); to.innerHTML = ""; channels.forEach(function (c) { var o = document.createElement("option"); o.value = c.id; o.textContent = c.name; to.appendChild(o) });
+      }
+      function addAudit(text, target) {
+        interventionCount++; q("#interventionMetric").textContent = String(interventionCount);
+        var a = document.createElement("div"); a.className = "activity"; a.innerHTML = "<div class='time figure'>" + stamp() + "</div><div class='text'>" + text + "</div><div class='meta'>" + target + "</div>";
+        q("#facilitatorLog").insertBefore(a, q("#facilitatorLog").firstChild);
+      }
+      q("#sendMessage").addEventListener("click", function () {
+        var body = q("#messageBody").value.trim(); if (!body) { q("#messageBody").focus(); return }
+        var id = q("#sendTo").value, as = q("#sendAs").value;
+        if (!messages[id]) messages[id] = [];
+        messages[id].push({ who: as, body: body, time: stamp().slice(0, 5), out: true, audit: true });
+        q("#messageBody").value = ""; selectChannel(id); addAudit("Message sent as " + as + ": " + body, id);
+      });
+      q("#markAllRead").addEventListener("click", function () { channels.forEach(function (c) { c.unread = 0 }); renderChannels(); selectChannel("occ") });
+
+      function renderPresets() {
+        var host = q("#presetList"); host.innerHTML = "";
+        presets.forEach(function (p) {
+          var b = document.createElement("button"); b.className = "preset"; b.innerHTML = "<div class='title'>" + p.title + "</div><div class='desc'>" + p.sender + " → " + p.target + "</div>";
+          b.addEventListener("click", function () {
+            q("#injectSender").value = p.sender; q("#injectAudience").value = p.target; q("#injectTitle").value = p.title; q("#injectBody").value = p.body; q("#injectReason").value = "Authored scenario inject"; updateInjectPreview();
+          }); host.appendChild(b);
+        });
+      }
+      function updateInjectPreview() { q("#injectPreview").innerHTML = "<strong>Participant-facing preview.</strong><br>" + q("#injectBody").value }
+      q("#injectBody").addEventListener("input", updateInjectPreview);
+      q("#releaseInject").addEventListener("click", function () {
+        var sender = q("#injectSender").value, title = q("#injectTitle").value.trim(), body = q("#injectBody").value.trim(), target = q("#injectAudience").value, reason = q("#injectReason").value.trim(), timing = q("#injectTiming").value;
+        if (!title || !body || !reason) { return }
+        var a = document.createElement("div"); a.className = "activity";
+        a.innerHTML = "<div class='time figure'>" + stamp() + "</div><div class='text'><strong>" + title + "</strong><br>" + body + "</div><div class='meta'>" + sender + " · " + timing + "</div>";
+        q("#injectLog").insertBefore(a, q("#injectLog").firstChild);
+        addAudit("Inject released/scheduled: " + title, target);
+        if (timing === "Now") {
+          var channelId = target.indexOf("Kuvera") >= 0 ? "team" : target.indexOf("OCC") >= 0 ? "occ" : "occ";
+          messages[channelId].push({ who: sender, body: body, time: stamp().slice(0, 5), out: false, audit: true });
+          var c = channels.find(function (x) { return x.id === channelId }); if (c) c.unread++;
+          updateUnread();
+        }
+      });
+      function initialInjectLog() {
+        var host = q("#injectLog");
+        host.innerHTML = "<div class='activity'><div class='time figure'>14:37:06</div><div class='text'><strong>Clock procedure clarification</strong><br>Master clock continues while information requests are pending.</div><div class='meta'>Facilitator · released</div></div>" +
+          "<div class='activity'><div class='time figure'>14:31:10</div><div class='text'><strong>OCC opening request</strong><br>Please prepare initial treatment parameters using the current restructuring envelope.</div><div class='meta'>OCC Secretariat · released</div></div>";
+      }
+      function tick() { if (paused) return; clockSeconds = Math.max(0, clockSeconds - 1); var m = Math.floor(clockSeconds / 60), s = clockSeconds % 60; q("#clockValue").textContent = String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") }
+      timer = setInterval(tick, 1000);
+      q("#pauseClock").addEventListener("click", function () { paused = !paused; this.textContent = paused ? "Resume clock" : "Pause clock"; q("#sessionState").textContent = paused ? "Session paused" : "Session live"; addAudit(paused ? "Clock paused" : "Clock resumed", "All participants") });
+      q("#addTime").addEventListener("click", function () { clockSeconds += 300; addAudit("5 minutes added to the session clock", "All participants") });
+
+      var modalAction = null;
+      function openModal(title, text, fields, confirm, action) {
+        q("#modalTitle").textContent = title; q("#modalText").textContent = text; q("#modalFields").innerHTML = fields || ""; q("#modalConfirm").textContent = confirm || "Confirm"; modalAction = action; q("#modalScrim").classList.add("open");
+      }
+      function closeModal() { q("#modalScrim").classList.remove("open"); modalAction = null }
+      q("#modalCancel").addEventListener("click", closeModal); q("#modalScrim").addEventListener("click", function (e) { if (e.target === this) closeModal() });
+      q("#modalConfirm").addEventListener("click", function () { if (modalAction) modalAction(); closeModal() });
+      q("#openClarification").addEventListener("click", function () {
+        openModal("Issue procedural clarification", "During play, facilitator clarification should address mechanics or procedure rather than scenario substance.",
+          "<div class='field'><label>Audience</label><select id='clarAudience'><option>All participants</option><option>Kuvera Finance Ministry</option><option>Creditor teams</option></select></div><div class='field' style='margin-top:10px'><label>Clarification</label><textarea id='clarText'>The master clock continues while verification and information requests are pending.</textarea></div>",
+          "Send clarification", function () { var text = q("#clarText").value.trim(); var aud = q("#clarAudience").value; addAudit("Procedural clarification: " + text, aud) });
+      });
+      function debriefModal() {
+        openModal("Initiate debrief", "This will pause consequential play and move the session into replay/reflection. Ground-truth reveals remain permission-bound.",
+          "<div class='field'><label>Reason</label><input id='debriefReason' value='End of live decision episode'></div>",
+          "Initiate debrief", function () { paused = true; q("#pauseClock").textContent = "Resume clock"; q("#sessionState").textContent = "Debrief"; addAudit("Debrief initiated", "All participants"); showView("replay") });
+      }
+      q("#openDebrief").addEventListener("click", debriefModal); q("#debriefFromReplay").addEventListener("click", debriefModal);
+      q("#checkpointBtn").addEventListener("click", function () { addAudit("Manual session checkpoint created", "System") });
+      q("#participantPreview").addEventListener("click", function () { window.open("interface_guided_v12.html", "_blank") });
+
+      renderParticipants(); renderChannels(); selectChannel("occ"); fillPersonas(); renderPresets(); initialInjectLog(); updateInjectPreview();
+    
+        var themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', function(e) {
+                var current = document.documentElement.getAttribute('data-theme');
+                if (current === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('sovereign-theme', 'light');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('sovereign-theme', 'dark');
+                }
+            });
+        }
+        })();
+  </script>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('userMenuBtn');
+      var menu = document.getElementById('userMenuDropdown');
+      if(btn && menu) {
+        btn.addEventListener('click', function(e) {
+          menu.classList.toggle('open');
+          e.stopPropagation();
+        });
+        document.addEventListener('click', function(e) {
+          if (!e.target.closest('.user-menu-container')) {
+            menu.classList.remove('open');
+          }
+        });
+      }
+    
+        var themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', function(e) {
+                var current = document.documentElement.getAttribute('data-theme');
+                if (current === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('sovereign-theme', 'light');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('sovereign-theme', 'dark');
+                }
+            });
+        }
+        })();
+  </script>
+</body>
+
+</html>

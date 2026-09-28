@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <title>Sovereign</title>
+    <link rel="preload" as="image" href="assets/AidData Logo full_color.png">
+    <link rel="preload" as="image" href="assets/AidData Logo.png">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            /* --- Semantic Color System — Light (default) --- */
+            --bg-color: #f5f4f0;
+            --surface-color: #eceae4;
+            --surface-raised: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-muted: #8a8a8a;
+            --accent: #5a7a80;
+            --grid-line: rgba(0, 0, 0, 0.06);
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-interactive: rgba(0, 0, 0, 0.18);
+            --state-error: #c45c4a;
+            --state-disabled: #cccccc;
+
+            /* --- Canvas --- */
+            --canvas-bg: #f5f4f0;
+            --canvas-stroke: 90, 122, 128;
+
+            /* --- Blend mode --- */
+            --blend-mode: multiply;
+
+            /* --- Type Scale (ST-08) --- */
+            --text-caption: 0.65rem;
+            --text-caption-modal: 0.9rem;
+            --text-body-sm: 0.75rem;
+            --text-body: 0.85rem;
+            --text-heading-sm: 0.75rem;
+            --text-display: clamp(2rem, 6vw, 6rem);
+
+            /* --- Motion System (ST-29) --- */
+            --motion-fast: 120ms;
+            --motion-standard: 300ms;
+            --motion-deliberate: 500ms;
+            --motion-cinematic: 1400ms;
+
+            --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+            --ease-in-out-circ: cubic-bezier(0.785, 0.135, 0.15, 0.86);
+            --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);
+
+            /* --- Radius Scale (ST-16) --- */
+            --radius-none: 0;
+        }
+
+        /* --- Dark Theme --- */
+        [data-theme="dark"] {
+            --bg-color: #030303;
+            --surface-color: #0a0a0a;
+            --surface-raised: #111111;
+            --text-primary: #f0f0f0;
+            --text-muted: #7a7a7a;
+            --accent: #90a4a8;
+            --grid-line: rgba(255, 255, 255, 0.04);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-interactive: rgba(255, 255, 255, 0.15);
+            --state-error: #c45c4a;
+            --state-disabled: #333333;
+            --canvas-bg: #030303;
+            --canvas-stroke: 144, 164, 168;
+            --blend-mode: screen;
+        }
+
+        @view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: 420ms var(--ease-fluid) both route-out;
+        }
+
+        ::view-transition-new(root) {
+            animation: 620ms var(--ease-out-expo) both route-in;
+        }
+
+        @keyframes route-out {
+            to {
+                opacity: 0;
+                transform: scale(1.01);
+            }
+        }
+
+        @keyframes route-in {
+            from {
+                opacity: 0;
+                transform: scale(0.995);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::selection {
+            background: #004E38;
+            color: #fff;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            font-size: 125%;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- Page Transition Overlay --- */
+        .page-transition-shield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 1;
+            will-change: opacity;
+            transition: opacity 700ms var(--ease-fluid);
+        }
+
+        body.is-exiting .page-transition-shield {
+            opacity: 1;
+            transform: translateY(0);
+            background-color: var(--bg-color);
+        }
+
+        body.is-exiting #canvas-container {
+            transform: scale(1.015);
+        }
+
+        /* --- Canvas & Background Layers --- */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            opacity: 0;
+            transform: scale(1.05);
+            transition: opacity 3s ease, transform 4s var(--ease-out-expo);
+        }
+
+        body.is-loaded #canvas-container {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .grain {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0.06;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* ST-19: Removed .ambient-glow decorative radial orb.
+           The topography canvas provides sufficient visual atmosphere. */
+
+        /* --- Architectural HUD --- */
+        .hud-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+            border: 1px solid var(--grid-line);
+        }
+
+        .hud-grid::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: var(--grid-line);
+        }
+
+        .hud-grid::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 1px;
+            height: 100%;
+            background: var(--grid-line);
+        }
+
+        .hud-label {
+            position: absolute;
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-caption);
+            color: var(--text-muted);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            z-index: 60;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        body.is-loaded .hud-label {
+            opacity: 1;
+            transition-delay: 0.15s;
+        }
+
+        .hud-top-left {
+            top: 2.5rem;
+            left: 2.5rem;
+        }
+
+        .hud-top-right {
+            top: 2.5rem;
+            right: 2.5rem;
+            text-align: right;
+        }
+
+        .hud-logo {
+            width: 175px;
+            height: auto;
+            opacity: 0.85;
+        }
+
+        .content-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .content-layer h1,
+        .content-layer .slide-label {
+            pointer-events: none;
+            mix-blend-mode: var(--blend-mode);
+        }
+
+        h1 {
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-display);
+            font-weight: 400;
+            line-height: 0.9;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            text-align: center;
+            width: 100%;
+            overflow-wrap: anywhere;
+
+            transform: translateY(30px);
+            opacity: 0;
+            filter: blur(12px);
+            transition: transform var(--motion-cinematic) var(--ease-out-expo), opacity var(--motion-cinematic) ease, filter var(--motion-cinematic) ease;
+        }
+
+        .slide-label {
+            display: block;
+            margin-top: 1.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-body-sm);
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            text-align: center;
+
+            transform: translateY(20px);
+            opacity: 0;
+            filter: blur(8px);
+            transition: transform var(--motion-cinematic) var(--ease-out-expo), opacity var(--motion-cinematic) ease, filter var(--motion-cinematic) ease;
+        }
+
+        body.is-loaded .slide-label {
+            transform: translateY(0);
+            opacity: 1;
+            filter: blur(0);
+            transition-delay: 0.28s;
+        }
+
+        body.is-exiting .slide-label {
+            transform: translateY(-40px);
+            opacity: 0;
+            filter: blur(10px);
+            transition: transform 650ms var(--ease-fluid), opacity 500ms ease, filter 500ms ease;
+        }
+
+        /* --- Buttons --- */
+        .action-group {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            margin-top: 3.5rem;
+            pointer-events: auto;
+
+            transform: translateY(20px);
+            opacity: 0;
+            filter: blur(8px);
+            transition: transform var(--motion-cinematic) var(--ease-out-expo), opacity var(--motion-cinematic) ease, filter var(--motion-cinematic) ease;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--border-interactive);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-body-sm);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            padding: 1.2rem 3rem;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            touch-action: manipulation;
+            border-radius: var(--radius-none);
+            /* ST-27: Hover communicates "clickable" via fill reveal */
+            transition: color var(--motion-deliberate) var(--ease-out-expo), border-color var(--motion-deliberate) var(--ease-out-expo), transform var(--motion-standard) ease;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #004E38;
+            transform: scaleY(0);
+            transform-origin: bottom;
+            transition: transform var(--motion-deliberate) var(--ease-out-expo);
+            z-index: -1;
+        }
+
+        .btn:hover {
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .btn:hover::before {
+            transform: scaleY(1);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+            background: #004E38;
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .btn:active::before {
+            background: #004E38;
+        }
+
+        .btn:focus-visible {
+            outline: 1px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        .btn[disabled] {
+            opacity: 0.3;
+            pointer-events: none;
+            border-color: var(--state-disabled);
+            color: var(--state-disabled);
+        }
+
+        /* --- Animation Triggers --- */
+        /* Entrance */
+        body.is-loaded h1 {
+            transform: translateY(0);
+            opacity: 1;
+            filter: blur(0);
+            transition-delay: 0.2s;
+        }
+
+        body.is-loaded .action-group {
+            transform: translateY(0);
+            opacity: 1;
+            filter: blur(0);
+            transition-delay: 0.35s;
+        }
+
+        /* Exit */
+        body.is-exiting h1,
+        body.is-exiting .action-group {
+            transform: translateY(-40px);
+            opacity: 0;
+            filter: blur(10px);
+            transition: transform 650ms var(--ease-fluid), opacity 500ms ease, filter 500ms ease;
+        }
+
+        /* --- Login Overlay --- */
+        /* The login uses the same dimmed topographic atmosphere as About. */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(3, 3, 3, 0.08);
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 650ms var(--ease-fluid), visibility 0s 650ms;
+        }
+
+        .login-overlay.is-active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            backdrop-filter: blur(1px);
+            transition: opacity 650ms var(--ease-fluid), visibility 0s;
+        }
+
+        .login-modal {
+            position: relative;
+            background: transparent;
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            border-left: 0;
+            border-right: 0;
+            padding: 4rem;
+            width: 100%;
+            max-width: 575px;
+            opacity: 0;
+            transform: translateY(24px);
+            transition: transform 750ms var(--ease-out-expo), opacity 500ms ease;
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+        }
+
+        /* Architectural HUD Corners */
+        .login-modal::before,
+        .login-modal::after {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border: 1px solid var(--accent);
+            opacity: 0.5;
+        }
+
+        .login-modal::before {
+            top: -1px;
+            left: -1px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .login-modal::after {
+            bottom: -1px;
+            right: -1px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .login-overlay.is-active .login-modal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ST-22: Labels use plain language instead of fake terminal jargon.
+           Uppercase removed from form labels — it doesn't communicate
+           hierarchy here, only decoration. */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .input-group label {
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-caption-modal);
+            color: var(--text-primary);
+            letter-spacing: 0.1em;
+        }
+
+        .input-group input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--grid-line);
+            color: var(--text-primary);
+            padding: 0.5rem 0;
+            font-family: 'Inter', sans-serif;
+            font-size: var(--text-body);
+            letter-spacing: 0.15em;
+            outline: none;
+            border-radius: var(--radius-none);
+            transition: border-color var(--motion-standard) ease, color var(--motion-standard) ease;
+        }
+
+        .input-group input:focus {
+            border-bottom-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* ST-30: Error state for login */
+        .input-group.has-error input {
+            border-bottom-color: var(--state-error);
+            color: var(--state-error);
+        }
+
+        .input-group .error-message {
+            font-size: var(--text-caption);
+            color: var(--state-error);
+            letter-spacing: 0.05em;
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+            transition: opacity var(--motion-standard) ease, height var(--motion-standard) ease;
+        }
+
+        .input-group.has-error .error-message {
+            opacity: 1;
+            height: 1.2rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+            padding: 1.2rem;
+            font-size: var(--text-caption);
+        }
+
+        .btn-ghost {
+            border-color: transparent;
+            color: var(--text-muted);
+        }
+
+        .btn-ghost:hover {
+            color: var(--text-primary);
+            border-color: transparent;
+        }
+
+        .btn-ghost:hover::before {
+            transform: scaleY(0);
+        }
+
+        /* --- Content Reaction to Login --- */
+        .content-layer {
+            transition: transform 1s var(--ease-fluid), opacity 0.8s ease, filter 0.8s ease;
+        }
+
+        body.login-active .content-layer {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.05) translateY(-20px);
+            filter: blur(10px);
+        }
+
+        body.login-active #canvas-container {
+            opacity: 0.35;
+            transform: scale(1);
+        }
+
+        /* --- Theme Toggle --- */
+        .theme-toggle {
+            position: absolute;
+            top: 2.5rem;
+            right: 2.5rem;
+            z-index: 60;
+            background: transparent;
+            border: 1px solid var(--border-interactive);
+            color: var(--text-muted);
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-none);
+            opacity: 0;
+            transition: opacity 1s ease, color var(--motion-standard) ease, border-color var(--motion-standard) ease, background var(--motion-standard) ease;
+        }
+
+        body.is-loaded .theme-toggle {
+            opacity: 1;
+            transition-delay: 0.15s;
+        }
+
+        .theme-toggle:hover {
+            color: #fff;
+            border-color: #004E38;
+            background: #004E38;
+        }
+
+        .theme-toggle:active {
+            background: #004E38;
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .theme-toggle:focus-visible {
+            outline: 1px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        .theme-toggle .icon-sun,
+        .theme-toggle .icon-moon {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Show sun in dark mode (click to go light), moon in light mode (click to go dark) */
+        .theme-toggle .icon-sun {
+            display: none;
+        }
+
+        .theme-toggle .icon-moon {
+            display: block;
+        }
+
+        [data-theme="dark"] .theme-toggle .icon-sun {
+            display: block;
+        }
+
+        [data-theme="dark"] .theme-toggle .icon-moon {
+            display: none;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 600px) {
+            .login-modal {
+                padding: 2.5rem;
+                margin: 1.5rem;
+            }
+
+            .action-group {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 350px;
+            }
+
+            .hud-top-left {
+                top: 1.5rem;
+                left: 1.5rem;
+            }
+
+            .hud-logo {
+                width: 150px;
+            }
+
+            .theme-toggle {
+                top: 1.5rem;
+                right: 1.5rem;
+            }
+        }
+
+        /* --- Reduced Motion --- */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            .page-transition-shield {
+                transition: none;
+            }
+
+            body.is-loaded h1,
+            body.is-loaded .slide-label,
+            body.is-loaded .action-group {
+                transition: none;
+                opacity: 1;
+                filter: none;
+                transform: none;
+            }
+        }
+
+        /* === UNIVERSAL MODAL ANIMATIONS === */
+        .comm-overlay,
+        .advisor-overlay,
+        .ref-overlay,
+        .learning-overlay {
+            display: flex !important;
+            opacity: 1 !important;
+            visibility: hidden;
+            background-color: transparent !important;
+            backdrop-filter: blur(0px) !important;
+            transition: background-color 300ms var(--ease), backdrop-filter 300ms var(--ease), visibility 600ms !important;
+            pointer-events: none;
+        }
+
+        .comm-overlay.open,
+        .advisor-overlay.open,
+        .ref-overlay.open,
+        .learning-overlay.open,
+        #onboardingModal.open {
+            visibility: visible !important;
+            background-color: rgba(0, 0, 0, .72) !important;
+            backdrop-filter: blur(8px) !important;
+            transition: background-color 300ms var(--ease), backdrop-filter 300ms var(--ease), visibility 0s !important;
+            pointer-events: auto;
+        }
+
+        /* Base panel transition */
+        .comm-panel,
+        .advisor-panel,
+        .ref-panel,
+        .learning-panel {
+            transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1), opacity 450ms var(--ease) !important;
+        }
+
+        /* Top-Right Origin (Case File, Communications) */
+        .ref-overlay:not(.open) .ref-panel,
+        .comm-overlay:not(.open) .comm-panel {
+            transform: translate(calc(50vw - 60px), calc(-50vh + 60px)) scale(0.05) !important;
+            opacity: 0 !important;
+        }
+
+        /* Bottom-Left Origin (AI Advisors List, Learning Bridge, Orientation) */
+        #advisorsListOverlay:not(.open) .ref-panel,
+        #learningBridge:not(.open) .learning-panel,
+        #onboardingModal:not(.open) .learning-panel {
+            transform: translate(calc(-50vw + 60px), calc(50vh - 60px)) scale(0.05) !important;
+            opacity: 0 !important;
+        }
+
+        /* Center Origin (Advisor Chat) */
+        .advisor-overlay:not(.open) .advisor-panel {
+            transform: scale(0.05) !important;
+            opacity: 0 !important;
+        }
+
+        /* Open States */
+        .ref-overlay.open .ref-panel,
+        .comm-overlay.open .comm-panel,
+        .advisor-overlay.open .advisor-panel,
+        .learning-overlay.open .learning-panel,
+        #onboardingModal.open .learning-panel {
+            transform: none !important;
+            opacity: 1 !important;
+        }
+
+
+        /* === ONBOARDING HIGHLIGHTS === */
+        .onboarding-highlight {
+            position: relative !important;
+            z-index: 130 !important;
+            box-shadow: 0 0 0 4px rgba(169, 198, 183, 0.4), 0 0 40px rgba(169, 198, 183, 0.25) !important;
+            border-radius: 4px !important;
+            background-color: var(--surface) !important;
+            transition: all 300ms ease !important;
+        }
+
+        aside.process.onboarding-highlight {
+            background-color: rgba(12, 15, 14, 0.95) !important;
+        }
+
+
+        .lift-stacking {
+            z-index: 130 !important;
+        }
+
+
+        /* === HAMBURGER MENU === */
+        .user-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: rgba(10, 11, 11, 0.98);
+            border: 1px solid var(--edge2);
+            border-radius: 4px;
+            padding: 6px 0;
+            min-width: 170px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(14px);
+            z-index: 200;
+            display: none;
+        }
+
+        .user-menu-dropdown.open {
+            display: block;
+        }
+
+        .menu-item {
+            appearance: none;
+            border: none;
+            background: transparent;
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 10px 18px;
+            font: 12px var(--sans);
+            color: var(--text);
+            cursor: pointer;
+            transition: background 120ms ease;
+        }
+
+        .menu-item:hover {
+            background: var(--surface2);
+        }
+
+        .menu-divider {
+            height: 1px;
+            background: var(--edge);
+            margin: 6px 0;
+        }
+
+        .text-bad {
+            color: var(--bad) !important;
+        }
+
+        /* ==================================================================
+           INTERFACE-ALIGNED CONTROLS
+           Buttons are brought closer to the decision-room interface: tighter
+           padding, a soft radius, a quiet default and a filled primary, so the
+           landing reads as the front door of the same product.
+           ================================================================== */
+        .btn {
+            padding: 0.9rem 2.1rem;
+            font-size: 0.68rem;
+            letter-spacing: 0.14em;
+            border-radius: 8px;
+            border-color: var(--border-subtle);
+            color: var(--text-muted);
+            isolation: isolate;
+        }
+
+        .btn:hover {
+            color: #fff;
+            border-color: #004E38;
+        }
+
+        .btn.primary {
+            border-color: #004E38;
+            color: var(--text-primary);
+        }
+
+        .btn.primary::before {
+            transform: scaleY(1);
+            opacity: 0.12;
+        }
+
+        .btn.primary:hover::before {
+            opacity: 1;
+        }
+
+        .action-group .btn {
+            min-width: 168px;
+        }
+
+        .modal-actions .btn {
+            padding: 0.95rem 1rem;
+            font-size: 0.66rem;
+        }
+
+        /* ==================================================================
+           ABOUT OVERLAY
+           Same modal grammar as the sign-in overlay: a dulled backdrop, a
+           panel that rises into place, and no page navigation.
+           ================================================================== */
+        .about-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(1rem, 4vw, 3rem);
+            background: rgba(3, 3, 3, 0.42);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 500ms var(--ease-fluid), visibility 0s 500ms;
+        }
+
+        .about-overlay.is-active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            backdrop-filter: blur(6px);
+            transition: opacity 500ms var(--ease-fluid), visibility 0s;
+        }
+
+        .about-modal {
+            position: relative;
+            width: 100%;
+            max-width: 980px;
+            height: min(680px, 88vh);
+            display: flex;
+            flex-direction: column;
+            background: var(--surface-raised);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(26px) scale(0.995);
+            transition: transform 700ms var(--ease-out-expo), opacity 420ms ease;
+        }
+
+        .about-overlay.is-active .about-modal {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .about-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1.5rem;
+            padding: 1.6rem 1.9rem 1.3rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .about-kicker {
+            display: block;
+            font-size: 0.58rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .about-head h2 {
+            margin-top: 0.55rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.12rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+        }
+
+        .about-close {
+            flex: none;
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: 999px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color var(--motion-standard) ease, border-color var(--motion-standard) ease;
+        }
+
+        .about-close:hover {
+            color: var(--text-primary);
+            border-color: var(--border-interactive);
+        }
+
+        .about-viewport {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .about-slide {
+            position: absolute;
+            inset: 0;
+            overflow-y: auto;
+            padding: 2.4rem 2.6rem 2.6rem;
+            opacity: 0;
+            transform: translateY(18px);
+            pointer-events: none;
+            transition: opacity 520ms var(--ease-fluid), transform 620ms var(--ease-out-expo);
+        }
+
+        .about-slide.is-active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .about-label {
+            display: block;
+            margin-bottom: 1.1rem;
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .about-title {
+            font-family: 'Inter', sans-serif;
+            font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+            font-weight: 400;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.6rem;
+            color: var(--text-primary);
+        }
+
+        .about-heading {
+            font-family: 'Inter', sans-serif;
+            font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+            font-weight: 400;
+            line-height: 1.3;
+            letter-spacing: -0.01em;
+            margin-bottom: 1.4rem;
+            max-width: 32ch;
+            color: var(--text-primary);
+        }
+
+        .about-body {
+            font-size: 0.92rem;
+            line-height: 1.75;
+            color: var(--text-muted);
+            max-width: 64ch;
+        }
+
+        .about-body p {
+            margin-bottom: 1.2em;
+        }
+
+        .about-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .about-link {
+            display: inline-block;
+            margin-top: 1.8rem;
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            text-decoration: none;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 0.75rem 1.3rem;
+            transition: color var(--motion-standard) ease, border-color var(--motion-standard) ease;
+        }
+
+        .about-link:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .about-progress {
+            height: 2px;
+            background: var(--grid-line);
+        }
+
+        .about-progress-fill {
+            display: block;
+            height: 100%;
+            width: 16.6667%;
+            background: var(--accent);
+            transition: width 600ms var(--ease-out-expo);
+        }
+
+        .about-foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1.05rem 1.9rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .about-dots {
+            display: flex;
+            gap: 7px;
+        }
+
+        .about-dot {
+            width: 22px;
+            height: 3px;
+            border: 0;
+            padding: 0;
+            border-radius: 999px;
+            background: var(--grid-line);
+            cursor: pointer;
+            transition: background var(--motion-standard) ease;
+        }
+
+        .about-dot.is-on {
+            background: var(--accent);
+        }
+
+        .about-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+
+        .about-counter {
+            font-size: 0.62rem;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            min-width: 3.4rem;
+            text-align: center;
+        }
+
+        .about-nav-btn {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: color var(--motion-standard) ease, border-color var(--motion-standard) ease, background var(--motion-standard) ease;
+        }
+
+        .about-nav-btn:hover:not([disabled]) {
+            background: #004E38;
+            border-color: #004E38;
+            color: #fff;
+        }
+
+        .about-nav-btn[disabled] {
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        body.about-active .content-layer {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.03);
+            filter: blur(8px);
+        }
+
+        body.about-active #canvas-container {
+            opacity: 0.35;
+        }
+
+        @media (max-width: 720px) {
+            .about-modal {
+                height: 92vh;
+                border-radius: 10px;
+            }
+
+            .about-slide {
+                padding: 1.6rem 1.4rem 2rem;
+            }
+
+            .about-head {
+                padding: 1.2rem 1.3rem 1rem;
+            }
+
+            .about-foot {
+                padding: 0.9rem 1.3rem;
+            }
+
+            .about-dots {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Smooth Transition Shield -->
+    <div class="page-transition-shield" aria-hidden="true"></div>
+
+    <!-- Background Engine -->
+    <div id="canvas-container" aria-hidden="true">
+        <canvas id="topography-canvas"></canvas>
+    </div>
+    <div class="grain" aria-hidden="true"></div>
+    <!-- ST-19: Decorative ambient-glow orb removed. -->
+
+    <!-- Framing -->
+    <div class="hud-grid" aria-hidden="true"></div>
+    <div class="hud-label hud-top-left">
+        <img src="assets/AidData Logo full_color.png" alt="AidData Logo" class="hud-logo" id="hud-logo-img">
+    </div>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+    </button>
+
+    <!-- Core Content -->
+    <div class="content-layer" id="content-layer">
+        <h1>Sovereign</h1>
+        <span class="slide-label">Research-translation learning and decision environment.</span>
+        <div class="action-group">
+            <button class="btn" id="btn-about" aria-haspopup="dialog">About</button>
+            <button class="btn primary" id="btn-enter">Enter</button>
+        </div>
+    </div>
+    <!-- Login Overlay -->
+    <div class="login-overlay" id="login-overlay" aria-hidden="true">
+        <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+            <h2 id="login-modal-title" class="sr-only">Participant sign-in</h2>
+            <form id="login-form" novalidate>
+                <div class="input-group" id="username-group">
+                    <label for="username">PARTICIPANT ID</label>
+                    <input type="text" id="username" placeholder="Enter your ID" autocomplete="username"
+                        aria-describedby="username-error" aria-invalid="false">
+                    <span class="error-message" id="username-error" aria-live="assertive">An ID is required to
+                        continue.</span>
+                </div>
+                <div class="input-group" id="password-group">
+                    <label for="password">ACCESS CODE</label>
+                    <input type="password" id="password" placeholder="Enter your code" autocomplete="current-password"
+                        aria-describedby="password-error" aria-invalid="false">
+                    <span class="error-message" id="password-error" aria-live="assertive">An access code is
+                        required.</span>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn" id="btn-submit">Verify</button>
+                    <button type="button" class="btn btn-ghost" id="btn-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- About Overlay -->
+    <div class="about-overlay" id="about-overlay" aria-hidden="true">
+        <div class="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
+            <div class="about-head">
+                <div>
+                    <h2 id="about-modal-title"></h2>
+                </div>
+                <button type="button" class="about-close" id="about-close" aria-label="Close about"><svg width="15"
+                        height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg></button>
+            </div>
+            <div class="about-progress" role="progressbar" aria-label="Section progress" aria-valuemin="1"
+                aria-valuemax="6" aria-valuenow="1"><span class="about-progress-fill" id="about-progress-fill"></span>
+            </div>
+            <div class="about-viewport" id="about-viewport">
+                <div class="about-slide is-active" data-about-slide="0" role="group" aria-label="1 of 6">
+                    <span class="about-label">Training and Professional Development</span>
+                    <h3 class="about-title">Bridging research and institutional reality</h3>
+                    <div class="about-body">
+                        <p>A research-to-decision simulation platform that translates AidData's empirical research into
+                            practitioner decision environments.</p>
+                    </div>
+                </div>
+                <div class="about-slide" data-about-slide="1" role="group" aria-label="2 of 6" aria-hidden="true">
+                    <span class="about-label">The problem</span>
+                    <h3 class="about-heading">Research insights rarely survive translation into practice</h3>
+                    <div class="about-body">
+                        <p>The architecture loses coherence when research, mechanics, learning objectives and assessment
+                            evidence collapse into a single layer. Findings are reduced to content, while the decisions,
+                            constraints and causal mechanisms embedded in the research disappear.</p>
+                        <p>Practitioners may understand what the evidence says without rehearsing how to interpret it,
+                            act on it or defend a decision under institutional pressure.</p>
+                    </div>
+                </div>
+                <div class="about-slide" data-about-slide="2" role="group" aria-label="3 of 6" aria-hidden="true">
+                    <span class="about-label">The framework</span>
+                    <h3 class="about-heading">RTLF preserves the evidence</h3>
+                    <div class="about-body">
+                        <p>RTLF is the translation layer between research evidence and executable scenario design. It
+                            converts a bounded research claim into a causal mechanism, a consequential decision, a
+                            playable constraint and an observable professional performance.</p>
+                        <p>Explicit validity gates preserve the claim's scope, prevent unsupported inference and
+                            maintain traceability from source evidence through assessment and debrief.</p>
+                    </div>
+                </div>
+                <div class="about-slide" data-about-slide="3" role="group" aria-label="4 of 6" aria-hidden="true">
+                    <span class="about-label">The engine</span>
+                    <h3 class="about-heading">The Decision Engine makes causality executable</h3>
+                    <div class="about-body">
+                        <p>The Decision Engine is the authoritative causal runtime between scenario definition and the
+                            user-facing platform. It validates what an actor can authorize, resolves the submitted
+                            decision against explicit rules and writes the resulting consequence into canonical state.
+                        </p>
+                        <p>Because inputs, rules and scenario versions are frozen, every material outcome can be
+                            replayed and traced to the evidence, authority and timing that produced it.</p>
+                    </div>
+                </div>
+                <div class="about-slide" data-about-slide="4" role="group" aria-label="5 of 6" aria-hidden="true">
+                    <span class="about-label">The platform</span>
+                    <h3 class="about-heading">Sovereign turns the architecture into practice</h3>
+                    <div class="about-body">
+                        <p>Sovereign is the user-facing workflow layer built on the RTLF, versioned scenario packages
+                            and the Decision Engine. Its role-specific workspaces require participants to interpret
+                            evidence, negotiate within institutional mandates and distinguish proposals from authorized
+                            commitments.</p>
+                        <p>The platform records the decision process and its consequences as one canonical history that
+                            supports simulation, learning assessment and decision research.</p>
+                    </div>
+                </div>
+                <div class="about-slide" data-about-slide="5" role="group" aria-label="6 of 6" aria-hidden="true">
+                    <span class="about-label">The proposition</span>
+                    <h3 class="about-heading">One system. Three outputs.</h3>
+                    <div class="about-body">
+                        <p>Together, the framework, engine and platform form a single research-to-decision architecture.
+                            The system strengthens practitioner capability by making institutional judgment visible,
+                            consequential and open to structured reflection. The same decision history reveals recurring
+                            institutional friction and creates reproducible evidence for decision research.</p>
+                    </div>
+                    <a class="about-link" href="https://github.com/Seth-arc/Sovereign-Room" target="_blank"
+                        rel="noopener noreferrer">View the project on GitHub &#8599;</a>
+                </div>
+            </div>
+            <div class="about-foot">
+                <div class="about-dots" id="about-dots"></div>
+                <div class="about-controls">
+                    <button type="button" class="about-nav-btn" id="about-prev" aria-label="Previous section" disabled>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 2L4 7L9 12" />
+                        </svg>
+                    </button>
+                    <span class="about-counter" id="about-counter" aria-live="polite">1 / 6</span>
+                    <button type="button" class="about-nav-btn" id="about-next" aria-label="Next section">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 2L10 7L5 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Theme Management
+         */
+        var LOGO_LIGHT = 'assets/AidData Logo full_color.png';
+        var LOGO_DARK = 'assets/AidData Logo.png';
+        var logoImg = document.getElementById('hud-logo-img');
+        var themeToggle = document.getElementById('theme-toggle');
+
+        function getThemeColors() {
+            var style = getComputedStyle(document.documentElement);
+            return {
+                bg: style.getPropertyValue('--canvas-bg').trim(),
+                stroke: style.getPropertyValue('--canvas-stroke').trim()
+            };
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                logoImg.src = LOGO_DARK;
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                logoImg.src = LOGO_LIGHT;
+            }
+            localStorage.setItem('sovereign-theme', theme);
+        }
+
+        // Initialize theme before paint
+        var savedTheme = localStorage.getItem('sovereign-theme') || 'light';
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', function () {
+            var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+
+        /**
+         * Page Initialization & Entrance
+         */
+        window.addEventListener('load', function () {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    document.body.classList.add('is-loaded');
+                    document.querySelector('.page-transition-shield').style.opacity = '0';
+                });
+            });
+        });
+
+        window.addEventListener('pageshow', function () {
+            document.body.classList.remove('is-exiting');
+            document.body.classList.add('is-loaded');
+            document.querySelector('.page-transition-shield').style.opacity = '0';
+        });
+
+        /**
+         * Topography Engine Variables
+         */
+        var canvas = document.getElementById('topography-canvas');
+        var ctx = canvas.getContext('2d');
+
+        var width, height;
+        var time = 0;
+        var currentSpeed = 0.003;
+        var targetSpeed = 0.003;
+
+        var lines = 60;
+        var segments = 120;
+        var amplitude = 200;
+        var frequency = 0.0015;
+
+        /**
+         * Interaction & Modal Logic
+         */
+        var enterBtn = document.getElementById('btn-enter');
+        var aboutBtn = document.getElementById('btn-about');
+        var overlay = document.getElementById('login-overlay');
+        var contentLayer = document.getElementById('content-layer');
+        var cancelBtn = document.getElementById('btn-cancel');
+        var loginForm = document.getElementById('login-form');
+        var submitBtn = document.getElementById('btn-submit');
+
+        // Shared transition flag
+        var isTransitioning = false;
+        var shield = document.querySelector('.page-transition-shield');
+
+        function openLoginModal() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            clearErrors();
+
+            document.body.classList.add('login-active');
+            overlay.classList.add('is-active');
+            overlay.removeAttribute('aria-hidden');
+            contentLayer.setAttribute('aria-hidden', 'true');
+            targetSpeed = 0.007;
+
+            setTimeout(function () {
+                targetSpeed = 0.003;
+                isTransitioning = false;
+                document.getElementById('username').focus();
+            }, 800);
+        }
+
+        function closeLoginModal() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            clearErrors();
+
+            overlay.classList.remove('is-active');
+            overlay.setAttribute('aria-hidden', 'true');
+            contentLayer.removeAttribute('aria-hidden');
+            document.body.classList.remove('login-active');
+            targetSpeed = 0.007;
+
+            setTimeout(function () {
+                targetSpeed = 0.003;
+                isTransitioning = false;
+                enterBtn.focus();
+            }, 800);
+        }
+
+        // Open Login Modal — a direct depth transition keeps the canvas continuous.
+        enterBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            openLoginModal();
+        });
+
+        // Close Login Modal — reverse the same depth transition.
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                closeLoginModal();
+            });
+        }
+
+        // Escape closes the modal, matching the cancel action.
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && overlay.classList.contains('is-active')) {
+                closeLoginModal();
+            }
+        });
+
+        // ST-30: Login validation with error states — submitting via Enter or the button both work.
+        if (loginForm) {
+            loginForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                clearErrors();
+
+                var usernameInput = document.getElementById('username');
+                var passwordInput = document.getElementById('password');
+                var usernameVal = usernameInput.value.trim();
+                var passwordVal = passwordInput.value.trim();
+                var hasError = false;
+
+                if (!usernameVal) {
+                    document.getElementById('username-group').classList.add('has-error');
+                    usernameInput.setAttribute('aria-invalid', 'true');
+                    hasError = true;
+                }
+                if (!passwordVal) {
+                    document.getElementById('password-group').classList.add('has-error');
+                    passwordInput.setAttribute('aria-invalid', 'true');
+                    hasError = true;
+                }
+
+                if (hasError) {
+                    (usernameVal ? passwordInput : usernameInput).focus();
+                    return;
+                }
+
+                // Disable button while verifying
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Verifying';
+
+                // Simulate verification — replace with real logic
+                setTimeout(function () {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Verify';
+                    console.log('Verification submitted for:', usernameVal);
+                }, 1500);
+            });
+        }
+
+        function clearErrors() {
+            var groups = document.querySelectorAll('.input-group');
+            for (var i = 0; i < groups.length; i++) {
+                groups[i].classList.remove('has-error');
+            }
+            var inputs = document.querySelectorAll('.input-group input');
+            for (var j = 0; j < inputs.length; j++) {
+                inputs[j].setAttribute('aria-invalid', 'false');
+            }
+        }
+
+        // Clear individual error on input
+        document.getElementById('username').addEventListener('input', function () {
+            document.getElementById('username-group').classList.remove('has-error');
+            this.setAttribute('aria-invalid', 'false');
+        });
+        document.getElementById('password').addEventListener('input', function () {
+            document.getElementById('password-group').classList.remove('has-error');
+            this.setAttribute('aria-invalid', 'false');
+        });
+
+        /**
+         * About Overlay
+         * The about content lives in this page as a modal rather than a separate
+         * route, so opening it costs no navigation and returns the participant to
+         * exactly where they were.
+         */
+        var aboutOverlay = document.getElementById('about-overlay');
+        var aboutSlides = Array.prototype.slice.call(document.querySelectorAll('[data-about-slide]'));
+        var aboutPrev = document.getElementById('about-prev');
+        var aboutNext = document.getElementById('about-next');
+        var aboutCounter = document.getElementById('about-counter');
+        var aboutFill = document.getElementById('about-progress-fill');
+        var aboutDots = document.getElementById('about-dots');
+        var aboutIndex = 0;
+        var aboutReturn = null;
+
+        aboutSlides.forEach(function (slide, i) {
+            var dot = document.createElement('button');
+            dot.type = 'button';
+            dot.className = 'about-dot' + (i === 0 ? ' is-on' : '');
+            dot.setAttribute('aria-label', 'Section ' + (i + 1));
+            dot.addEventListener('click', function () { renderAbout(i); });
+            aboutDots.appendChild(dot);
+        });
+
+        function renderAbout(i) {
+            aboutIndex = Math.max(0, Math.min(aboutSlides.length - 1, i));
+            aboutSlides.forEach(function (slide, j) {
+                var on = j === aboutIndex;
+                slide.classList.toggle('is-active', on);
+                slide.setAttribute('aria-hidden', on ? 'false' : 'true');
+                if (on) slide.scrollTop = 0;
+            });
+            Array.prototype.forEach.call(aboutDots.children, function (dot, j) {
+                dot.classList.toggle('is-on', j === aboutIndex);
+            });
+            aboutCounter.textContent = (aboutIndex + 1) + ' / ' + aboutSlides.length;
+            aboutFill.style.width = (((aboutIndex + 1) / aboutSlides.length) * 100) + '%';
+            aboutFill.parentNode.setAttribute('aria-valuenow', String(aboutIndex + 1));
+            aboutPrev.disabled = aboutIndex === 0;
+            aboutNext.disabled = aboutIndex === aboutSlides.length - 1;
+        }
+
+        function openAboutModal() {
+            aboutReturn = document.activeElement;
+            renderAbout(0);
+            document.body.classList.add('about-active');
+            aboutOverlay.classList.add('is-active');
+            aboutOverlay.setAttribute('aria-hidden', 'false');
+            setTimeout(function () { document.getElementById('about-close').focus(); }, 60);
+        }
+
+        function closeAboutModal() {
+            aboutOverlay.classList.remove('is-active');
+            aboutOverlay.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('about-active');
+            if (aboutReturn && aboutReturn.focus) aboutReturn.focus();
+        }
+
+        aboutBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (isTransitioning) return;
+            openAboutModal();
+        });
+        document.getElementById('about-close').addEventListener('click', closeAboutModal);
+        aboutOverlay.addEventListener('click', function (e) { if (e.target === aboutOverlay) closeAboutModal(); });
+        aboutPrev.addEventListener('click', function () { renderAbout(aboutIndex - 1); });
+        aboutNext.addEventListener('click', function () { renderAbout(aboutIndex + 1); });
+        document.addEventListener('keydown', function (e) {
+            if (!aboutOverlay.classList.contains('is-active')) return;
+            if (e.key === 'Escape') { closeAboutModal(); return; }
+            if (e.key === 'ArrowRight') renderAbout(aboutIndex + 1);
+            if (e.key === 'ArrowLeft') renderAbout(aboutIndex - 1);
+        });
+        renderAbout(0);
+
+        /**
+         * Fluid Parametric Topography Engine
+         */
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawTopography() {
+            var colors = getThemeColors();
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, width, height);
+
+            currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+            time += currentSpeed;
+
+            ctx.lineWidth = 1;
+
+            for (var i = 0; i < lines; i++) {
+                var norm = i / lines;
+                var depthScale = 0.2 + (norm * 0.8);
+                var yOffset = (height * 0.25) + (norm * height * 0.55);
+
+                var alpha = Math.max(0.03, 0.4 * norm);
+                ctx.strokeStyle = 'rgba(' + colors.stroke + ', ' + alpha + ')';
+
+                ctx.beginPath();
+
+                for (var j = 0; j <= segments; j++) {
+                    var xNorm = j / segments;
+                    var x = xNorm * width;
+
+                    var wave1 = Math.sin(x * frequency * 1.5 + time * 2 + norm * 5);
+                    var wave2 = Math.cos(x * frequency * 0.8 - time + norm * 8);
+                    var wave3 = Math.sin(x * frequency * 3 + time * 0.5);
+
+                    var centerBias = Math.sin(xNorm * Math.PI);
+
+                    var y = yOffset + ((wave1 + wave2 * 0.5 + wave3 * 0.2) * amplitude * depthScale * centerBias);
+
+                    if (j === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(drawTopography);
+        }
+
+        drawTopography();
+    </script>
+
+
+    <script>
+        (function () {
+            var btn = document.getElementById('userMenuBtn');
+            var menu = document.getElementById('userMenuDropdown');
+            if (btn && menu) {
+                btn.addEventListener('click', function (e) {
+                    menu.classList.toggle('open');
+                    e.stopPropagation();
+                });
+                document.addEventListener('click', function (e) {
+                    if (!e.target.closest('.user-menu-container')) {
+                        menu.classList.remove('open');
+                    }
+                });
+            }
+
+            var themeBtn = document.getElementById('themeToggleBtn');
+            if (themeBtn) {
+                themeBtn.addEventListener('click', function (e) {
+                    var current = document.documentElement.getAttribute('data-theme');
+                    if (current === 'dark') {
+                        document.documentElement.setAttribute('data-theme', 'light');
+                        localStorage.setItem('sovereign-theme', 'light');
+                    } else {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                        localStorage.setItem('sovereign-theme', 'dark');
+                    }
+                });
+            }
+        })();
+    </script>
+</body>
+
+</html>
