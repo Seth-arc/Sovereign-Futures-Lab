@@ -15,12 +15,46 @@ import {
   type ParticipantBundle,
 } from "./data";
 import { evidenceIsAvailable } from "./engine";
-import { EVIDENCE_CATALOG, ROLE_TITLE, STAGES, WORKSHOP_TITLE } from "./scenario";
+import { EVIDENCE_CATALOG, STAGES, WORKSHOP_TITLE } from "./scenario";
+import { ReferenceExperience, type ReferenceSurface } from "./ReferenceExperience";
 import { ThemeButton } from "./ThemeButton";
 import type { AdvisorId, DecisionState, InstitutionRole } from "./types";
 
 const PARTICIPANT_KEY = "futureslab-participant-id";
 const ENTRY_HANDOFF_KEY = "futureslab-entry-handoff-v1";
+const GLOSSARY_TERMS = [
+  { term: "Debt Management Office (DMO)", definition: "The Finance Ministry function that maintains the debt record, reconciles claims, maps dependencies, and prepares recommendations without creating sovereign or creditor commitments." },
+  { term: "Usable liquidity", definition: "Cash that is actually available after restrictions, protected balances, and control arrangements are accounted for." },
+  { term: "Restricted account", definition: "An account whose balances or payment flows are constrained by contractual controls and therefore may not be fully available to the sovereign." },
+  { term: "Effective control", definition: "A practical constraint on the sovereign's access to cash flows, even where the arrangement is not formal collateral in the traditional legal sense." },
+  { term: "Financing assurance", definition: "A recorded creditor indication that provides the IMF with sufficient confidence that the financing envelope can be supported. It is not the same as final legal implementation." },
+  { term: "Official Creditor Committee (OCC)", definition: "The committee through which participating official bilateral creditors coordinate treatment discussions and assurances under the Common Framework." },
+  { term: "Treatment perimeter", definition: "The set of claims or facilities carried into the restructuring and comparability analysis." },
+  { term: "Comparability of Treatment (CoT)", definition: "The assessment of whether other creditors provide treatment comparable to official creditors across debt-service, net-present-value, and duration dimensions." },
+  { term: "IMF Board horizon", definition: "The eleven-week scenario deadline by which the information, treatment framework, and adequate financing assurances must support IMF Board consideration." },
+] as const;
+const ADVISOR_PROFILES: Record<AdvisorId, { name: string; shortName: string; role: string; bio: string; image: string; brief: string; welcome: string; suggestions: readonly string[] }> = {
+  amara: {
+    name: "Amara Okoye",
+    shortName: "Amara",
+    role: "Country, macroeconomic context & Common Framework advisor",
+    bio: "Sovereign debt economist · fifteen years on Paris Club and Common Framework cases",
+    image: "/img/Amara Okoye.jpg",
+    brief: "The Kuvera country profile, debt-sustainability context, creditor composition and the IMF Board horizon—plus the Common Framework sequence from debtor request through financing assurances, the OCC and the MoU to cash-effective relief.",
+    welcome: "Welcome. I’m Amara, your Kuvera country and Common Framework advisor. I can help you interpret the country profile, debt sustainability context, creditor composition, and the difference between source-backed case facts and demo calibrations. I can also walk you through where Kuvera sits in the Common Framework process, what financing assurances are meant to establish, how the Official Creditor Committee and IMF program parameters fit together, and what happens from an MoU through bilateral implementation. I’ll explain the process and evidence available to you, but I won’t make the decision for you.",
+    suggestions: ["Why is Kuvera in debt distress?", "Where is Kuvera in the Common Framework process?", "What are financing assurances?", "What happens after an MoU?", "Which numbers are demo calibrations?"],
+  },
+  daniel: {
+    name: "Daniel Mensah",
+    shortName: "Daniel",
+    role: "Contracts, escrow, financing assurances & CoT advisor",
+    bio: "Sovereign finance lawyer · collateralised lending and restructuring documentation",
+    image: "/img/Daniel Mensah.jpg",
+    brief: "Facility A and B, the copper-revenue account, confidentiality and cross-collateralization, formal security versus effective control, disclosure choices and commitment levels—plus the three Comparability of Treatment dimensions.",
+    welcome: "Welcome. I’m Daniel Mensah, your contracts, escrow, financing assurances, and comparability advisor. I can help you work through Facility A, Facility B, the copper-revenue account, confidentiality constraints, cross-collateralization, and the distinction between formal security and effective control. I can also explain commitment levels, what counts as a financing assurance, the three Comparability of Treatment dimensions used in this simulation, and how treatment terms connect to the financing-assurances package. I’ll help you interpret the evidence and trade-offs, but I won’t classify an unresolved account or tell you which option to choose.",
+    suggestions: ["What do we know about the escrow account?", "What is cross-collateralization here?", "What counts as an assurance?", "Why is CoT not one haircut number?", "What are the three CoT dimensions?"],
+  },
+};
 
 type JoinInput = {
   code: string;
@@ -98,8 +132,17 @@ export function ParticipantApp() {
   const [notice, setNotice] = useState("");
   const [now, setNow] = useState(Date.now());
   const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [communicationsOpen, setCommunicationsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [referenceSurface, setReferenceSurface] = useState<ReferenceSurface | null>(null);
+  const [roleBriefOpen, setRoleBriefOpen] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const handoffAttempted = useRef(false);
+  const communicationsTrigger = useRef<HTMLButtonElement>(null);
+  const advisorTrigger = useRef<HTMLButtonElement>(null);
+  const menuContainer = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -142,6 +185,32 @@ export function ParticipantApp() {
     });
   }, [bundle?.participant.id, bundle?.session.id]);
 
+  useEffect(() => {
+    if (!bundle) return;
+    const orientationKey = `futureslab-orientation-seen:${bundle.participant.id}`;
+    if (localStorage.getItem(orientationKey)) return;
+    localStorage.setItem(orientationKey, "true");
+    setReferenceSurface("orientation");
+  }, [bundle?.participant.id]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeFromOutside = (event: MouseEvent) => {
+      if (event.target instanceof Node && !menuContainer.current?.contains(event.target)) setMenuOpen(false);
+    };
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuTrigger.current?.focus();
+    };
+    document.addEventListener("mousedown", closeFromOutside);
+    document.addEventListener("keydown", closeFromKeyboard);
+    return () => {
+      document.removeEventListener("mousedown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromKeyboard);
+    };
+  }, [menuOpen]);
+
   async function handleJoin(input: JoinInput) {
     setBusy(true); setError("");
     try {
@@ -175,13 +244,56 @@ export function ParticipantApp() {
   const availableStage = Math.max(bundle.session.currentStage, bundle.participant.currentStage);
   const latestInject = bundle.injects.at(-1);
   const clock = remainingFor(bundle, now);
+  const pendingRequests = bundle.evidenceRequests.filter((request) => !evidenceIsAvailable(request, new Date(now)));
+  const pendingCommunications = pendingRequests.length + bundle.messages.filter((message) => message.status === "PENDING").length;
+
+  function closeCommunications() {
+    setCommunicationsOpen(false);
+    window.requestAnimationFrame(() => communicationsTrigger.current?.focus());
+  }
+
+  function closeGlossary() {
+    setGlossaryOpen(false);
+    window.requestAnimationFrame(() => menuTrigger.current?.focus());
+  }
+
+  function closeAdvisor() {
+    setAdvisorOpen(false);
+    window.requestAnimationFrame(() => advisorTrigger.current?.focus());
+  }
+
+  async function exitWorkshop() {
+    if (!bundle || !decisions) return;
+    setMenuOpen(false); setBusy(true); setError("");
+    try {
+      const saved = await saveDecisions(bundle, decisions, stage);
+      setBundle(saved);
+      localStorage.removeItem(PARTICIPANT_KEY);
+      sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
+      window.location.assign("/");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Your work could not be saved. The workshop remains open.");
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="app-shell participant-reference">
+    <div className="app participant-reference">
       <a className="skip-link" href="#main-content">Skip to exercise</a>
       <header className="topbar">
-        <div className="brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><div className="brand-copy"><strong>Sovereign</strong><span>Role · Debt Management Office</span></div></div>
-        <div className="topmeta"><span className={`pill ${bundle.session.status === "RUNNING" ? "ok" : "warn"}`}><span className={`status-dot ${bundle.session.status.toLowerCase()}`} />{bundle.session.status.toLowerCase()} · {bundle.session.kind.toLowerCase()}</span><span className="pill warn clock" aria-label={`${clock} seconds remaining`}><small>Exercise clock</small><strong>{formatClock(clock)}</strong></span><ThemeButton /></div>
+        <div className="brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><div className="brand-copy"><strong>Sovereign</strong></div></div>
+        <div className="topmeta">
+          <span className={`pill clock ${bundle.session.status === "RUNNING" ? "warn" : "ok"}`} id="masterClock" aria-label={`${clock} seconds remaining`} title="Live workshop exercise clock"><span className={`status-dot ${bundle.session.status.toLowerCase()}`} /><span>Exercise · {formatClock(clock)}</span></span>
+          <button ref={communicationsTrigger} type="button" className="reference-icon-button comm-launch" id="openCommunications" aria-label="Open communications" title="Communications" aria-haspopup="dialog" aria-expanded={communicationsOpen} onClick={() => { setError(""); setCommunicationsOpen(true); }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            {pendingCommunications > 0 && <span className="comm-unread" aria-label={`${pendingCommunications} communications awaiting resolution`}>{pendingCommunications}</span>}
+          </button>
+          <button type="button" className="secondary-button reference-top-button" id="openReference" onClick={() => setReferenceSurface("case-file")}>Case file</button>
+          <div className="participant-menu" ref={menuContainer}>
+            <button ref={menuTrigger} type="button" className="reference-icon-button menu-trigger" id="participantMenuButton" aria-label="Open participant menu" aria-expanded={menuOpen} aria-controls="participantMenu" onClick={() => setMenuOpen((open) => !open)}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg></button>
+            <div className="user-menu-dropdown" id="participantMenu" hidden={!menuOpen}><button className="menu-item" type="button" onClick={() => { setMenuOpen(false); setGlossaryOpen(true); }}>Glossary</button><ThemeButton variant="menu" onToggle={() => setMenuOpen(false)} /><div className="menu-divider" /><button className="menu-item text-bad" type="button" disabled={busy} onClick={() => void exitWorkshop()}>Exit</button></div>
+          </div>
+        </div>
       </header>
 
       {(notice || latestInject) && (
@@ -191,42 +303,65 @@ export function ParticipantApp() {
         </div>
       )}
 
-      <div className="workspace-layout">
-        <aside className="process-rail" aria-label="Exercise stages">
-          <div className="role-card"><small>Your role</small><strong>{ROLE_TITLE}</strong><span>{bundle.participant.name}<br />{bundle.participant.organization}</span></div>
-          <ol>
+      <div className="orientation-tools" aria-label="Orientation and learning resources">
+        <button type="button" className="secondary-button reference-tool-button" onClick={() => setReferenceSurface("orientation")}>Orientation</button>
+        <button type="button" className="secondary-button reference-tool-button" id="replayBridge" onClick={() => setReferenceSurface("bridge")}>Learning bridge</button>
+        <button ref={advisorTrigger} type="button" className="secondary-button reference-tool-button" id="openAdvisors" aria-haspopup="dialog" aria-expanded={advisorOpen} onClick={() => setAdvisorOpen(true)}>AI advisors</button>
+      </div>
+
+      <div className="shell">
+        <aside className="process" aria-label="Simulation process" tabIndex={0}>
+          <div className="rail-title"><div className="eyebrow">Process flow</div><h2>Complete the decision chain</h2><div className="rail-sub">The facilitator unlocks each new step. Earlier work remains open for revision.</div></div>
+          <ol className="steps">
             {STAGES.map((item, index) => {
               const unlocked = index <= availableStage;
-              return <li key={item.short}><button type="button" className={stage === index ? "active" : ""} disabled={!unlocked} onClick={() => setStage(index)}><span>{index + 1}</span><div><strong>{item.short}</strong><small>{unlocked ? item.title : "Await facilitator"}</small></div></button></li>;
+              const complete = index < bundle.participant.currentStage;
+              const stepClass = ["step", stage === index ? "current" : "", complete ? "complete" : "", unlocked ? "available" : "locked"].filter(Boolean).join(" ");
+              return <li key={item.short}><button type="button" className={stepClass} disabled={!unlocked} aria-current={stage === index ? "step" : undefined} onClick={() => { setRoleBriefOpen(index === 0); setStage(index); }}><span className="step-num">{index + 1}</span><span className="step-copy"><strong>{item.short}</strong><span>{unlocked ? item.title : "Await facilitator"}</span></span></button></li>;
             })}
           </ol>
           <div className="mode-note"><strong>{isLocalBundle(bundle) ? "Local emergency mode" : "Live workshop mode"}</strong><span>{isLocalBundle(bundle) ? "This browser retains your work. Download the handoff file when finished." : "Your activity is synchronized with the facilitator."}</span></div>
         </aside>
 
-        <main className="decision-workspace" id="main-content">
-          <div className="stage-heading"><div><span className="eyebrow">Step {stage + 1} of {STAGES.length}</span><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><span className="autosave-state">{busy ? "Saving…" : "Saved on action"}</span></div>
-          {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
-          <StageContent stage={stage} decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />
-          <div className="stage-actions">
-            <button type="button" className="secondary-button" disabled={stage === 0 || busy} onClick={() => { void persist(stage); setStage((value) => value - 1); }}>Previous</button>
-            <button type="button" className="primary-button" disabled={busy} onClick={() => void persist(stage)}>Save work</button>
-            {stage < availableStage && <button type="button" className="primary-button" disabled={busy} onClick={() => { void persist(stage + 1); setStage((value) => value + 1); }}>Continue</button>}
-          </div>
+        <main className={`workspace ${stage === 0 && roleBriefOpen ? "role-brief-open" : ""}`} id="main-content">
+          {stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
+            <div className="stage-head"><div><div className="eyebrow">Step {stage + 1} · {STAGES[stage].short}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className="autosave-state">{busy ? "Saving…" : "Saved on action"}</span></div></div>
+            {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
+            <StageContent stage={stage} decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />
+            <div className="stage-actions actions">
+              <button type="button" className="secondary-button" disabled={stage === 0 || busy} onClick={() => { void persist(stage); setRoleBriefOpen(false); setStage((value) => value - 1); }}>Previous</button>
+              <button type="button" className="primary-button" disabled={busy} onClick={() => void persist(stage)}>Save work</button>
+              {stage < availableStage && <button type="button" className="primary-button" disabled={busy} onClick={() => { void persist(stage + 1); setRoleBriefOpen(false); setStage((value) => value + 1); }}>Continue</button>}
+            </div>
+          </>}
         </main>
 
-        <aside className="case-rail">
-          <div className="country-lockup"><img src="/assets/national flag.jpg" alt="Flag of Kuvera" /><div><span className="eyebrow">Decision frame</span><strong>Republic of Kuvera</strong></div></div>
-          <h2>Two clocks are running</h2>
-          <div className="deadline"><strong>6 weeks</strong><span>USD 750m maturity</span></div>
-          <div className="deadline"><strong>11 weeks</strong><span>IMF Board horizon</span></div>
-          <hr />
-          <dl className="case-facts"><div><dt>Reported liquidity</dt><dd>USD 780m</dd></div><div><dt>Restricted</dt><dd>USD 240m</dd></div><div><dt>Protected</dt><dd>USD 60m</dd></div><div><dt>Verified usable</dt><dd>USD 480m</dd></div></dl>
-          <button type="button" className="advisor-launch" onClick={() => setAdvisorOpen(true)}><span className="advisor-launch-portraits"><img src="/img/Amara Okoye.jpg" alt="" /><img src="/img/Daniel Mensah.jpg" alt="" /></span><span>Ask Amara or Daniel</span><small>Grounded advisor · voice available</small></button>
-        </aside>
       </div>
-      {advisorOpen && <AdvisorPanel bundle={bundle} setBundle={setBundle} onClose={() => setAdvisorOpen(false)} />}
+      {communicationsOpen && <CommunicationsPanel bundle={bundle} setBundle={setBundle} setError={setError} error={error} now={now} onClose={closeCommunications} />}
+      {glossaryOpen && <GlossaryDialog onClose={closeGlossary} />}
+      {advisorOpen && <AdvisorPanel bundle={bundle} setBundle={setBundle} onClose={closeAdvisor} />}
+      {referenceSurface && <ReferenceExperience surface={referenceSurface} onClose={() => setReferenceSurface(null)} />}
     </div>
   );
+}
+
+function GlossaryDialog({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
+
+  return <div className="modal-scrim glossary-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="glossary-dialog" role="dialog" aria-modal="true" aria-labelledby="glossary-title" onKeyDown={(event) => {
+    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }}><header><div><span className="eyebrow">Workshop reference</span><h2 id="glossary-title">Glossary</h2><p>Terms used in the Kuvera financing-assurances exercise.</p></div><button type="button" className="icon-button" aria-label="Close glossary" autoFocus onClick={onClose}>×</button></header><div className="glossary-body" role="region" aria-label="Glossary terms" tabIndex={0}><dl>{GLOSSARY_TERMS.map((item) => <div key={item.term}><dt>{item.term}</dt><dd>{item.definition}</dd></div>)}</dl></div></section></div>;
 }
 
 function WorkshopEntryState({ initializing, busy, error, entryHandoff, onRetry, onJoinLocal }: { initializing: boolean; busy: boolean; error: string; entryHandoff: JoinInput | null; onRetry: () => void; onJoinLocal: () => void }) {
@@ -234,19 +369,23 @@ function WorkshopEntryState({ initializing, busy, error, entryHandoff, onRetry, 
   return <main className="entry-page participant-reference"><div className="entry-brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><span><strong>Sovereign</strong><small>Futureslab workshop</small></span></div><section className="entry-copy"><span className="eyebrow">Kuvera · Financing assurances</span><h1>{WORKSHOP_TITLE}</h1><p>Enter the Kuvera financing-assurances case as a member of the Debt Management Office. Your evidence requests, decisions, and rationale will form a facilitator-led after-action review.</p><div className="method-line"><span>Evidence</span><i /> <span>Decision</span><i /> <span>Consequence</span><i /> <span>Reflection</span></div></section><section className="join-card" aria-labelledby="entry-state-title" aria-live="polite"><h2 id="entry-state-title">{inProgress ? "Joining the workshop" : "Enter through the main page"}</h2>{inProgress ? <p>Your participant details are being verified. Keep this page open.</p> : <p>The participant sign-in is on the Sovereign landing page so your details are entered only once.</p>}{error && <div className="error-panel" role="alert">{error}</div>}{!inProgress && entryHandoff && <><button className="primary-button full" type="button" onClick={onRetry}>Try again</button><button className="secondary-button full" type="button" onClick={onJoinLocal}>Continue in local emergency mode</button></>}{!inProgress && <p><a href="/">Return to participant sign-in</a></p>}</section></main>;
 }
 
-function StageContent({ stage, decisions, setDecisions, bundle, setBundle, setError, now }: { stage: number; decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; now: number }) {
-  const update = <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => setDecisions({ ...decisions, [key]: value });
-  if (stage === 0) return <section className="work-card"><h2>Debt Management Office mandate</h2><div className="mandate-grid"><div><small>You may</small><ul><li>Maintain and reconcile the claims record.</li><li>Request role-relevant evidence.</li><li>Assess dependencies and prepare recommendations.</li><li>Preserve uncertainty and document non-readiness.</li></ul></div><div><small>You may not</small><ul><li>Issue a sovereign commitment.</li><li>Declare a creditor assurance adequate.</li><li>Reveal evidence not released to your role.</li><li>Convert an indicative position into an agreement.</li></ul></div></div><label className="consent"><input type="checkbox" checked={decisions.mandateConfirmed} onChange={(event) => update("mandateConfirmed", event.target.checked)} /><span>I understand that the DMO prepares the record and recommendation; it does not create sovereign or creditor commitment.</span></label><TextArea label="In your own words, what is your authority boundary?" value={decisions.mandateRationale} onChange={(value) => update("mandateRationale", value)} /></section>;
-  if (stage === 1) return <section className="work-card"><h2>Can the package rely on USD 780m?</h2><p>The cash ledger reports USD 780m. A partial memo indicates that copper revenues pass through an account with restrictions that have not yet been reconciled.</p><ChoiceGroup value={decisions.liquidityAction} onChange={(value) => update("liquidityAction", value as DecisionState["liquidityAction"])} options={[{ value: "VERIFY_NOW", title: "Verify before reliance", detail: "Use scarce time to establish the restriction and protected-balance effect." },{ value: "PROCEED_WITH_CAVEAT", title: "Proceed with an explicit caveat", detail: "Begin coordination now without treating the reported figure as verified." }]} /><TextArea label="Why is this the appropriate first move?" value={decisions.liquidityRationale} onChange={(value) => update("liquidityRationale", value)} /></section>;
-  if (stage === 2) return <section className="work-card"><h2>Institutional evidence requests</h2><p>Requests return after an authored delay. The facilitator may release a response early. Requesting everything is not automatically better; each request consumes attention within the exercise.</p><div className="evidence-list">{EVIDENCE_CATALOG.map((definition) => { const request = bundle.evidenceRequests.find((item) => item.evidenceId === definition.id); const ready = request ? evidenceIsAvailable(request, new Date(now)) : false; const seconds = request ? Math.max(0, Math.ceil((new Date(request.availableAt).getTime() - now) / 1000)) : 0; return <article key={definition.id} className={ready ? "evidence ready" : "evidence"}><div><small>{definition.requestedFrom}</small><h3>{definition.title}</h3><p>{definition.summary}</p></div>{ready ? <details><summary>Review returned evidence</summary><p>{definition.details}</p><cite>{definition.sourceLabel}</cite></details> : request ? <span className="pending-tag">Response in {seconds}s</span> : <button type="button" className="secondary-button" onClick={() => { void requestEvidence(bundle, definition.id).then(setBundle).catch((caught) => setError(caught instanceof Error ? caught.message : "Request failed")); }}>Request</button>}</article>; })}</div><InstitutionalRequestDesk bundle={bundle} setBundle={setBundle} setError={setError} /></section>;
-  if (stage === 3) return <section className="work-card"><h2>Record the supported liquidity basis</h2><p>Record what your current evidence supports. Access to a figure is not the same as verification.</p><ChoiceGroup value={decisions.liquidityBasis} onChange={(value) => update("liquidityBasis", value as DecisionState["liquidityBasis"])} options={[{ value: "VERIFIED_480", title: "USD 480m verified usable", detail: "USD 780m less USD 240m restricted and USD 60m protected." },{ value: "REPORTED_780", title: "USD 780m reported, not verified", detail: "Carry the gross figure only as a provisional report." },{ value: "UNRESOLVED", title: "Keep the basis unresolved", detail: "The record does not yet support either value as usable cash." }]} /><TextArea label="State the evidence and caveat behind this record entry." value={decisions.liquidityBasisRationale} onChange={(value) => update("liquidityBasisRationale", value)} /></section>;
-  if (stage === 4) return <section className="work-card"><h2>Map account control and facility dependency</h2><h3>Account classification</h3><ChoiceGroup value={decisions.accountClassification} onChange={(value) => update("accountClassification", value as DecisionState["accountClassification"])} options={[{ value: "EFFECTIVE_CONTROL", title: "Quasi-collateral / effective control", detail: "Cash-flow controls constrain Kuvera's practical access without assuming traditional security." },{ value: "ORDINARY_ACCOUNT", title: "Ordinary operating account", detail: "No material creditor control established." },{ value: "UNRESOLVED", title: "Unresolved", detail: "Available evidence does not support a classification." }]} /><h3>Facility A/B linkage</h3><ChoiceGroup value={decisions.facilityLinkage} onChange={(value) => update("facilityLinkage", value as DecisionState["facilityLinkage"])} options={[{ value: "SHARED_POOL", title: "Shared revenue pool", detail: "Both facilities depend on RA-01 and must be carried in the dependency analysis." },{ value: "INDEPENDENT", title: "Independent facilities", detail: "Treat Facility B outside the shared account dependency." },{ value: "UNRESOLVED", title: "Linkage unresolved", detail: "Preserve the gap rather than assume independence." }]} /><TextArea label="Explain the evidence supporting both entries." value={decisions.linkageRationale} onChange={(value) => update("linkageRationale", value)} /></section>;
-  if (stage === 5) return <section className="work-card"><h2>Recommend disclosure and treatment perimeter</h2><h3>Disclosure level</h3><ChoiceGroup value={decisions.disclosure} onChange={(value) => update("disclosure", value as DecisionState["disclosure"])} options={[{ value: "FULL", title: "Full contract disclosure", detail: "Strongest information transfer; scenario consent has not been established." },{ value: "REDACTED", title: "Redacted functional summary", detail: "Share control, balances, and dependency without restricted contract text." },{ value: "WITHHOLD", title: "Withhold pending consent", detail: "Preserve confidentiality while retaining an OCC information gap." }]} /><h3>Treatment perimeter</h3><ChoiceGroup value={decisions.treatmentPerimeter} onChange={(value) => update("treatmentPerimeter", value as DecisionState["treatmentPerimeter"])} options={[{ value: "BOTH_FACILITIES", title: "Carry Facilities A and B", detail: "Include the shared-pool dependency in later treatment analysis." },{ value: "FACILITY_A_ONLY", title: "Carry Facility A only", detail: "Treat Facility B as outside the current dependency perimeter." },{ value: "DEFER", title: "Defer perimeter recommendation", detail: "State that evidence is insufficient for a bounded recommendation." }]} /><TextArea label="Explain the trade-off and the boundary of your recommendation." value={decisions.disclosureRationale} onChange={(value) => update("disclosureRationale", value)} /></section>;
-  if (stage === 6) return <SubmissionStage decisions={decisions} update={update} bundle={bundle} setBundle={setBundle} setError={setError} />;
-  return <section className="work-card"><h2>Reflection before debrief</h2><p>The facilitator holds the detailed after-action report. Record the most important change in your reasoning so it can be compared with the decision-time record.</p><TextArea label="What evidence, dependency, or authority boundary most changed your recommendation?" value={decisions.reflection} onChange={(value) => update("reflection", value)} rows={7} /><div className="completion-note"><strong>Your detailed AAR is not shown here.</strong><span>The facilitator will reconstruct the decision sequence, realistic consequences, and deterministic counterfactuals during the debrief.</span></div>{isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => downloadEmergencyHandoff(bundle, decisions)}>Download emergency handoff file</button>}</section>;
+function RoleBrief({ onContinue }: { onContinue: () => void }) {
+  return <section className="role-lens" aria-labelledby="role-lens-title"><div className="role-lens-head"><div className="role-lens-id"><div className="role-lens-avatar" aria-hidden="true">DMO</div><div><h1 id="role-lens-title">Debt Management Office</h1><span>Kuvera Finance Ministry · internal role partition</span></div></div><div className="role-lens-kicker">Your role</div></div><p className="role-lens-lead">You hold the loan agreements and the claims record. You do not hold the cash position, the legal reading, or the authority to release anything externally. Everything below is what the room will hold you to.</p><div className="role-lens-grid"><div className="role-lens-cell"><b>Mandate</b><p>Maintain and reconcile the claims record, map Facility A/B dependencies, and prepare debt-treatment inputs for the Finance Ministry team.</p></div><div className="role-lens-cell"><b>Private evidence</b><p>Facility agreements, the debt-service calendar, claim terms, the partial copper-revenue account memo, and internal creditor-position notes.</p></div><div className="role-lens-cell"><b>Authority boundary</b><p>May request verification, reconcile claims, map dependencies, propose treatment inputs, and revise DMO artifacts. Cannot authorize disclosure or create a creditor financing assurance.</p></div><div className="role-lens-cell"><b>Critical handoff</b><p>Needs Treasury for cash availability and protected balances; Legal for interpretation; and the Lead for external submission and disclosure decisions.</p></div></div><div className="role-lens-foot"><p>The facilitator controls when new steps open. Select Mandate in the process rail whenever you need to reopen this brief.</p><button className="primary-button" type="button" onClick={onContinue}>Continue to my first decision</button></div></section>;
 }
 
-function InstitutionalRequestDesk({ bundle, setBundle, setError }: { bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void }) {
+function StageContent({ stage, decisions, setDecisions, bundle, setBundle, setError, now }: { stage: number; decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; now: number }) {
+  const update = <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => setDecisions({ ...decisions, [key]: value });
+  if (stage === 0) return <section className="work-card task-card highlight"><h2>Debt Management Office mandate</h2><div className="mandate-grid"><div><small>You may</small><ul><li>Maintain and reconcile the claims record.</li><li>Request role-relevant evidence.</li><li>Assess dependencies and prepare recommendations.</li><li>Preserve uncertainty and document non-readiness.</li></ul></div><div><small>You may not</small><ul><li>Issue a sovereign commitment.</li><li>Declare a creditor assurance adequate.</li><li>Reveal evidence not released to your role.</li><li>Convert an indicative position into an agreement.</li></ul></div></div><label className="consent"><input type="checkbox" checked={decisions.mandateConfirmed} onChange={(event) => update("mandateConfirmed", event.target.checked)} /><span>I understand that the DMO prepares the record and recommendation; it does not create sovereign or creditor commitment.</span></label><TextArea label="In your own words, what is your authority boundary?" value={decisions.mandateRationale} onChange={(value) => update("mandateRationale", value)} /></section>;
+  if (stage === 1) return <section className="work-card task-card highlight"><h2>Can the package rely on USD 780m?</h2><p>The cash ledger reports USD 780m. A partial memo indicates that copper revenues pass through an account with restrictions that have not yet been reconciled.</p><ChoiceGroup value={decisions.liquidityAction} onChange={(value) => update("liquidityAction", value as DecisionState["liquidityAction"])} options={[{ value: "VERIFY_NOW", title: "Verify before reliance", detail: "Use scarce time to establish the restriction and protected-balance effect." },{ value: "PROCEED_WITH_CAVEAT", title: "Proceed with an explicit caveat", detail: "Begin coordination now without treating the reported figure as verified." }]} /><TextArea label="Why is this the appropriate first move?" value={decisions.liquidityRationale} onChange={(value) => update("liquidityRationale", value)} /></section>;
+  if (stage === 2) return <section className="work-card task-card highlight"><h2>Institutional evidence requests</h2><p>Requests return after an authored delay. The facilitator may release a response early. Requesting everything is not automatically better; each request consumes attention within the exercise.</p><div className="evidence-list">{EVIDENCE_CATALOG.map((definition) => { const request = bundle.evidenceRequests.find((item) => item.evidenceId === definition.id); const ready = request ? evidenceIsAvailable(request, new Date(now)) : false; const seconds = request ? Math.max(0, Math.ceil((new Date(request.availableAt).getTime() - now) / 1000)) : 0; return <article key={definition.id} className={ready ? "evidence ready" : "evidence"}><div><small>{definition.requestedFrom}</small><h3>{definition.title}</h3><p>{definition.summary}</p></div>{ready ? <details><summary>Review returned evidence</summary><p>{definition.details}</p><cite>{definition.sourceLabel}</cite></details> : request ? <span className="pending-tag">Response in {seconds}s</span> : <button type="button" className="secondary-button" onClick={() => { void requestEvidence(bundle, definition.id).then(setBundle).catch((caught) => setError(caught instanceof Error ? caught.message : "Request failed")); }}>Request</button>}</article>; })}</div><InstitutionalRequestDesk bundle={bundle} setBundle={setBundle} setError={setError} /></section>;
+  if (stage === 3) return <section className="work-card task-card highlight"><h2>Record the supported liquidity basis</h2><p>Record what your current evidence supports. Access to a figure is not the same as verification.</p><ChoiceGroup value={decisions.liquidityBasis} onChange={(value) => update("liquidityBasis", value as DecisionState["liquidityBasis"])} options={[{ value: "VERIFIED_480", title: "USD 480m verified usable", detail: "USD 780m less USD 240m restricted and USD 60m protected." },{ value: "REPORTED_780", title: "USD 780m reported, not verified", detail: "Carry the gross figure only as a provisional report." },{ value: "UNRESOLVED", title: "Keep the basis unresolved", detail: "The record does not yet support either value as usable cash." }]} /><TextArea label="State the evidence and caveat behind this record entry." value={decisions.liquidityBasisRationale} onChange={(value) => update("liquidityBasisRationale", value)} /></section>;
+  if (stage === 4) return <section className="work-card task-card highlight"><h2>Map account control and facility dependency</h2><h3>Account classification</h3><ChoiceGroup value={decisions.accountClassification} onChange={(value) => update("accountClassification", value as DecisionState["accountClassification"])} options={[{ value: "EFFECTIVE_CONTROL", title: "Quasi-collateral / effective control", detail: "Cash-flow controls constrain Kuvera's practical access without assuming traditional security." },{ value: "ORDINARY_ACCOUNT", title: "Ordinary operating account", detail: "No material creditor control established." },{ value: "UNRESOLVED", title: "Unresolved", detail: "Available evidence does not support a classification." }]} /><h3>Facility A/B linkage</h3><ChoiceGroup value={decisions.facilityLinkage} onChange={(value) => update("facilityLinkage", value as DecisionState["facilityLinkage"])} options={[{ value: "SHARED_POOL", title: "Shared revenue pool", detail: "Both facilities depend on RA-01 and must be carried in the dependency analysis." },{ value: "INDEPENDENT", title: "Independent facilities", detail: "Treat Facility B outside the shared account dependency." },{ value: "UNRESOLVED", title: "Linkage unresolved", detail: "Preserve the gap rather than assume independence." }]} /><TextArea label="Explain the evidence supporting both entries." value={decisions.linkageRationale} onChange={(value) => update("linkageRationale", value)} /></section>;
+  if (stage === 5) return <section className="work-card task-card highlight"><h2>Recommend disclosure and treatment perimeter</h2><h3>Disclosure level</h3><ChoiceGroup value={decisions.disclosure} onChange={(value) => update("disclosure", value as DecisionState["disclosure"])} options={[{ value: "FULL", title: "Full contract disclosure", detail: "Strongest information transfer; scenario consent has not been established." },{ value: "REDACTED", title: "Redacted functional summary", detail: "Share control, balances, and dependency without restricted contract text." },{ value: "WITHHOLD", title: "Withhold pending consent", detail: "Preserve confidentiality while retaining an OCC information gap." }]} /><h3>Treatment perimeter</h3><ChoiceGroup value={decisions.treatmentPerimeter} onChange={(value) => update("treatmentPerimeter", value as DecisionState["treatmentPerimeter"])} options={[{ value: "BOTH_FACILITIES", title: "Carry Facilities A and B", detail: "Include the shared-pool dependency in later treatment analysis." },{ value: "FACILITY_A_ONLY", title: "Carry Facility A only", detail: "Treat Facility B as outside the current dependency perimeter." },{ value: "DEFER", title: "Defer perimeter recommendation", detail: "State that evidence is insufficient for a bounded recommendation." }]} /><TextArea label="Explain the trade-off and the boundary of your recommendation." value={decisions.disclosureRationale} onChange={(value) => update("disclosureRationale", value)} /></section>;
+  if (stage === 6) return <SubmissionStage decisions={decisions} update={update} bundle={bundle} setBundle={setBundle} setError={setError} />;
+  return <section className="work-card task-card highlight"><h2>Reflection before debrief</h2><p>The facilitator holds the detailed after-action report. Record the most important change in your reasoning so it can be compared with the decision-time record.</p><TextArea label="What evidence, dependency, or authority boundary most changed your recommendation?" value={decisions.reflection} onChange={(value) => update("reflection", value)} rows={7} /><div className="completion-note"><strong>Your detailed AAR is not shown here.</strong><span>The facilitator will reconstruct the decision sequence, realistic consequences, and deterministic counterfactuals during the debrief.</span></div>{isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => downloadEmergencyHandoff(bundle, decisions)}>Download emergency handoff file</button>}</section>;
+}
+
+function InstitutionalRequestDesk({ bundle, setBundle, setError, idPrefix = "stage" }: { bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; idPrefix?: string }) {
   const [institution, setInstitution] = useState<InstitutionRole>("TREASURY");
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -263,12 +402,46 @@ function InstitutionalRequestDesk({ bundle, setBundle, setError }: { bundle: Par
     catch (caught) { setError(caught instanceof Error ? caught.message : "Request failed"); }
     finally { setBusy(false); }
   }
-  return <section className="exception-desk" aria-labelledby="exception-desk-title"><h3 id="exception-desk-title">Request something not listed</h3><p>Use this only for a material question outside the routine evidence menu. The facilitator will answer in the named institutional role.</p><div className="request-compose"><label>Institution<select value={institution} onChange={(event) => setInstitution(event.target.value as InstitutionRole)}>{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label><label>Request<textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><button type="button" className="secondary-button" disabled={busy || question.trim().length < 2} onClick={() => void send()}>{busy ? "Sending…" : "Send request"}</button></div><div className="request-history" aria-live="polite">{bundle.messages.map((message) => <article key={message.id}><small>{message.institution.replaceAll("_", " ")} · {message.status.toLowerCase()}</small><p><strong>You:</strong> {message.question}</p>{message.reply ? <p><strong>{message.institution.replaceAll("_", " ")}:</strong> {message.reply}</p> : <p className="muted-copy">{isLocalBundle(bundle) ? "Saved for the emergency handoff; no live facilitator is connected." : "Awaiting facilitator response."}</p>}</article>)}</div></section>;
+  const titleId = `${idPrefix}-exception-desk-title`;
+  return <section className="exception-desk" aria-labelledby={titleId}><h3 id={titleId}>Request something not listed</h3><p>Use this only for a material question outside the routine evidence menu. The facilitator will answer in the named institutional role.</p><div className="request-compose"><label>Institution<select value={institution} onChange={(event) => setInstitution(event.target.value as InstitutionRole)}>{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label><label>Request<textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><button type="button" className="secondary-button" disabled={busy || question.trim().length < 2} onClick={() => void send()}>{busy ? "Sending…" : "Send request"}</button></div><div className="request-history" aria-live="polite">{bundle.messages.length ? bundle.messages.map((message) => <article key={message.id}><small>{message.institution.replaceAll("_", " ")} · {message.status.toLowerCase()}</small><p><strong>You:</strong> {message.question}</p>{message.reply ? <p><strong>{message.institution.replaceAll("_", " ")}:</strong> {message.reply}</p> : <p className="muted-copy">{isLocalBundle(bundle) ? "Saved for the emergency handoff; no live facilitator is connected." : "Awaiting facilitator response."}</p>}</article>) : <p className="communications-empty">No exceptional institutional requests have been sent.</p>}</div></section>;
+}
+
+function CommunicationsPanel({ bundle, setBundle, setError, error, now, onClose }: { bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; error: string; now: number; onClose: () => void }) {
+  const [activeChannel, setActiveChannel] = useState<"facilitator" | "evidence" | "institutions">("facilitator");
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
+
+  return <div className="drawer-scrim communications-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="communications-dialog" role="dialog" aria-modal="true" aria-labelledby="communications-title" onKeyDown={(event) => {
+    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }}><header className="communications-head"><div><h2 id="communications-title">Communications</h2><p>Internal team and institutional counterparts</p></div><div className="communications-head-actions"><span className="pill"><span className="status-dot" />{bundle.messages.filter((message) => message.status === "PENDING").length} awaiting reply</span><button type="button" className="secondary-button" autoFocus onClick={onClose}>Close</button></div></header><div className="communications-layout">
+    <aside className="communications-sidebar" aria-label="Communication channels"><div className="communications-sidebar-head"><strong>Channels</strong><span>Internal team + external counterparts</span></div>{[
+      { id: "facilitator" as const, initials: "FR", title: "Facilitator room", subtitle: "Room-wide broadcasts", count: bundle.injects.length },
+      { id: "evidence" as const, initials: "ED", title: "Evidence desk", subtitle: "Requests and returns", count: bundle.evidenceRequests.length },
+      { id: "institutions" as const, initials: "IR", title: "Institutional requests", subtitle: "Counterpart correspondence", count: bundle.messages.length },
+    ].map((channel) => <button key={channel.id} type="button" className={`communications-channel ${activeChannel === channel.id ? "active" : ""}`} aria-pressed={activeChannel === channel.id} onClick={() => setActiveChannel(channel.id)}><span className="communications-channel-avatar" aria-hidden="true">{channel.initials}</span><span className="communications-channel-copy"><strong>{channel.title}</strong><span>{channel.subtitle}</span></span><span className="communications-channel-count">{channel.count}</span></button>)}</aside>
+    <section className="communications-thread-wrap" aria-live="polite"><div className="communications-thread-head"><div><strong>{activeChannel === "facilitator" ? "Facilitator room" : activeChannel === "evidence" ? "Evidence desk" : "Institutional requests"}</strong><span>{activeChannel === "facilitator" ? "Room-wide workshop direction" : activeChannel === "evidence" ? "Routine evidence correspondence" : "Finance Ministry, Legal, Treasury, creditors, and IMF"}</span></div><span className="communications-visibility">{activeChannel === "facilitator" ? "Internal" : "Recorded"}</span></div><div className="communications-thread" tabIndex={0}>
+      {error && <div className="error-panel" role="alert">{error}</div>}
+      {activeChannel === "facilitator" && (bundle.injects.length ? <div className="communications-list">{bundle.injects.map((inject) => <article key={inject.id}><small>{new Date(inject.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small><strong>{inject.title}</strong><p>{inject.body}</p></article>)}</div> : <p className="communications-empty">No facilitator broadcasts yet.</p>)}
+      {activeChannel === "evidence" && (bundle.evidenceRequests.length ? <div className="communications-list">{bundle.evidenceRequests.map((request) => { const definition = EVIDENCE_CATALOG.find((item) => item.id === request.evidenceId); const ready = evidenceIsAvailable(request, new Date(now)); return <article key={request.id}><small>{definition?.requestedFrom ?? "Institution"} · {ready ? "returned" : "in flight"}</small><strong>{definition?.title ?? "Evidence request"}</strong><p>{ready ? definition?.details : `Requested ${new Date(request.requestedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Awaiting the authored response time or facilitator release.`}</p>{ready && definition && <cite>{definition.sourceLabel}</cite>}</article>; })}</div> : <p className="communications-empty">No routine evidence has been requested. Requests are initiated in the Evidence stage.</p>)}
+      {activeChannel === "institutions" && <InstitutionalRequestDesk bundle={bundle} setBundle={setBundle} setError={setError} idPrefix="communications" />}
+    </div></section>
+    <aside className="communications-context" aria-label="Channel context"><span className="eyebrow">Channel context</span><h3>{activeChannel === "facilitator" ? "Workshop direction" : activeChannel === "evidence" ? "Evidence record" : "Institutional role-play"}</h3><p>{activeChannel === "facilitator" ? "Broadcasts are issued by the facilitator to every participant in the shared scenario." : activeChannel === "evidence" ? "Routine evidence responses follow authored scenario rules. Returned material becomes part of your decision record." : "Unusual requests are routed to the facilitator, who replies in the selected institutional role."}</p><dl><div><dt>Broadcasts</dt><dd>{bundle.injects.length}</dd></div><div><dt>Evidence requests</dt><dd>{bundle.evidenceRequests.length}</dd></div><div><dt>Institutional messages</dt><dd>{bundle.messages.length}</dd></div></dl></aside>
+  </div><footer className="communications-footnote"><span><strong>Process evidence:</strong> requests, responses, and facilitator interventions are preserved for replay.</span><span>Message volume and response speed are not competence measures.</span></footer></section></div>;
 }
 
 function SubmissionStage({ decisions, update, bundle, setBundle, setError }: { decisions: DecisionState; update: <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void }) {
   const canSubmit = Boolean(decisions.readiness && decisions.finalRationale.trim());
-  return <section className="work-card"><h2>DMO recommendation</h2><p>This submission is a recommendation, not a sovereign commitment or creditor assurance. You may submit a conditional or not-ready package with unresolved evidence.</p><ChoiceGroup value={decisions.readiness} onChange={(value) => update("readiness", value as DecisionState["readiness"])} options={[{ value: "READY", title: "Ready", detail: "The evidence state supports advancing the DMO package without a blocking dependency." },{ value: "READY_WITH_CONDITIONS", title: "Ready with conditions", detail: "Advance only with the conditions and unresolved dependencies stated." },{ value: "NOT_READY", title: "Not ready", detail: "The DMO record does not support advancing the package." }]} /><TextArea label="Unresolved risks" value={decisions.unresolvedRisks} onChange={(value) => update("unresolvedRisks", value)} /><TextArea label="Final recommendation rationale" value={decisions.finalRationale} onChange={(value) => update("finalRationale", value)} rows={6} /><div className="submission-bar"><div><strong>{bundle.submissions.length} version{bundle.submissions.length === 1 ? "" : "s"} submitted</strong><span>Every submission is retained in the AAR.</span></div><button type="button" className="record-button" disabled={!canSubmit || bundle.session.submissionsClosed} onClick={() => { void saveDecisions(bundle, decisions, 6).then((saved) => submitRecommendation(saved)).then(setBundle).catch((caught) => setError(caught instanceof Error ? caught.message : "Submission failed")); }}>{bundle.session.submissionsClosed ? "Submissions closed" : "Submit recommendation"}</button></div></section>;
+  return <section className="work-card task-card highlight"><h2>DMO recommendation</h2><p>This submission is a recommendation, not a sovereign commitment or creditor assurance. You may submit a conditional or not-ready package with unresolved evidence.</p><ChoiceGroup value={decisions.readiness} onChange={(value) => update("readiness", value as DecisionState["readiness"])} options={[{ value: "READY", title: "Ready", detail: "The evidence state supports advancing the DMO package without a blocking dependency." },{ value: "READY_WITH_CONDITIONS", title: "Ready with conditions", detail: "Advance only with the conditions and unresolved dependencies stated." },{ value: "NOT_READY", title: "Not ready", detail: "The DMO record does not support advancing the package." }]} /><TextArea label="Unresolved risks" value={decisions.unresolvedRisks} onChange={(value) => update("unresolvedRisks", value)} /><TextArea label="Final recommendation rationale" value={decisions.finalRationale} onChange={(value) => update("finalRationale", value)} rows={6} /><div className="submission-bar"><div><strong>{bundle.submissions.length} version{bundle.submissions.length === 1 ? "" : "s"} submitted</strong><span>Every submission is retained in the AAR.</span></div><button type="button" className="record-button" disabled={!canSubmit || bundle.session.submissionsClosed} onClick={() => { void saveDecisions(bundle, decisions, 6).then((saved) => submitRecommendation(saved)).then(setBundle).catch((caught) => setError(caught instanceof Error ? caught.message : "Submission failed")); }}>{bundle.session.submissionsClosed ? "Submissions closed" : "Submit recommendation"}</button></div></section>;
 }
 
 function ChoiceGroup({ value, onChange, options }: { value?: string; onChange: (value: string) => void; options: Array<{ value: string; title: string; detail: string }> }) {
@@ -289,6 +462,16 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const turns = useMemo(() => bundle.advisorTurns.filter((turn) => turn.advisorId === advisorId), [bundle.advisorTurns, advisorId]);
+  const profile = ADVISOR_PROFILES[advisorId];
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    };
+  }, []);
 
   async function send() {
     const prompt = question.trim(); if (!prompt) return;
@@ -322,5 +505,25 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
 
   function stopRecording() { if (recorder.current?.state === "recording") recorder.current.stop(); setRecording(false); }
 
-  return <div className="drawer-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="advisor-drawer" role="dialog" aria-modal="true" aria-labelledby="advisor-title"><header><div className="advisor-person"><img src={advisorId === "amara" ? "/img/Amara Okoye.jpg" : "/img/Daniel Mensah.jpg"} alt={advisorId === "amara" ? "Amara Okoye" : "Daniel Mensah"} /><div><span className="eyebrow">Participant-visible context only</span><h2 id="advisor-title">{advisorId === "amara" ? "Amara Okoye" : "Daniel Mensah"}</h2></div></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close advisors">×</button></header><div className="advisor-tabs"><button type="button" className={advisorId === "amara" ? "active" : ""} onClick={() => setAdvisorId("amara")}><img src="/img/Amara Okoye.jpg" alt="" /><span><strong>Amara Okoye</strong><small>Country and process</small></span></button><button type="button" className={advisorId === "daniel" ? "active" : ""} onClick={() => setAdvisorId("daniel")}><img src="/img/Daniel Mensah.jpg" alt="" /><span><strong>Daniel Mensah</strong><small>Contracts and treatment</small></span></button></div><div className="conversation" aria-live="polite">{turns.length === 0 && <div className="advisor-intro">Ask for an explanation of visible evidence, decision criteria, or process. Advisors cannot select your recommendation or reveal hidden state.</div>}{turns.map((turn) => <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{advisorId === "amara" ? "Amara" : "Daniel"}</strong><p>{turn.answer}</p><div className="citations">{turn.sources.map((source) => <span key={source}>{source}</span>)}<span>{turn.mode === "AI" ? "AI response" : "Scripted fallback"}</span></div></div></article>)}</div>{error && <div className="error-panel" role="alert">{error}</div>}<div className="advisor-compose"><label><span>Review or edit the transcript before sending</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle"><input type="checkbox" checked={voiceReply} onChange={(event) => setVoiceReply(event.target.checked)} />Speak replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div></section></div>;
+  function playWelcome(welcome: string) {
+    if (!("speechSynthesis" in window)) { setError("Spoken welcome is not supported in this browser. The complete transcript remains visible."); return; }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(welcome);
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  return <div className="advisor-workspace-scrim" role="presentation"><section className="advisor-workspace" role="dialog" aria-modal="true" aria-labelledby="advisor-title" onKeyDown={(event) => {
+    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }}><header className="advisor-workspace-head"><div><h2 id="advisor-title">AI advisors</h2><p>Two case-grounded advisors explain evidence and process boundaries. They will not make your decision.</p></div><button className="secondary-button" type="button" autoFocus onClick={onClose}>Close</button></header><div className="advisor-workspace-body">
+    <aside className="advisor-briefs" aria-label="Advisor briefs"><div className="advisor-selector" aria-label="Choose an advisor">{(Object.entries(ADVISOR_PROFILES) as Array<[AdvisorId, typeof profile]>).map(([id, advisor]) => <button key={id} type="button" aria-pressed={advisorId === id} onClick={() => setAdvisorId(id)}><img src={advisor.image} alt="" /><span><strong>{advisor.name}</strong><small>{advisor.shortName === "Amara" ? "Country and process" : "Contracts and treatment"}</small></span></button>)}</div><article className="advisor-brief-card selected"><div className="advisor-brief-head"><img src={profile.image} alt={profile.name} /><div><strong>{profile.name}</strong><small>{profile.bio}</small><span>{profile.role}</span></div></div><p>{profile.brief}</p><details className="advisor-welcome-message"><summary>Read welcome transcript</summary><p>{profile.welcome}</p></details><div className="advisor-brief-actions"><button type="button" className="text-button" onClick={() => playWelcome(profile.welcome)}>Play welcome</button></div></article></aside>
+    <section className="advisor-chat" aria-labelledby="active-advisor-name"><header className="advisor-chat-head"><div className="advisor-person"><img src={profile.image} alt="" /><div><span className="eyebrow">Active advisor</span><h3 id="active-advisor-name">{profile.name}</h3><p className="advisor-active-bio">{profile.bio}</p><small>{profile.role}</small></div></div></header><div className="advisor-conversation" role="log" aria-live="polite" aria-label={`Conversation with ${profile.name}`} tabIndex={0}>{turns.map((turn) => <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{profile.shortName}</strong><p>{turn.answer}</p><div className="citations">{turn.sources.map((source) => <span key={source}>{source}</span>)}<span>{turn.mode === "AI" ? "AI response" : "Scripted fallback"}</span></div></div></article>)}</div><div className="advisor-suggestions" aria-label={`Suggested questions for ${profile.name}`}>{profile.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>{error && <div className="error-panel advisor-error" role="alert">{error}</div>}<div className="advisor-compose"><label><span>Review or edit the transcript before sending</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle"><input type="checkbox" checked={voiceReply} onChange={(event) => setVoiceReply(event.target.checked)} />Speak replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div><footer>AI advisor · participant-visible case context only · no hidden-state disclosure · no decision recommendation</footer></section>
+  </div></section></div>;
 }

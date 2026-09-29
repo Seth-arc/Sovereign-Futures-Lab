@@ -8,6 +8,7 @@
 - Human role: **Debt Management Office**
 - Duration: **20 minutes**
 - Capacity: **20–50 individual participants and one facilitator**
+- Site icon: **AidData Brandmark** from `public/assets/AidData Brandmark.png` on every deployable page
 
 ## Scenario facts
 
@@ -20,16 +21,26 @@
 
 ## Participant journey
 
-1. Confirm mandate.
-2. Diagnose the USD 780 million liquidity claim.
-3. Request evidence or proceed with uncertainty.
-4. Update the debt record.
-5. Assess Facility A/B linkage and account control.
-6. Prepare disclosure and treatment-perimeter recommendations.
-7. Submit a versioned DMO recommendation.
-8. Complete a short reflection.
+1. Complete the Debt Management Office orientation and subject-matter Learning Bridge.
+2. Review the role-visible Kuvera Case File: country profile, indicators and DSA, creditor architecture, contracts and escrow, Common Framework process, and evidence basis.
+3. Confirm mandate.
+4. Diagnose the USD 780 million liquidity claim.
+5. Request evidence or proceed with uncertainty.
+6. Update the debt record.
+7. Assess Facility A/B linkage and account control.
+8. Prepare disclosure and treatment-perimeter recommendations.
+9. Submit a versioned DMO recommendation.
+10. Complete a short reflection.
 
-Participants may revisit unlocked steps. Facilitator pacing determines which new step is available. A participant may submit `READY`, `READY_WITH_CONDITIONS`, or `NOT_READY`; unresolved evidence never blocks an honest non-ready recommendation.
+Orientation, the Learning Bridge, and the complete Case File remain available throughout the exercise without resetting participant work. Participants may revisit unlocked steps. Facilitator pacing determines which new step is available. A participant may submit `READY`, `READY_WITH_CONDITIONS`, or `NOT_READY`; unresolved evidence never blocks an honest non-ready recommendation.
+
+The live participant room has one navigation model: the accepted eight-stage process flow on the left and the decision workspace in the center. Orientation retains the reference modal styling and motion but is rendered transparently over that live room, so it never presents a second or obsolete rail. The prototype's right-hand current-step guide is intentionally absent because it duplicates the active stage heading and does not map cleanly to the facilitator-paced build. The top bar shows the enlarged Sovereign identity without repeating the participant role, followed by the clock, Communications, Case File, and a hamburger menu for the Glossary, light/dark mode, and Exit. Exit saves current work before clearing the local participant session and returning to the landing page. Orientation, Learning Bridge, and AI-advisor controls remain at lower left.
+
+Communications is a separate full-screen workspace and never changes the participant's current process stage. It retains the reference channel rail, central correspondence thread, and channel-context panel while consolidating facilitator broadcasts, requested-evidence status and returned content, and exceptional institutional requests and replies. On supported laptop layouts, the workspace uses the reference interface's 150% visual scale while compensating its layout dimensions so it remains within one viewport. Routine requests are still initiated from the Evidence stage so the decision record retains the correct stage context.
+
+AI Advisors opens as a full-page workspace without changing the participant's process stage. On supported laptop layouts it uses a viewport-compensated 150% visual scale, preventing outer-page or profile-panel scrolling. A compact selector shows one advisor brief at a time alongside the grounded text/voice conversation; longer conversation history remains the only internal overflow region. Each complete welcome transcript remains available in a collapsed disclosure and through its Play welcome control so the default view stays focused. The interface omits the redundant readiness prompt, participant-support kicker, selector instruction, and visible-evidence badge. Advisor identity is presented as name, professional biography, then advisory remit. Advisor responses remain limited to participant-visible evidence and may explain but never choose or alter a decision.
+
+The interface intentionally omits the redundant advisor readiness prompt, participant-support kicker, selector instruction, and visible-evidence badge. The Close, Hold to speak, and Ask advisor controls use the same dimensions and compact typography as the participant reference-tool buttons while retaining their distinct action states.
 
 ## Deterministic boundary
 

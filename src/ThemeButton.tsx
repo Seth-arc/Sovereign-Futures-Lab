@@ -8,11 +8,12 @@ function initialTheme(): Theme {
   return "dark";
 }
 
-export function ThemeButton() {
+export function ThemeButton({ variant = "default", onToggle }: { variant?: "default" | "menu"; onToggle?: () => void }) {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("sovereign-theme", theme);
   }, [theme]);
-  return <button type="button" className="theme-button" aria-label={`Use ${theme === "dark" ? "light" : "dark"} theme`} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "Light" : "Dark"}</button>;
+  const nextTheme = theme === "dark" ? "light" : "dark";
+  return <button type="button" className={variant === "menu" ? "menu-item" : "theme-button"} aria-label={`Use ${nextTheme} theme`} onClick={() => { setTheme(nextTheme); onToggle?.(); }}>{variant === "menu" ? `Switch to ${nextTheme} mode` : nextTheme === "light" ? "Light" : "Dark"}</button>;
 }
