@@ -193,4 +193,13 @@ describe("reference interface fidelity", () => {
   it('guards the asynchronous exit save against an unavailable participant bundle', () => {
     expect(participantSource).toMatch(/async function exitWorkshop\(\) \{\r?\n\s+if \(!bundle \|\| !decisions\) return;/);
   });
+
+  it('keeps citations out of participant chat and sizes the conversation proportionally', () => {
+    expect(styles).toContain('.advisor-conversation .citations { display: none; }');
+    expect(styles).toContain('.advisor-conversation .question { width: 64%; margin-left: auto;');
+    expect(styles).toContain('.advisor-conversation .answer { width: 74%; margin-right: auto;');
+    expect(styles).toContain('.advisor-conversation .question, .advisor-conversation .answer { padding: 8px 10px;');
+    expect(styles).toContain('.advisor-conversation p { margin: 4px 0 0; font-size: .6rem; line-height: 1.45; }');
+    expect(referenceExperienceSource).not.toContain('include sources');
+  });
 });

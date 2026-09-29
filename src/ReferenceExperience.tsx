@@ -62,7 +62,7 @@ function alignOrientationCopy(referenceDocument: Document) {
   } else if (title.textContent === "Two advisors, on call") {
     setContent(
       "Two advisors, on call",
-      "<b>Amara Okoye</b> covers the country, creditor architecture, and Common Framework sequence. <b>Daniel Mensah</b> covers contracts, restricted accounts, effective control, disclosure, and comparability.<br><br>Open AI advisors from the lower-left control. Their answers use participant-visible evidence, include sources, and cannot choose your recommendation or reveal hidden state.",
+      "<b>Amara Okoye</b> covers the country, creditor architecture, and Common Framework sequence. <b>Daniel Mensah</b> covers contracts, restricted accounts, effective control, disclosure, and comparability.<br><br>Open AI advisors from the lower-left control. Their answers are grounded in participant-visible evidence and cannot choose your recommendation or reveal hidden state.",
       "Look bottom left · AI advisors",
     );
   } else if (title.textContent === "The debrief is the point") {

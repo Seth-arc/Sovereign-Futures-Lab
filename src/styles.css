@@ -381,13 +381,13 @@ label { display: grid; gap: 7px; margin: 15px 0; color: var(--muted); font-size:
 .advisor-person small { display: block; margin-top: 3px; color: var(--quiet); font-size: .61rem; }
 .advisor-conversation { min-height: 0; overflow-y: auto; padding: 20px; }
 .advisor-conversation:focus-visible { outline: 3px solid var(--recorded); outline-offset: -3px; }
-.advisor-conversation article { margin: 0 0 20px; }
-.advisor-conversation .question, .advisor-conversation .answer { padding: 13px 15px; border-radius: 2px; }
-.advisor-conversation .question { margin-left: 15%; background: var(--surface-2); }
-.advisor-conversation .answer { margin-right: 8%; border: 1px solid var(--edge); background: var(--surface); }
-.advisor-conversation p { margin: 5px 0 0; }
-.citations { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
-.citations span { padding: 4px 6px; border: 1px solid rgb(201 164 104 / 25%); color: var(--attention); font-size: .62rem; }
+.advisor-conversation article { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; }
+.advisor-conversation .question, .advisor-conversation .answer { padding: 8px 10px; border-radius: 2px; }
+.advisor-conversation .question { width: 64%; margin-left: auto; background: var(--surface-2); }
+.advisor-conversation .answer { width: 74%; margin-right: auto; border: 1px solid var(--edge); background: var(--surface); }
+.advisor-conversation strong { font-size: .56rem; }
+.advisor-conversation p { margin: 4px 0 0; font-size: .6rem; line-height: 1.45; }
+.advisor-conversation .citations { display: none; }
 .advisor-suggestions { display: flex; gap: 6px; overflow-x: auto; padding: 10px 20px; border-top: 1px solid var(--edge); }
 .advisor-suggestions button { flex: 0 0 auto; padding: 7px 9px; border: 1px solid var(--edge); border-radius: var(--pill); background: transparent; color: var(--muted); font-size: .62rem; }
 .advisor-suggestions button:hover { border-color: var(--edge-lit); background: var(--surface); color: var(--text); }
