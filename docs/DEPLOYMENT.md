@@ -128,7 +128,7 @@ The Edge Functions support Groq or OpenAI. Configure one primary provider so pro
 
 ```powershell
 npx supabase secrets set GROQ_API_KEY=replace_me
-npx supabase secrets set GROQ_ADVISOR_TEXT_MODEL=replace_with_a_model_enabled_for_your_account
+npx supabase secrets set GROQ_ADVISOR_TEXT_MODEL=openai/gpt-oss-120b
 npx supabase secrets set GROQ_TRANSCRIPTION_MODEL=whisper-large-v3-turbo
 ```
 
@@ -167,10 +167,17 @@ Then test through the application with a real participant session:
 
 1. ask each advisor a grounded question;
 2. confirm the response is recorded for the facilitator report;
-3. record a short microphone question and confirm an editable transcript is returned;
-4. temporarily use an invalid provider key in rehearsal and confirm text falls back safely;
-5. restore the correct key and confirm voice works again;
-6. inspect Supabase Edge Function logs and confirm no secret, raw authorization token, or microphone file is logged.
+3. greet each advisor and confirm each gives a brief, natural, in-character greeting;
+4. confirm Amara uses a measured explanatory cadence while Daniel uses a concise fact/boundary/implication cadence;
+5. confirm each visible answer reveals progressively, then enable reduced motion at the operating-system level and confirm the complete answer appears immediately;
+6. enable Speak replies, play both welcomes, and confirm Amara and Daniel sound distinct while both complete transcripts remain visible;
+7. repeat the voice check on the actual workshop browser and operating system because installed speech voices vary by device;
+8. record a short microphone question and confirm an editable transcript is returned;
+9. temporarily use an invalid provider key in rehearsal and confirm text falls back safely;
+10. restore the correct key and confirm voice works again;
+11. inspect Supabase Edge Function logs and confirm no secret, raw authorization token, or microphone file is logged.
+
+Groq supplies advisor text and participant speech-to-text in this deployment. Spoken advisor replies use the browser's installed speech-synthesis voices, with separate deterministic delivery profiles as a fallback when only one English voice is available.
 
 Supabase automatically supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to hosted Edge Functions. Do not copy the service-role key into Vercel.
 

@@ -153,7 +153,7 @@ Futureslab prefers Groq when it is configured. OpenAI can be configured as an al
 
 ```powershell
 supabase secrets set GROQ_API_KEY=replace_me
-supabase secrets set GROQ_ADVISOR_TEXT_MODEL=replace_with_an_available_model
+supabase secrets set GROQ_ADVISOR_TEXT_MODEL=openai/gpt-oss-120b
 supabase secrets set GROQ_TRANSCRIPTION_MODEL=whisper-large-v3-turbo
 ```
 
@@ -235,6 +235,9 @@ npm run dev
 - [ ] Join the rehearsal from at least three separate browser profiles.
 - [ ] Test facilitator stage controls, clock controls, injects, evidence requests, and institutional replies.
 - [ ] Test typed advisor messages and push-to-talk voice interaction.
+- [ ] Greet both advisors and confirm their distinct personalities and response cadence.
+- [ ] Confirm responses reveal progressively and appear immediately when reduced motion is enabled.
+- [ ] Play both advisor welcomes and confirm Amara and Daniel have distinct voices on the actual workshop devices while their transcripts remain visible.
 - [ ] Confirm that advisor answers include visible grounded citations.
 - [ ] Test the scripted advisor fallback by temporarily making the selected provider unavailable.
 - [ ] Submit a participant recommendation.
@@ -259,4 +262,3 @@ Setup is complete when all of the following are true:
 - [ ] Facilitator reports and exports work.
 - [ ] Rehearsal and live session data remain separate.
 - [ ] No private API key is visible in browser code, browser storage, or browser network requests.
-

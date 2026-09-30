@@ -18,6 +18,8 @@ import { evidenceIsAvailable } from "./engine";
 import { EVIDENCE_CATALOG, STAGES, WORKSHOP_TITLE } from "./scenario";
 import { ReferenceExperience, type ReferenceSurface } from "./ReferenceExperience";
 import { ThemeButton } from "./ThemeButton";
+import { ADVISOR_RESPONSE_REVEAL_INTERVAL_MS, revealAdvisorResponse, splitAdvisorResponse } from "./advisorPresentation";
+import { ADVISOR_VOICE_PROFILES, selectAdvisorVoice } from "./advisorVoice";
 import type { AdvisorId, DecisionState, InstitutionRole } from "./types";
 
 const PARTICIPANT_KEY = "futureslab-participant-id";
@@ -33,13 +35,14 @@ const GLOSSARY_TERMS = [
   { term: "Comparability of Treatment (CoT)", definition: "The assessment of whether other creditors provide treatment comparable to official creditors across debt-service, net-present-value, and duration dimensions." },
   { term: "IMF Board horizon", definition: "The eleven-week scenario deadline by which the information, treatment framework, and adequate financing assurances must support IMF Board consideration." },
 ] as const;
-const ADVISOR_PROFILES: Record<AdvisorId, { name: string; shortName: string; role: string; bio: string; image: string; brief: string; welcome: string; suggestions: readonly string[] }> = {
+const ADVISOR_PROFILES: Record<AdvisorId, { name: string; shortName: string; role: string; bio: string; image: string; brief: string; greeting: string; welcome: string; suggestions: readonly string[] }> = {
   amara: {
     name: "Amara Okoye",
     shortName: "Amara",
     role: "Country, macroeconomic context & Common Framework advisor",
     bio: "Sovereign debt economist · fifteen years on Paris Club and Common Framework cases",
     image: "/img/Amara Okoye.jpg",
+    greeting: "Hello, I'm Amara. Where would you like to begin: Kuvera's fiscal position, its creditor landscape, or the Common Framework sequence?",
     brief: "The Kuvera country profile, debt-sustainability context, creditor composition and the IMF Board horizon—plus the Common Framework sequence from debtor request through financing assurances, the OCC and the MoU to cash-effective relief.",
     welcome: "Welcome. I’m Amara, your Kuvera country and Common Framework advisor. I can help you interpret the country profile, debt sustainability context, creditor composition, and the difference between source-backed case facts and demo calibrations. I can also walk you through where Kuvera sits in the Common Framework process, what financing assurances are meant to establish, how the Official Creditor Committee and IMF program parameters fit together, and what happens from an MoU through bilateral implementation. I’ll explain the process and evidence available to you, but I won’t make the decision for you.",
     suggestions: ["Why is Kuvera in debt distress?", "Where is Kuvera in the Common Framework process?", "What are financing assurances?", "What happens after an MoU?", "Which numbers are demo calibrations?"],
@@ -50,6 +53,7 @@ const ADVISOR_PROFILES: Record<AdvisorId, { name: string; shortName: string; rol
     role: "Contracts, escrow, financing assurances & CoT advisor",
     bio: "Sovereign finance lawyer · collateralised lending and restructuring documentation",
     image: "/img/Daniel Mensah.jpg",
+    greeting: "Hello, I'm Daniel. What should we examine first: the facilities, account control, disclosure, or comparability of treatment?",
     brief: "Facility A and B, the copper-revenue account, confidentiality and cross-collateralization, formal security versus effective control, disclosure choices and commitment levels—plus the three Comparability of Treatment dimensions.",
     welcome: "Welcome. I’m Daniel Mensah, your contracts, escrow, financing assurances, and comparability advisor. I can help you work through Facility A, Facility B, the copper-revenue account, confidentiality constraints, cross-collateralization, and the distinction between formal security and effective control. I can also explain commitment levels, what counts as a financing assurance, the three Comparability of Treatment dimensions used in this simulation, and how treatment terms connect to the financing-assurances package. I’ll help you interpret the evidence and trade-offs, but I won’t classify an unresolved account or tell you which option to choose.",
     suggestions: ["What do we know about the escrow account?", "What is cross-collateralization here?", "What counts as an assurance?", "Why is CoT not one haircut number?", "What are the three CoT dimensions?"],
@@ -458,19 +462,77 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
   const [voiceReply, setVoiceReply] = useState(true);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [revealingReply, setRevealingReply] = useState<{ turnId: string; text: string; advisorName: string } | null>(null);
+  const [revealedReply, setRevealedReply] = useState("");
+  const [replyAnnouncement, setReplyAnnouncement] = useState("");
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
+  const conversation = useRef<HTMLDivElement | null>(null);
   const turns = useMemo(() => bundle.advisorTurns.filter((turn) => turn.advisorId === advisorId), [bundle.advisorTurns, advisorId]);
   const profile = ADVISOR_PROFILES[advisorId];
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const synthesis = "speechSynthesis" in window ? window.speechSynthesis : null;
+    const refreshVoices = () => setAvailableVoices(synthesis?.getVoices() ?? []);
+    refreshVoices();
+    synthesis?.addEventListener("voiceschanged", refreshVoices);
     return () => {
       document.body.style.overflow = previousOverflow;
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      synthesis?.removeEventListener("voiceschanged", refreshVoices);
+      synthesis?.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if (!revealingReply) return;
+    const responseChunks = splitAdvisorResponse(revealingReply.text);
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    let visibleChunkCount = 0;
+    let timer = 0;
+
+    const complete = () => {
+      setRevealedReply(revealingReply.text);
+      setReplyAnnouncement(`${revealingReply.advisorName} replied: ${revealingReply.text}`);
+      setRevealingReply(null);
+    };
+    if (reducedMotion || responseChunks.length === 0) {
+      complete();
+      return;
+    }
+
+    setRevealedReply("");
+    const revealNextWord = () => {
+      visibleChunkCount += 1;
+      setRevealedReply(revealAdvisorResponse(responseChunks, visibleChunkCount));
+      if (visibleChunkCount >= responseChunks.length) complete();
+      else timer = window.setTimeout(revealNextWord, ADVISOR_RESPONSE_REVEAL_INTERVAL_MS);
+    };
+    timer = window.setTimeout(revealNextWord, ADVISOR_RESPONSE_REVEAL_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [revealingReply]);
+
+  useEffect(() => {
+    if (conversation.current) conversation.current.scrollTop = conversation.current.scrollHeight;
+  }, [busy, revealedReply, advisorId]);
+
+  function speakAdvisorText(text: string) {
+    if (!("speechSynthesis" in window)) {
+      setError("Spoken replies are not supported in this browser. The complete transcript remains visible.");
+      return;
+    }
+    const voiceProfile = ADVISOR_VOICE_PROFILES[advisorId];
+    const selectedVoice = selectAdvisorVoice(availableVoices, advisorId);
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = voiceProfile.rate;
+    utterance.pitch = voiceProfile.pitch;
+    utterance.lang = selectedVoice?.lang ?? "en-US";
+    if (selectedVoice) utterance.voice = selectedVoice;
+    window.speechSynthesis.speak(utterance);
+  }
 
   async function send() {
     const prompt = question.trim(); if (!prompt) return;
@@ -479,7 +541,9 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
       const turn = await askAdvisor(bundle, advisorId, prompt);
       setBundle({ ...bundle, advisorTurns: [...bundle.advisorTurns, turn] });
       setQuestion("");
-      if (voiceReply && "speechSynthesis" in window) { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(turn.answer); utterance.rate = 0.95; window.speechSynthesis.speak(utterance); }
+      setReplyAnnouncement("");
+      setRevealingReply({ turnId: turn.id, text: turn.answer, advisorName: profile.shortName });
+      if (voiceReply) speakAdvisorText(turn.answer);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Advisor unavailable"); }
     finally { setBusy(false); }
   }
@@ -505,11 +569,7 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
   function stopRecording() { if (recorder.current?.state === "recording") recorder.current.stop(); setRecording(false); }
 
   function playWelcome(welcome: string) {
-    if (!("speechSynthesis" in window)) { setError("Spoken welcome is not supported in this browser. The complete transcript remains visible."); return; }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(welcome);
-    utterance.rate = 0.95;
-    window.speechSynthesis.speak(utterance);
+    speakAdvisorText(welcome);
   }
 
   return <div className="advisor-workspace-scrim" role="presentation"><section className="advisor-workspace" role="dialog" aria-modal="true" aria-labelledby="advisor-title" onKeyDown={(event) => {
@@ -523,6 +583,6 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }}><header className="advisor-workspace-head"><div><h2 id="advisor-title">AI advisors</h2><p>Two case-grounded advisors explain evidence and process boundaries. They will not make your decision.</p></div><button className="secondary-button" type="button" autoFocus onClick={onClose}>Close</button></header><div className="advisor-workspace-body">
     <aside className="advisor-briefs" aria-label="Advisor briefs"><div className="advisor-selector" aria-label="Choose an advisor">{(Object.entries(ADVISOR_PROFILES) as Array<[AdvisorId, typeof profile]>).map(([id, advisor]) => <button key={id} type="button" aria-pressed={advisorId === id} onClick={() => setAdvisorId(id)}><img src={advisor.image} alt="" /><span><strong>{advisor.name}</strong><small>{advisor.shortName === "Amara" ? "Country and process" : "Contracts and treatment"}</small></span></button>)}</div><article className="advisor-brief-card selected"><div className="advisor-brief-head"><img src={profile.image} alt={profile.name} /><div><strong>{profile.name}</strong><small>{profile.bio}</small><span>{profile.role}</span></div></div><p>{profile.brief}</p><details className="advisor-welcome-message"><summary>Read welcome transcript</summary><p>{profile.welcome}</p></details><div className="advisor-brief-actions"><button type="button" className="text-button" onClick={() => playWelcome(profile.welcome)}>Play welcome</button></div></article></aside>
-    <section className="advisor-chat" aria-labelledby="active-advisor-name"><header className="advisor-chat-head"><div className="advisor-person"><img src={profile.image} alt="" /><div><span className="eyebrow">Active advisor</span><h3 id="active-advisor-name">{profile.name}</h3><p className="advisor-active-bio">{profile.bio}</p><small>{profile.role}</small></div></div></header><div className="advisor-conversation" role="log" aria-live="polite" aria-label={`Conversation with ${profile.name}`} tabIndex={0}>{turns.map((turn) => <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{profile.shortName}</strong><p>{turn.answer}</p><div className="citations">{turn.sources.map((source) => <span key={source}>{source}</span>)}<span>{turn.mode === "AI" ? "AI response" : "Scripted fallback"}</span></div></div></article>)}</div><div className="advisor-suggestions" aria-label={`Suggested questions for ${profile.name}`}>{profile.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>{error && <div className="error-panel advisor-error" role="alert">{error}</div>}<div className="advisor-compose"><label><span>Review or edit the transcript before sending</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle"><input type="checkbox" checked={voiceReply} onChange={(event) => setVoiceReply(event.target.checked)} />Speak replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div><footer>AI advisor · participant-visible case context only · no hidden-state disclosure · no decision recommendation</footer></section>
+    <section className="advisor-chat" aria-labelledby="active-advisor-name"><header className="advisor-chat-head"><div className="advisor-person"><img src={profile.image} alt="" /><div><span className="eyebrow">Active advisor</span><h3 id="active-advisor-name">{profile.name}</h3><p className="advisor-active-bio">{profile.bio}</p><small>{profile.role}</small></div></div></header><div ref={conversation} className="advisor-conversation" role="log" aria-live="off" aria-busy={busy || Boolean(revealingReply)} aria-label={`Conversation with ${profile.name}`} tabIndex={0}><article className="advisor-opening"><div className="answer"><strong>{profile.shortName}</strong><p>{profile.greeting}</p></div></article>{turns.map((turn) => { const isRevealing = revealingReply?.turnId === turn.id; return <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{profile.shortName}</strong><p aria-hidden={isRevealing || undefined}>{isRevealing ? revealedReply : turn.answer}{isRevealing && <span className="advisor-stream-cursor" aria-hidden="true" />}</p><div className="citations">{turn.sources.map((source) => <span key={source}>{source}</span>)}<span>{turn.mode === "AI" ? "AI response" : "Scripted fallback"}</span></div></div></article>; })}{busy && <article className="advisor-thinking" role="status"><div className="answer"><strong>{profile.shortName}</strong><p>Considering the visible record<span aria-hidden="true">…</span></p></div></article>}</div><div className="sr-only" aria-live="polite" aria-atomic="true">{replyAnnouncement}</div><div className="advisor-suggestions" aria-label={`Suggested questions for ${profile.name}`}>{profile.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>{error && <div className="error-panel advisor-error" role="alert">{error}</div>}<div className="advisor-compose"><label><span>Review or edit the transcript before sending</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle"><input type="checkbox" checked={voiceReply} onChange={(event) => setVoiceReply(event.target.checked)} />Speak replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div><footer>AI advisor · participant-visible case context only · no hidden-state disclosure · no decision recommendation</footer></section>
   </div></section></div>;
 }

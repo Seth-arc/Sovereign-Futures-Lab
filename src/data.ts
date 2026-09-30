@@ -1,4 +1,5 @@
 import { createClient, type RealtimeChannel, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { applyAdvisorFallbackCadence, isAdvisorGreeting } from "./advisorPresentation";
 import { EVIDENCE_CATALOG, EXERCISE_TITLE } from "./scenario";
 import { EMPTY_DECISIONS } from "./types";
 import type {
@@ -445,9 +446,15 @@ export async function askAdvisor(bundle: ParticipantBundle, advisorId: AdvisorId
 
 function scriptedAdvisorTurn(bundle: ParticipantBundle, advisorId: AdvisorId, question: string): AdvisorTurn {
   const text = question.toLowerCase();
+  const greeting = isAdvisorGreeting(question);
   let answer: string;
   let sources: string[];
-  if (/780|480|liquid|cash|restrict/.test(text)) {
+  if (greeting) {
+    answer = advisorId === "amara"
+      ? "Hello—I'm Amara. I'm glad to work through this with you. We can begin with Kuvera's fiscal position, creditor landscape, or the Common Framework sequence."
+      : "Hello—I'm Daniel. Let's examine the record carefully. We can start with the facilities, account control, disclosure, or comparability of treatment.";
+    sources = ["Advisor role brief · workshop record"];
+  } else if (/780|480|liquid|cash|restrict/.test(text)) {
     answer = "The USD 780m figure is reported liquidity, not yet usable liquidity. The authored reconciliation subtracts USD 240m restricted and USD 60m protected, producing USD 480m usable. Your decision is whether the evidence available at this point supports using that verified basis or requires an explicit caveat.";
     sources = ["Kuvera Treasury reconciliation · scenario record"];
   } else if (/facility|account|collateral|link/.test(text)) {
@@ -465,6 +472,7 @@ function scriptedAdvisorTurn(bundle: ParticipantBundle, advisorId: AdvisorId, qu
       : "I can explain the account-control evidence, Facility A/B dependency, confidentiality boundary, commitment states, and treatment-perimeter criteria. I will not classify unresolved evidence or choose your disclosure posture.";
     sources = ["Kuvera case file · participant-visible"];
   }
+  if (!greeting) answer = applyAdvisorFallbackCadence(advisorId, answer);
   return {
     id: crypto.randomUUID(),
     participantId: bundle.participant.id,

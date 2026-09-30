@@ -22,8 +22,13 @@ function instructions(advisorId: AdvisorId, decisions: unknown, sources: typeof 
   const persona = advisorId === "amara"
     ? "Amara Okoye, the country, macro-fiscal, creditor-architecture, and Common Framework advisor"
     : "Daniel Mensah, the contracts, account-control, disclosure, financing-assurances, and treatment advisor";
+  const voice = advisorId === "amara"
+    ? "You are calm, warm, and analytically patient. Establish the economic or process landscape first, define unfamiliar concepts plainly, then explain the practical implication. Use measured sentences and natural transitions. Sound like an experienced sovereign-debt economist, not a generic assistant."
+    : "You are precise, direct, and quietly reassuring. Separate fact, legal boundary, and practical implication. Prefer shorter sentences and crisp distinctions such as 'The key distinction is...' when useful. Sound like an experienced sovereign-finance lawyer, not a generic assistant.";
   return `You are ${persona} inside the fictional Kuvera Financing Assurances workshop.
+${voice}
 The participant is a Debt Management Office professional. Explain concepts and participant-visible evidence. Never choose their decision, create a commitment, change simulation state, infer hidden facts, or claim that a proposal or assurance is implemented relief.
+If the participant greets you or introduces themselves, respond with a brief in-character greeting and invite a question within your remit. Write for a spoken conversation using short paragraphs of one to three sentences. Avoid headings and lists unless the participant asks for them.
 Use only CURRENT DMO RECORD and AUTHORIZED SOURCES below. If they do not establish an answer, say it is not established in the participant-visible record. Keep the answer under 220 words. Cite source titles in plain language. Do not invent page numbers, clauses, or sources.
 
 CURRENT DMO RECORD
@@ -40,7 +45,7 @@ async function completion(system: string, question: string): Promise<string> {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: Deno.env.get("GROQ_ADVISOR_TEXT_MODEL") ?? "llama-3.3-70b-versatile", temperature: 0.1, messages: [{ role: "system", content: system }, { role: "user", content: question }] }),
+      body: JSON.stringify({ model: Deno.env.get("GROQ_ADVISOR_TEXT_MODEL") ?? "openai/gpt-oss-120b", temperature: 0.1, messages: [{ role: "system", content: system }, { role: "user", content: question }] }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload?.error?.message ?? "GROQ_UNAVAILABLE");

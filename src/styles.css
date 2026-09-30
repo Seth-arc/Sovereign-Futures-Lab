@@ -48,6 +48,7 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; scrollbar-gutter: stable; background: var(--bg); font-family: var(--sans); }
 body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.55; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 body::before { content: ""; position: fixed; inset: -20vh -15vw auto; z-index: -1; height: 80vh; pointer-events: none; background: radial-gradient(50% 60% at 20% 0%, rgb(169 198 183 / 7%), transparent 72%); }
 ::selection { color: #fff; background: #004e38; }
 button, input, textarea, select { font: inherit; }
@@ -386,7 +387,11 @@ label { display: grid; gap: 7px; margin: 15px 0; color: var(--muted); font-size:
 .advisor-conversation .question { width: 64%; margin-left: auto; background: var(--surface-2); }
 .advisor-conversation .answer { width: 74%; margin-right: auto; border: 1px solid var(--edge); background: var(--surface); }
 .advisor-conversation strong { font-size: .56rem; }
-.advisor-conversation p { margin: 4px 0 0; font-size: .6rem; line-height: 1.45; }
+.advisor-conversation p { margin: 4px 0 0; white-space: pre-wrap; font-size: .6rem; line-height: 1.45; }
+.advisor-opening .answer { border-left: 2px solid var(--recorded); }
+.advisor-thinking .answer { color: var(--quiet); }
+.advisor-stream-cursor { display: inline-block; width: 2px; height: 1em; margin-left: 3px; vertical-align: -.12em; background: var(--recorded); animation: advisor-cursor 720ms steps(1, end) infinite; }
+@keyframes advisor-cursor { 50% { opacity: 0; } }
 .advisor-conversation .citations { display: none; }
 .advisor-suggestions { display: flex; gap: 6px; overflow-x: auto; padding: 10px 20px; border-top: 1px solid var(--edge); }
 .advisor-suggestions button { flex: 0 0 auto; padding: 7px 9px; border: 1px solid var(--edge); border-radius: var(--pill); background: transparent; color: var(--muted); font-size: .62rem; }
@@ -573,6 +578,7 @@ td strong, td small { display: block; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .advisor-stream-cursor { display: none; }
 }
 
 @media print {

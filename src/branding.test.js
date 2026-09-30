@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const participantSource = read("./ParticipantApp.tsx");
+const advisorFunctionSource = read("../supabase/functions/advisor-chat/index.ts");
 const facilitatorSource = read("./FacilitatorApp.tsx");
 const referenceExperienceSource = read("./ReferenceExperience.tsx");
 const themeButtonSource = read("./ThemeButton.tsx");
@@ -209,6 +210,17 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain("grid-template-columns: minmax(360px, 430px) minmax(0, 1fr)");
   });
 
+  it("gives each advisor a greeting, a distinct written cadence, and accessible progressive replies", () => {
+    expect(participantSource).toContain("profile.greeting");
+    expect(participantSource).toContain("ADVISOR_RESPONSE_REVEAL_INTERVAL_MS");
+    expect(participantSource).toContain('aria-live="off"');
+    expect(participantSource).toContain('className="sr-only" aria-live="polite"');
+    expect(advisorFunctionSource).toContain("You are calm, warm, and analytically patient.");
+    expect(advisorFunctionSource).toContain("You are precise, direct, and quietly reassuring.");
+    expect(advisorFunctionSource).toContain("respond with a brief in-character greeting");
+    expect(advisorFunctionSource).toContain('GROQ_ADVISOR_TEXT_MODEL") ?? "openai/gpt-oss-120b"');
+  });
+
   it("keeps workshop and facilitator as dedicated React entry points", () => {
     expect(workshopEntry).toContain('src="/src/main.tsx"');
     expect(facilitatorEntry).toContain('src="/src/main.tsx"');
@@ -227,7 +239,7 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain('.advisor-conversation .question { width: 64%; margin-left: auto;');
     expect(styles).toContain('.advisor-conversation .answer { width: 74%; margin-right: auto;');
     expect(styles).toContain('.advisor-conversation .question, .advisor-conversation .answer { padding: 8px 10px;');
-    expect(styles).toContain('.advisor-conversation p { margin: 4px 0 0; font-size: .6rem; line-height: 1.45; }');
+    expect(styles).toContain('.advisor-conversation p { margin: 4px 0 0; white-space: pre-wrap; font-size: .6rem; line-height: 1.45; }');
     expect(referenceExperienceSource).not.toContain('include sources');
   });
 });
