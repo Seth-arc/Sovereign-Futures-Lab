@@ -241,6 +241,9 @@ npm run dev
 - [ ] Confirm that research-backed advisor answers include an expandable Sources section with claim ID, source ID, title, exact page reference, and source classification.
 - [ ] Confirm an ordinary process or contract question does not retrieve policy proposals, while an explicit policy/reform question may retrieve a proposal that is clearly labeled as such.
 - [ ] Confirm Supabase Edge Function logs show only approved research claim IDs and never `CLAIM-CF-PROGRESS-001` or `SRC-CF-PROGRESS`.
+- [ ] Ask the four research boundary questions (all Chinese loans collateralized; MoU creates cash relief; World Bank options are current law; CoT is one haircut formula) and confirm deterministic "No" answers with structured sources.
+- [ ] Ask a question that relies on `Progress debt treatments_CF.docx` and confirm a source-gap response with no citation.
+- [ ] Confirm provider payloads contain only bounded card fields and short excerpts, never repository paths, source files, PDFs, DOCX files, or full report bodies.
 - [ ] Test the scripted advisor fallback by temporarily making the selected provider unavailable.
 - [ ] Submit a participant recommendation.
 - [ ] Begin the facilitator debrief.

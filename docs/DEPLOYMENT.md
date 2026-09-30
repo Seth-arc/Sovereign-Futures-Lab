@@ -232,10 +232,12 @@ Before collecting participant information, confirm the consent screen states tha
 - name, organization, email, decisions, activity, messages, advisor transcripts, and reflections are collected for workshop delivery and debrief;
 - the facilitator can access identified records and exports;
 - microphone audio is sent to the configured external AI provider for transcription but is not stored by this application;
-- advisor questions and relevant participant-visible scenario context may be sent to the configured AI provider;
+- advisor questions, relevant participant-visible scenario context, and selected bounded research cards may be sent to the configured AI provider; the cards contain short verified excerpts and citation metadata, not source documents or full reports;
 - application records are retained for up to 30 days and may be deleted earlier by the facilitator.
 
 Confirm the selected Supabase region and AI provider terms are acceptable for AidData. Do not claim that all provider or backup copies are deleted in exactly 30 days unless the applicable provider terms guarantee that outcome.
+
+Before production use of research-backed answers, the product owner must also confirm that the configured provider's processing and retention terms, together with each source's applicable rights, permit transfer of the approved bounded cards and short excerpts. Full-document provider processing remains blocked by `SG-005` in the source ledger.
 
 ## 9. Configure Vercel
 
@@ -302,14 +304,17 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 12. Ask a research-backed question and confirm its expandable Sources section shows the claim ID, source ID, source title, exact page reference, and source classification; confirm the same fields remain in the facilitator report.
 13. Ask an ordinary process or contract question and confirm no policy-proposal source is retrieved. Then ask an explicit policy-reform question and confirm any policy source is labeled as a proposal.
 14. Inspect the `advisor-chat` Edge Function logs for `advisor_retrieval_completed`; confirm the selected claim IDs come from the approved 21-card registry and never include `CLAIM-CF-PROGRESS-001` or `SRC-CF-PROGRESS`.
-15. Submit at least two recommendation versions and confirm both remain in the AAR.
-16. Begin debrief and confirm further submission is blocked.
-17. Export and open every individual and workshop-level format.
-18. Preview the anonymized projected comparison while identified reports remain facilitator-only.
-19. Delete a disposable rehearsal session and confirm related application records disappear.
-20. Verify local emergency mode separately and download its handoff file.
-21. Compare the participant and facilitator shells with the preserved interface references at a 1440px Chrome or Edge viewport.
-22. Confirm Escape, dialog focus trapping, focus return, keyboard-only operation, and no horizontal shell shift when opening or closing every modal workspace.
+15. Run the research boundary checks: ask whether all Chinese loans are collateralized, whether signing an MoU creates cash relief, whether the World Bank statutory options are current law, and whether CoT is one haircut formula. Each answer must begin with "No" and show the expected structured Sources disclosure.
+16. Ask a question that explicitly relies on `Progress debt treatments_CF.docx`. Confirm the answer reports a source gap, shows no source citation, and the Edge Function log records `advisor_research_boundary_returned` without an outbound model answer.
+17. Inspect an AI-provider request in a controlled rehearsal environment and confirm it contains only selected bounded card fields and short excerpts, never a source file, repository path, PDF, DOCX, or full report body.
+18. Submit at least two recommendation versions and confirm both remain in the AAR.
+19. Begin debrief and confirm further submission is blocked.
+20. Export and open every individual and workshop-level format.
+21. Preview the anonymized projected comparison while identified reports remain facilitator-only.
+22. Delete a disposable rehearsal session and confirm related application records disappear.
+23. Verify local emergency mode separately and download its handoff file.
+24. Compare the participant and facilitator shells with the preserved interface references at a 1440px Chrome or Edge viewport.
+25. Confirm Escape, dialog focus trapping, focus return, keyboard-only operation, and no horizontal shell shift when opening or closing every modal workspace.
 
 ## 12. Capacity rehearsal for 20–50 participants
 

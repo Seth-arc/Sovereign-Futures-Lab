@@ -13,6 +13,7 @@ export interface ResearchCard {
   sourceClass: string;
   pageReference: string;
   boundedClaim: string;
+  supportingExcerpt: string;
   scopeConditions: readonly string[];
   prohibitedInferences: readonly string[];
   publicUseStatus: "APPROVED_WITH_SCOPE" | "APPROVED_IF_LABELED_PROPOSAL";
@@ -30,6 +31,12 @@ export interface AdvisorCitation {
   sourceClass: string;
 }
 
+export interface ResearchBoundaryResponse {
+  kind: "BOUNDED_ANSWER" | "SOURCE_GAP";
+  answer: string;
+  claimIds: readonly string[];
+}
+
 const CF_TITLE = "Common Framework for Debt Treatments beyond the DSSI";
 const G20_TITLE = "G20 Note — Common Framework: Lessons Learned and Ways Forward";
 const MOU_TITLE = "Illustrative Template Memorandum of Understanding on Debt Treatment under the Common Framework";
@@ -44,6 +51,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_PROCESS",
     pageReference: "PDF p. 1, 'Need for Debt Treatment and Debt eligible to the Treatment'",
     boundedClaim: "The Common Framework process begins at the debtor country's request. The need for treatment and restructuring envelope are based on the IMF-WBG DSA and participating official creditors' collective assessment and should align with an upper-credit-tranche IMF-supported program.",
+    supportingExcerpt: "The process will be initiated at the request of a debtor country.",
     scopeConditions: ["Common Framework debt-treatment requests within the framework's eligibility and institutional scope."],
     prohibitedInferences: ["Do not turn this dependency into a rigid universal chronology.", "Do not claim one institution alone determines the envelope."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -59,6 +67,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_PROCESS",
     pageReference: "PDF p. 1, 'Need for Debt Treatment and Debt eligible to the Treatment'",
     boundedClaim: "The 2020 Common Framework states that eligible debt includes public and publicly guaranteed debt with original maturity over one year, while taking account of the DSSI cut-off date protecting new financing after 24 March 2020.",
+    supportingExcerpt: "Debt eligible to the treatment will include all public and publicly guaranteed debts which have an original maturity of more than one year.",
     scopeConditions: ["Use as the 2020 baseline; later case-specific treatment scope and cut-off decisions can differ."],
     prohibitedInferences: ["Do not imply every later Official Creditor Committee uses the same cut-off date or treatment perimeter."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -74,6 +83,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_PROCESS",
     pageReference: "PDF p. 1, final paragraph under 'Need for Debt Treatment and Debt eligible to the Treatment'",
     boundedClaim: "A debtor requesting treatment is expected to provide the IMF, World Bank Group, and participating creditors necessary information about public-sector financial commitments while respecting commercially sensitive information.",
+    supportingExcerpt: "necessary information regarding all public sector financial commitments (debt), while respecting commercially sensitive information.",
     scopeConditions: ["Common Framework process; precise disclosure content and legal ability remain case- and contract-specific."],
     prohibitedInferences: ["Do not infer that every participant automatically possesses all contract details.", "Do not infer that commercial sensitivity implies bad faith."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -89,6 +99,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_PROCESS",
     pageReference: "PDF pp. 1-2, 'Coordination among Official Bilateral Creditors' and 'Comparability of Treatment with Other Creditors'",
     boundedClaim: "The framework provides for coordinated official bilateral treatment and requires the debtor to seek treatment from other official bilateral and private creditors that is at least as favorable. Comparable efforts are assessed through nominal debt service, debt stock in NPV terms, and duration.",
+    supportingExcerpt: "Assessment of comparable efforts will be based on changes in nominal debt service, debt stock in net present value terms and duration of the treated claims.",
     scopeConditions: ["Common Framework baseline; assessment remains case-specific and later guidance recognizes flexibility across indicators."],
     prohibitedInferences: ["Do not collapse Comparability of Treatment into a single haircut formula."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -104,6 +115,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_PROCESS",
     pageReference: "PDF p. 1, final paragraph under 'Coordination among Official Bilateral Creditors'",
     boundedClaim: "Key treatment parameters are recorded in a legally non-binding MoU, while participating creditors implement the MoU through bilateral agreements with the debtor country.",
+    supportingExcerpt: "Creditors will implement the MoU through bilateral agreements signed with the debtor country.",
     scopeConditions: ["Common Framework official bilateral treatment."],
     prohibitedInferences: ["Do not claim an MoU itself creates realized cash relief.", "Do not claim signing completes all bilateral implementation."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -119,6 +131,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_LESSONS",
     pageReference: "PDF pp. 2-5, Summary and section 1.1",
     boundedClaim: "The 2024 G20 lessons note describes the Common Framework as a case-by-case coordination platform and summarizes major process steps while calling for improved timeliness, predictability, clarity, and information sharing.",
+    supportingExcerpt: "case-by-case basis, tailored to each borrower country's debt structure and to creditors' specific constraints.",
     scopeConditions: ["Lessons from Chad, Zambia, Ghana, and Ethiopia through October 2024."],
     prohibitedInferences: ["Do not represent the summarized steps as a fixed waterfall.", "Do not treat four cases as a universal causal model."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -134,6 +147,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_LESSONS",
     pageReference: "PDF p. 6, text below Table 1",
     boundedClaim: "The G20 note states that restructurings are time-consuming at each stage because creditors examine commitments, solve technical issues, and obtain internal approvals, while debtors assemble data including individual cashflows for debt reconciliation.",
+    supportingExcerpt: "Restructurings are time consuming at each stage.",
     scopeConditions: ["Observed lessons from the cases synthesized by the G20 note."],
     prohibitedInferences: ["Do not assign all delay to one creditor.", "Do not infer a universal duration for any step."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -149,6 +163,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_INSTITUTIONAL_LESSONS",
     pageReference: "PDF p. 11, section 1.4",
     boundedClaim: "The 2024 G20 note lists three Comparability of Treatment indicators—change in debt stock NPV, change in duration, and change in nominal debt service over the IMF program period—and states that the assessment includes flexibility across them.",
+    supportingExcerpt: "The assessment of the CoT based on the three indicators includes a certain degree of flexibility.",
     scopeConditions: ["Common Framework Comparability of Treatment implementation as discussed in the 2024 note."],
     prohibitedInferences: ["Do not infer that one indicator is dispositive in every case.", "Do not infer that the note defines a single haircut formula."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -164,6 +179,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_ILLUSTRATIVE_TEMPLATE",
     pageReference: "PDF p. 1, preamble paragraphs 2-3",
     boundedClaim: "The illustrative MoU template depicts financing assurances as a step that can pave the way for IMF Executive Board approval, followed separately by quantified treatment terms, agreement in principle, and MoU agreement.",
+    supportingExcerpt: "the OCC provided financing assurances [...] paving the way for the approval [...] by the IMF Executive Board",
     scopeConditions: ["Illustrative and non-binding; provisions are not universally applicable and cases remain tailored."],
     prohibitedInferences: ["Do not claim every Common Framework case follows this exact sequence.", "Do not claim financing assurances are final commitments from every creditor."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -179,6 +195,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_ILLUSTRATIVE_TEMPLATE",
     pageReference: "PDF p. 2, footnote 3",
     boundedClaim: "The illustrative template states that debts covered by its debt-treatment article include debts with security arrangements.",
+    supportingExcerpt: "All debts covered under Article II-1 a) and b), including those with security arrangements, shall be subject to the treatment.",
     scopeConditions: ["Illustrative template; the actual treatment perimeter remains subject to Official Creditor Committee decisions and case-specific terms."],
     prohibitedInferences: ["Do not infer every secured claim is treated identically.", "Do not infer security is irrelevant to comparability and implementation."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -194,6 +211,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "OFFICIAL_ILLUSTRATIVE_TEMPLATE",
     pageReference: "PDF p. 5, footnote 7",
     boundedClaim: "For illustrative Comparability of Treatment information sharing, the template identifies financial and non-financial terms that could affect comparability, including covenants, collateral, negative pledges, embedded options, contingencies, and other material benefits.",
+    supportingExcerpt: "Other relevant parameters also include, non-financial terms which could impact CoT, such as financial covenants, offers of collateral, negative pledge clauses",
     scopeConditions: ["Illustrative template; exact information and legal disclosure constraints remain case-specific."],
     prohibitedInferences: ["Do not claim every listed term changes Comparability of Treatment in every case.", "Do not claim contract clauses determine creditor behavior."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -209,6 +227,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_CONTRACT_ANALYSIS",
     pageReference: "PDF/report pp. 4-5 and 11-15, Introduction and Dataset",
     boundedClaim: "The study analyzes 100 publicly available loan contracts signed between 2000 and 2020 between Chinese state-owned entities and government borrowers in 24 developing countries. The sample is informative but non-random and covers a small part of the broader lending universe.",
+    supportingExcerpt: "100 debt contracts between Chinese state-owned entities and government borrowers in 24 countries [...] signed between 2000 and 2020.",
     scopeConditions: ["Preserve the sample, period, creditor, and public-availability boundaries."],
     prohibitedInferences: ["Do not universalize frequencies or terms to every Chinese loan, country, or period."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -224,6 +243,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_CONTRACT_ANALYSIS",
     pageReference: "PDF/report pp. 6-8 and 22-25, Summary and section 3.1",
     boundedClaim: "In the study's Chinese contract sample, borrower-facing confidentiality clauses are unusually broad relative to its benchmark sample, particularly in post-2014 China Eximbank contracts.",
+    supportingExcerpt: "All of the post-2014 contracts with Chinese state-owned entities in our sample contain or reference far-reaching confidentiality clauses.",
     scopeConditions: ["The contract sample and periods analyzed by the study; individual wording and legal carve-outs matter."],
     prohibitedInferences: ["Do not infer illegality, bad faith, or actual nondisclosure in every case.", "Do not infer actual creditor conduct from clause existence."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -239,6 +259,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_CONTRACT_ANALYSIS",
     pageReference: "PDF/report pp. 26-31, section 3.2",
     boundedClaim: "The study finds special or escrow accounts used as repayment security in a meaningful subset of its Chinese contract sample and little evidence in that sample that Chinese state-owned banks routinely use physical infrastructure as collateral.",
+    supportingExcerpt: "We find little evidence in our contract sample that China's state-owned banks routinely use physical infrastructure [...] as collateral.",
     scopeConditions: ["Study sample only; account details are sometimes contained in unavailable related agreements."],
     prohibitedInferences: ["Do not translate collateral into physical asset seizure.", "Do not infer that all account arrangements operate identically."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -254,6 +275,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS",
     pageReference: "report pp. 10-13 (PDF pp. 11-14), section 3.1",
     boundedClaim: "The HCC dataset identifies 620 collateralized PPG loan commitments by Chinese state-owned creditors to 158 borrowers in 57 EMDEs during 2000-2021. It classifies 46% of studied PPG lending volume as collateralized, which the authors describe as a lower-bound estimate.",
+    supportingExcerpt: "we identify 620 collateralized PPG loan commitments [...] to 158 borrowers in 57 EMDEs between 2000 and 2021.",
     scopeConditions: ["HCC Dataset v1.0, 2000-2021, PPG lending to emerging markets and developing economies."],
     prohibitedInferences: ["Do not claim all Chinese PPG lending is collateralized.", "Do not extend the percentage beyond the dataset or timeframe without new evidence."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -269,6 +291,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS",
     pageReference: "report pp. 14-17 (PDF pp. 15-18), Box 3.1 and Figure 3",
     boundedClaim: "In the HCC collateralized PPG lending portfolio, bank deposits and revenue claims are the dominant forms of collateral or quasi-collateral by lending volume, while physical and illiquid assets account for much smaller shares.",
+    supportingExcerpt: '"Bank Deposits" dominate, making up 84% of total lending volume.',
     scopeConditions: ["HCC Dataset v1.0 definitions and classification; shares can overlap because a loan may have multiple collateral types."],
     prohibitedInferences: ["Do not infer every secured transaction uses an offshore bank account.", "Do not infer physical assets are never used."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -284,6 +307,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS",
     pageReference: "report pp. 17-20 (PDF pp. 18-21), Figure 3 Panel B and surrounding text",
     boundedClaim: "Nearly two-thirds of the HCC collateralized PPG lending volume draws on assets unrelated to the financed project, and more than 70% of the portfolio collateralized against revenues relies on quasi-collateral arrangements providing effective control rather than only formal security grants.",
+    supportingExcerpt: "nearly two-thirds (62%) of the collateralized PPG lending portfolio relies on assets unrelated to the purpose of the loan.",
     scopeConditions: ["HCC Dataset v1.0 classifications of related/unrelated collateral and formal/quasi-collateral."],
     prohibitedInferences: ["Do not infer effective control guarantees enforcement.", "Do not infer all such arrangements have identical legal effect."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -299,6 +323,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS",
     pageReference: "report pp. 21-24 (PDF pp. 22-25), section 3.3",
     boundedClaim: "For nearly half of collateralized PPG lending in the HCC dataset, the same asset or asset pool supports more than one loan. The paper identifies 52 cash collateral pools securing multiple debts and describes long-lived control implications.",
+    supportingExcerpt: "For nearly half of the collateralized PPG lending portfolio, the same asset or pool of assets acts as collateral for more than one loan.",
     scopeConditions: ["HCC Dataset v1.0; predominantly same-creditor cross-collateralization in the documented cases."],
     prohibitedInferences: ["Do not infer competing creditor claims where the dataset instead shows the same creditor or group.", "Do not infer a specific restructuring outcome from cross-collateralization alone."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -314,6 +339,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "POLICY_OPTIONS_NOTE",
     pageReference: "report p. 3 and pp. 7-11 (PDF p. 4 and pp. 8-12), Background summary and 'Potential Statutory Options'",
     boundedClaim: "The World Bank note presents four statutory approaches jurisdictions could consider to encourage private-sector creditor participation: a duty to cooperate, limits on recoveries, additional immunity from attachment, and retrofitting collective action mechanisms.",
+    supportingExcerpt: "This note presents four statutory approaches that countries can consider adopting.",
     scopeConditions: ["Policy options and legal considerations as of 2022; applicability depends on jurisdiction and instrument."],
     prohibitedInferences: ["Do not represent the options as current universally applicable law.", "Do not represent them as existing Common Framework requirements."],
     publicUseStatus: "APPROVED_IF_LABELED_PROPOSAL",
@@ -329,6 +355,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "POLICY_SYNTHESIS_AND_REFORM_PROPOSAL",
     pageReference: "PDF/report pp. 2-5, sections 2.1-2.2",
     boundedClaim: "The IDOS paper recommends reforms to the Common Framework and proposes a universal code of conduct for sovereign debtors and creditors, including transparency, participation, and governance measures.",
+    supportingExcerpt: "We therefore propose the establishment of a universal code of conduct linked to the G20 Common Framework.",
     scopeConditions: ["The author's 2024 policy proposals; not an official Common Framework amendment."],
     prohibitedInferences: ["Do not treat recommendations as current binding G20 rules.", "Do not use them as evidence of how every restructuring currently operates."],
     publicUseStatus: "APPROVED_IF_LABELED_PROPOSAL",
@@ -344,6 +371,7 @@ export const RESEARCH_CARDS: readonly ResearchCard[] = [
     sourceClass: "EMPIRICAL_AND_CONTEXTUAL_RESEARCH_REPORT",
     pageReference: "PDF pp. 4-6 (Executive Summary) and PDF pp. 20-22 (Chapter 1, report pp. 7-9)",
     boundedClaim: "Chasing China presents broad evidence that China's overseas lending portfolio is large, globally distributed, and increasingly difficult to track in official sources over the study period.",
+    supportingExcerpt: "more than 30,000 projects and activities across 217 countries and territories",
     scopeConditions: ["Use only for broad contextual framing unless a more precise report section is separately registered."],
     prohibitedInferences: ["Do not use broad portfolio claims to replace contract-specific HCL/HCC evidence for Financing Assurances."],
     publicUseStatus: "APPROVED_WITH_SCOPE",
@@ -390,6 +418,78 @@ function normalize(value: string): string {
 export function isExplicitPolicyQuestion(question: string): boolean {
   const normalized = normalize(question);
   return POLICY_QUERY_TERMS.some((term) => normalized.includes(normalize(term)));
+}
+
+export function researchBoundaryResponse(question: string): ResearchBoundaryResponse | null {
+  const normalized = normalize(question);
+
+  if (
+    normalized.includes("progress debt treatments")
+    || normalized.includes("progress docx")
+    || normalized.includes("progress document")
+    || normalized.includes("progress chronology")
+  ) {
+    return {
+      kind: "SOURCE_GAP",
+      answer: "That progress chronology is a source gap, not an approved research source. Its provenance and authoritative publisher have not been established, so I cannot use it to answer. I can instead explain the verified Common Framework process or the bounded findings in the approved sources.",
+      claimIds: [],
+    };
+  }
+
+  if (
+    /\b(all|every)\b/.test(normalized)
+    && normalized.includes("chinese")
+    && normalized.includes("loan")
+    && normalized.includes("collateral")
+  ) {
+    return {
+      kind: "BOUNDED_ANSWER",
+      answer: "No. The approved dataset identifies 620 collateralized public and publicly guaranteed loan commitments by Chinese state-owned creditors across 57 emerging-market and developing economies from 2000 to 2021. Its authors describe the reported share as a lower-bound estimate; it does not establish that every Chinese loan is collateralized.",
+      claimIds: ["CLAIM-HCC-001"],
+    };
+  }
+
+  if (
+    (normalized.includes("mou") || normalized.includes("memorandum of understanding"))
+    && normalized.includes("sign")
+    && (normalized.includes("cash relief") || normalized.includes("create relief") || normalized.includes("implemented relief"))
+  ) {
+    return {
+      kind: "BOUNDED_ANSWER",
+      answer: "No. Under the official Common Framework baseline, an MoU records key treatment parameters and is legally non-binding. Participating creditors implement it through bilateral agreements, so signing the MoU does not itself create cash-effective relief.",
+      claimIds: ["CLAIM-CF-005"],
+    };
+  }
+
+  if (
+    (normalized.includes("world bank") || normalized.includes("statutory option"))
+    && (normalized.includes("current law") || normalized.includes("binding law") || normalized.includes("already law"))
+  ) {
+    return {
+      kind: "BOUNDED_ANSWER",
+      answer: "No. The World Bank note presents four statutory approaches that countries could consider adopting. They are policy options, not current universally applicable law and not existing Common Framework requirements.",
+      claimIds: ["CLAIM-WB-001"],
+    };
+  }
+
+  if (
+    (normalized.includes("cot") || normalized.includes("comparability of treatment"))
+    && (normalized.includes("one") || normalized.includes("single"))
+    && (normalized.includes("haircut") || normalized.includes("formula"))
+  ) {
+    return {
+      kind: "BOUNDED_ANSWER",
+      answer: "No. Comparability of Treatment is assessed through changes in nominal debt service, debt stock in net-present-value terms, and duration. Official guidance allows flexibility across those indicators; it does not define one universal haircut formula.",
+      claimIds: ["CLAIM-CF-004", "CLAIM-G20-003"],
+    };
+  }
+
+  return null;
+}
+
+export function researchCardsForClaimIds(claimIds: readonly string[]): ResearchCard[] {
+  const requested = new Set(claimIds);
+  return RESEARCH_CARDS.filter((card) => requested.has(card.claimId));
 }
 
 export function retrieveResearchCards(question: string, advisorId: AdvisorId, limit = 4): ResearchCard[] {
@@ -450,6 +550,7 @@ source_class: ${card.sourceClass}
 authority_tier: ${card.authorityTier}
 page_reference: ${card.pageReference}
 bounded_claim: ${card.boundedClaim}
+supporting_excerpt: ${card.supportingExcerpt}
 scope_conditions: ${card.scopeConditions.join(" | ")}
 prohibited_inferences: ${card.prohibitedInferences.join(" | ")}
 public_use_status: ${card.publicUseStatus}`).join("\n");

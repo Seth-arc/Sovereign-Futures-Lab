@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   RESEARCH_CARDS,
+  citationFor,
   citationsUsedByAnswer,
   isExplicitPolicyQuestion,
+  researchBoundaryResponse,
+  researchCardsForClaimIds,
   researchPrompt,
   retrieveResearchCards,
   stripClaimMarkers,
@@ -32,6 +35,8 @@ describe("advisor research retrieval", () => {
     expect(serialized).not.toContain("CLAIM-CF-PROGRESS-001");
     expect(serialized).not.toContain("SRC-CF-PROGRESS");
     expect(serialized.toLowerCase()).not.toContain(".docx");
+    expect(RESEARCH_CARDS.every((card) => card.supportingExcerpt.trim().length > 0)).toBe(true);
+    expect(RESEARCH_CARDS.every((card) => card.supportingExcerpt.trim().split(/\s+/).length <= 35)).toBe(true);
   });
 
   it("retrieves deterministically by topic and keyword", () => {
@@ -95,5 +100,56 @@ describe("advisor research retrieval", () => {
       "The assessment considers NPV, duration, and nominal debt service.",
     );
     expect(researchPrompt(cards)).toContain("prohibited_inferences:");
+  });
+
+  it.each([
+    ["Are all Chinese loans collateralized?", ["CLAIM-HCC-001"]],
+    ["Does signing an MoU create cash relief?", ["CLAIM-CF-005"]],
+    ["Are the World Bank statutory options current law?", ["CLAIM-WB-001"]],
+    ["Is CoT one haircut formula?", ["CLAIM-CF-004", "CLAIM-G20-003"]],
+  ])("returns a deterministic no with structured sources for boundary question: %s", (question, claimIds) => {
+    const boundary = researchBoundaryResponse(question);
+
+    expect(boundary).not.toBeNull();
+    expect(boundary.kind).toBe("BOUNDED_ANSWER");
+    expect(boundary.answer).toMatch(/^No\./);
+    expect(boundary.claimIds).toEqual(claimIds);
+    const citations = researchCardsForClaimIds(boundary.claimIds).map(citationFor);
+    expect(citations).toHaveLength(claimIds.length);
+    expect(citations.every((citation) => (
+      citation.claimId
+      && citation.sourceId
+      && citation.sourceTitle
+      && citation.pageReference
+      && citation.sourceClass
+    ))).toBe(true);
+  });
+
+  it("fails closed when a question relies on the blocked progress DOCX", () => {
+    const boundary = researchBoundaryResponse(
+      "What does Progress debt treatments_CF.docx say about the latest case chronology?",
+    );
+
+    expect(boundary).toEqual(expect.objectContaining({
+      kind: "SOURCE_GAP",
+      claimIds: [],
+    }));
+    expect(boundary.answer).toContain("source gap");
+    expect(boundary.answer).toContain("cannot use it to answer");
+  });
+
+  it("sends Groq only bounded cards and short excerpts, never source files or full reports", () => {
+    const prompt = researchPrompt(RESEARCH_CARDS);
+    const boundaryCheck = advisorFunctionSource.indexOf("researchBoundaryResponse(question)");
+    const providerCall = advisorFunctionSource.indexOf("await completion(system, messages)");
+
+    expect(prompt).toContain("bounded_claim:");
+    expect(prompt).toContain("supporting_excerpt:");
+    expect(prompt).not.toContain("verified_source_path");
+    expect(prompt).not.toContain("repository_path");
+    expect(prompt.toLowerCase()).not.toContain(".pdf");
+    expect(prompt.toLowerCase()).not.toContain(".docx");
+    expect(boundaryCheck).toBeGreaterThan(-1);
+    expect(providerCall).toBeGreaterThan(boundaryCheck);
   });
 });

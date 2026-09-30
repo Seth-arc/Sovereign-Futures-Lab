@@ -17,6 +17,8 @@ source_use_rules:
   Empirical Research Baseline.
 - If evidence is insufficient, classify the proposition as SOURCE GAP or RESEARCH HYPOTHESIS rather than filling it with model
   knowledge.
+- Public citation approval does not by itself authorize full-document processing by an external AI provider. Runtime transfer
+  is limited to approved bounded cards and short excerpts; full source files remain repository-only.
 sources:
 - source_id: SRC-CF-2020
   exact_title: Common Framework for Debt Treatments beyond the DSSI
@@ -311,10 +313,17 @@ source_gaps:
     the supplied file.
   impact: NONBLOCKING
   handling: Cite as an undated illustrative, non-binding template and never as a universal process.
+- gap_id: SG-005
+  description: Source-by-source licenses and provider terms have not been recorded as authorization to process complete reports
+    with an external AI provider.
+  impact: BLOCKING_FOR_FULL_DOCUMENT_PROVIDER_PROCESSING
+  handling: Never send source files or full report bodies to an AI provider. Before production, the product owner must confirm
+    that provider processing of the approved bounded cards and short excerpts is consistent with source rights and provider terms.
 source_selection_guidance:
   approved_retrieval_artifact: docs/research/research-cards.yaml
   runtime_retrieval:
     method: DETERMINISTIC_TOPIC_AND_KEYWORD
+    provider_payload: BOUNDED_CARD_FIELDS_AND_SHORT_EXCERPTS_ONLY
     policy_proposal_gate: EXPLICIT_POLICY_OR_REFORM_QUESTION_ONLY
     blocked_sources:
     - SRC-CF-PROGRESS

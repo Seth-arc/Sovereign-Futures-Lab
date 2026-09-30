@@ -1,7 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import {
+  citationFor,
   citationsUsedByAnswer,
+  researchBoundaryResponse,
+  researchCardsForClaimIds,
   researchPrompt,
   retrieveResearchCards,
   stripClaimMarkers,
@@ -241,6 +244,32 @@ Deno.serve(async (request) => {
     if (participantResult.error || !participantResult.data) return json({ error: "PARTICIPANT_NOT_FOUND", requestId }, 404);
 
     const sessionId = participantResult.data.session_id;
+    const boundaryResponse = researchBoundaryResponse(question);
+    if (boundaryResponse) {
+      const boundaryCards = researchCardsForClaimIds(boundaryResponse.claimIds);
+      if (boundaryCards.length !== boundaryResponse.claimIds.length) {
+        throw new Error("ADVISOR_BOUNDARY_CITATION_MISSING");
+      }
+      const inserted = await service.from("futureslab_advisor_turns").insert({
+        session_id: sessionId,
+        participant_id: participantId,
+        advisor_id: advisorId,
+        question,
+        answer: boundaryResponse.answer,
+        sources: boundaryCards.map(citationFor),
+        mode: "SCRIPTED_FALLBACK",
+      }).select("*").single();
+      if (inserted.error) throw inserted.error;
+      console.info(JSON.stringify({
+        event: "advisor_research_boundary_returned",
+        request_id: requestId,
+        advisor_id: advisorId,
+        boundary_kind: boundaryResponse.kind,
+        research_claim_ids: boundaryResponse.claimIds,
+      }));
+      return json({ turn: inserted.data, requestId });
+    }
+
     const [sessionResult, evidenceResult, injectsResult, messagesResult, historyResult] = await Promise.all([
       service.from("futureslab_sessions").select("id,kind,status,current_stage,submissions_closed").eq("id", sessionId).single(),
       service.from("futureslab_evidence_requests").select("evidence_id,available_at,released_at").eq("participant_id", participantId),
