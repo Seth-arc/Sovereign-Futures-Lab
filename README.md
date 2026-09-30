@@ -21,7 +21,7 @@ Supabase Storage is intentionally not required for this workshop slice: micropho
 
 - `/` — exact Sovereign landing reference, including its topography motion engine, theme control, login transition, and integrated six-section About modal
 - `/about` or `/about.html` — complete standalone About presentation with its original motion and navigation
-- `/workshop/` — Debt Management Office exercise; the landing modal is the single participant identity and consent gate, and this route consumes its one-time browser handoff automatically
+- `/workshop/` — Debt Management Office exercise; the landing modal is the single participant identity and consent gate, this route consumes its one-time browser handoff automatically, and Orientation opens after every successful sign-in
 - `/kuvera_debt_management_office.html` — exact preserved participant reference used at runtime for the revisitable Orientation, Learning Bridge, and six-section Case File surfaces
 - `/facilitator/` — passwordless facilitator console, restricted to `snguna@aiddata.wm.edu`
 

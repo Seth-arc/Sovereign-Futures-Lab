@@ -186,14 +186,6 @@ export function ParticipantApp() {
   }, [bundle?.participant.id, bundle?.session.id]);
 
   useEffect(() => {
-    if (!bundle) return;
-    const orientationKey = `futureslab-orientation-seen:${bundle.participant.id}`;
-    if (localStorage.getItem(orientationKey)) return;
-    localStorage.setItem(orientationKey, "true");
-    setReferenceSurface("orientation");
-  }, [bundle?.participant.id]);
-
-  useEffect(() => {
     if (!menuOpen) return;
     const closeFromOutside = (event: MouseEvent) => {
       if (event.target instanceof Node && !menuContainer.current?.contains(event.target)) setMenuOpen(false);
@@ -216,7 +208,10 @@ export function ParticipantApp() {
     try {
       const joined = await joinWorkshop(input);
       localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
-      setBundle(joined); setDecisions(joined.decisions); setStage(0);
+      setBundle(joined);
+      setDecisions(joined.decisions);
+      setStage(0);
+      setReferenceSurface("orientation");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to join the workshop.");
     } finally { setBusy(false); }
@@ -225,7 +220,11 @@ export function ParticipantApp() {
   function handleLocalJoin(input: { name: string; organization: string; email: string }) {
     const joined = joinLocalWorkshop(input);
     localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
-    setBundle(joined); setDecisions(joined.decisions); setStage(0); setError("");
+    setBundle(joined);
+    setDecisions(joined.decisions);
+    setStage(0);
+    setReferenceSurface("orientation");
+    setError("");
   }
 
   async function persist(nextStage = stage) {

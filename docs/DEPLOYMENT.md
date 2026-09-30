@@ -283,9 +283,9 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 
 1. Verify the landing motion, theme switch, About modal, modal keyboard behavior, validation, consent, and workshop transition.
 2. Verify all six About sections and the standalone `/about` route.
-3. Verify Orientation opens over the live room and uses the same eight-stage process rail as the exercise.
+3. Verify Orientation opens automatically over the live room after initial sign-in and after rejoining with the same email, uses the same eight-stage process rail as the exercise, and does not reopen on a normal page refresh.
 4. Verify locked stages read `Await facilitator`, and Mandate reopens the role brief.
-5. Verify the top navigation, Glossary, theme control, Exit, Learning Bridge, and all six Case File tabs preserve participant work.
+5. Verify the top navigation, Glossary, theme control, Exit, Learning Bridge, and all six Case File tabs preserve participant work; confirm light mode uses the neutral-grey canvas and differentiated surfaces without pure-white fields.
 6. Confirm only the Case File dossier content scrolls.
 7. Confirm Communications opens as a full-page workspace without changing the current process stage and shows broadcasts, evidence status, requests, and replies.
 8. Unlock every stage and confirm earlier participant work remains editable.
@@ -300,7 +300,7 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 17. Delete a disposable rehearsal session and confirm related application records disappear.
 18. Verify local emergency mode separately and download its handoff file.
 19. Compare the participant and facilitator shells with the preserved interface references at a 1440px Chrome or Edge viewport.
-20. Confirm Escape, dialog focus trapping, focus return, and keyboard-only operation on every modal workspace.
+20. Confirm Escape, dialog focus trapping, focus return, keyboard-only operation, and no horizontal shell shift when opening or closing every modal workspace.
 
 ## 12. Capacity rehearsal for 20–50 participants
 

@@ -26,7 +26,7 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f4f5f3;
+  --bg: #e7e9e6;
   --surface: rgb(12 15 14 / 3%);
   --surface-2: rgb(12 15 14 / 5.5%);
   --surface-3: rgb(12 15 14 / 8.2%);
@@ -39,14 +39,14 @@
   --attention: #8a6316;
   --blocking: #9b3d3d;
   --team: #365a78;
-  --shell: rgb(244 245 243 / 94%);
+  --shell: rgb(231 233 230 / 96%);
   --scrim: rgb(12 15 14 / 42%);
-  --field: #fff;
+  --field: #f1f3f0;
   --shadow: 0 10px 34px rgb(12 15 14 / 10%);
 }
 
 * { box-sizing: border-box; }
-html { min-width: 320px; background: var(--bg); font-family: var(--sans); }
+html { min-width: 320px; scrollbar-gutter: stable; background: var(--bg); font-family: var(--sans); }
 body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.55; }
 body::before { content: ""; position: fixed; inset: -20vh -15vw auto; z-index: -1; height: 80vh; pointer-events: none; background: radial-gradient(50% 60% at 20% 0%, rgb(169 198 183 / 7%), transparent 72%); }
 ::selection { color: #fff; background: #004e38; }

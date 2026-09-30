@@ -26,6 +26,20 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain("grid-template-columns: 220px minmax(0, 1fr)");
   });
 
+  it("uses a low-glare grey hierarchy for the workshop light theme", () => {
+    const lightTheme = styles.match(/:root\[data-theme="light"\]\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+    expect(lightTheme).toContain("--bg: #e7e9e6");
+    expect(lightTheme).toContain("--shell: rgb(231 233 230 / 96%)");
+    expect(lightTheme).toContain("--field: #f1f3f0");
+    expect(lightTheme).not.toContain("--field: #fff");
+  });
+
+  it("keeps the page width stable while modal scroll locks are active", () => {
+    expect(styles).toContain("scrollbar-gutter: stable");
+    expect(referenceExperienceSource).toContain('document.body.style.overflow = "hidden"');
+    expect(participantSource).toContain('document.body.style.overflow = "hidden"');
+  });
+
   it("uses the exact reference branding and role imagery", () => {
     expect(participantSource).toContain('/assets/AidData Brandmark.png');
     expect(runtimeParticipantReference).toContain('src="assets/national flag.jpg"');
@@ -99,6 +113,20 @@ describe("reference interface fidelity", () => {
       const hash = createHash("sha256").update(script[1].replace(/\r\n/g, "\n"), "utf8").digest("base64");
       expect(vercelConfig).toContain(`'sha256-${hash}'`);
     }
+  });
+
+  it("opens orientation after every successful workshop sign-in", () => {
+    const cloudJoin = participantSource.slice(
+      participantSource.indexOf("async function handleJoin"),
+      participantSource.indexOf("function handleLocalJoin"),
+    );
+    const localJoin = participantSource.slice(
+      participantSource.indexOf("function handleLocalJoin"),
+      participantSource.indexOf("async function persist"),
+    );
+    expect(cloudJoin).toContain('setReferenceSurface("orientation")');
+    expect(localJoin).toContain('setReferenceSurface("orientation")');
+    expect(participantSource).not.toContain("futureslab-orientation-seen:");
   });
 
   it("keeps the embedded Case File to one accessible scroll region", () => {
