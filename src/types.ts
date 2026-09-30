@@ -104,6 +104,14 @@ export interface InstitutionalMessage {
   answeredAt?: string;
 }
 
+export interface AdvisorCitation {
+  claimId: string;
+  sourceId: string;
+  sourceTitle: string;
+  pageReference: string;
+  sourceClass: string;
+}
+
 export interface AdvisorTurn {
   id: string;
   participantId: string;
@@ -111,7 +119,7 @@ export interface AdvisorTurn {
   advisorId: AdvisorId;
   question: string;
   answer: string;
-  sources: string[];
+  sources: AdvisorCitation[];
   createdAt: string;
   mode: "AI" | "SCRIPTED_FALLBACK";
 }

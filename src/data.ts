@@ -4,6 +4,7 @@ import { EVIDENCE_CATALOG, EXERCISE_TITLE } from "./scenario";
 import { EMPTY_DECISIONS } from "./types";
 import type {
   ActivityEvent,
+  AdvisorCitation,
   AdvisorId,
   AdvisorTurn,
   DecisionState,
@@ -121,6 +122,22 @@ function mapMessage(row: Record<string, unknown>): InstitutionalMessage {
   };
 }
 
+function mapAdvisorSources(value: unknown): AdvisorCitation[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const citation = {
+      claimId: String(record.claimId ?? ""),
+      sourceId: String(record.sourceId ?? ""),
+      sourceTitle: String(record.sourceTitle ?? ""),
+      pageReference: String(record.pageReference ?? ""),
+      sourceClass: String(record.sourceClass ?? ""),
+    };
+    return Object.values(citation).every(Boolean) ? [citation] : [];
+  });
+}
+
 function mapAdvisorTurn(row: Record<string, unknown>): AdvisorTurn {
   return {
     id: String(row.id),
@@ -129,7 +146,7 @@ function mapAdvisorTurn(row: Record<string, unknown>): AdvisorTurn {
     advisorId: row.advisor_id as AdvisorId,
     question: String(row.question),
     answer: String(row.answer),
-    sources: Array.isArray(row.sources) ? row.sources.map(String) : [],
+    sources: mapAdvisorSources(row.sources),
     createdAt: iso(row.created_at),
     mode: row.mode as AdvisorTurn["mode"],
   };
@@ -155,7 +172,11 @@ function localBundle(profile?: { name: string; organization: string; email: stri
   const stored = localStorage.getItem(LOCAL_KEY);
   if (stored) {
     const parsed = JSON.parse(stored) as ParticipantBundle;
-    return { ...parsed, messages: parsed.messages ?? [] };
+    return {
+      ...parsed,
+      messages: parsed.messages ?? [],
+      advisorTurns: (parsed.advisorTurns ?? []).map((turn) => ({ ...turn, sources: mapAdvisorSources(turn.sources) })),
+    };
   }
   if (!profile) throw new Error("LOCAL_PARTICIPANT_NOT_FOUND");
   const now = new Date();
@@ -429,7 +450,7 @@ export async function askAdvisor(bundle: ParticipantBundle, advisorId: AdvisorId
   const fallback = scriptedAdvisorTurn(bundle, advisorId, question);
   if (!supabase || isLocalBundle(bundle)) saveLocal({ ...bundle, advisorTurns: [...bundle.advisorTurns, fallback] });
   if (supabase && !isLocalBundle(bundle)) {
-    await supabase.from("futureslab_advisor_turns").insert({
+    const inserted = await supabase.from("futureslab_advisor_turns").insert({
       id: fallback.id,
       session_id: fallback.sessionId,
       participant_id: fallback.participantId,
@@ -439,38 +460,46 @@ export async function askAdvisor(bundle: ParticipantBundle, advisorId: AdvisorId
       sources: fallback.sources,
       mode: fallback.mode,
       created_at: fallback.createdAt,
-    }).then(() => undefined, () => undefined);
+    });
+    if (inserted.error) throw inserted.error;
   }
   return fallback;
+}
+
+function hasVisibleEvidence(bundle: ParticipantBundle, evidenceId: string): boolean {
+  const request = bundle.evidenceRequests.find((item) => item.evidenceId === evidenceId);
+  return Boolean(request && (request.releasedAt || new Date(request.availableAt).getTime() <= Date.now()));
 }
 
 function scriptedAdvisorTurn(bundle: ParticipantBundle, advisorId: AdvisorId, question: string): AdvisorTurn {
   const text = question.toLowerCase();
   const greeting = isAdvisorGreeting(question);
   let answer: string;
-  let sources: string[];
+  const sources: AdvisorCitation[] = [];
   if (greeting) {
     answer = advisorId === "amara"
       ? "Hello—I'm Amara. I'm glad to work through this with you. We can begin with Kuvera's fiscal position, creditor landscape, or the Common Framework sequence."
       : "Hello—I'm Daniel. Let's examine the record carefully. We can start with the facilities, account control, disclosure, or comparability of treatment.";
-    sources = ["Advisor role brief · workshop record"];
   } else if (/780|480|liquid|cash|restrict/.test(text)) {
-    answer = "The USD 780m figure is reported liquidity, not yet usable liquidity. The authored reconciliation subtracts USD 240m restricted and USD 60m protected, producing USD 480m usable. Your decision is whether the evidence available at this point supports using that verified basis or requires an explicit caveat.";
-    sources = ["Kuvera Treasury reconciliation · scenario record"];
+    answer = hasVisibleEvidence(bundle, "treasury-reconciliation")
+      ? "The USD 780m figure is reported liquidity, not yet usable liquidity. The returned reconciliation subtracts USD 240m restricted and USD 60m protected, producing USD 480m usable. Your decision is whether that visible evidence supports the basis you record or still requires a caveat."
+      : "The participant-visible record currently establishes reported liquidity of USD 780m, but not a reconciled usable-liquidity figure. Request or await the Treasury cash reconciliation before treating restrictions or a lower usable balance as established.";
   } else if (/facility|account|collateral|link/.test(text)) {
-    answer = "Facilities A and B should not be assumed independent. Participant-visible agreement extracts and the dependency review establish that both rely on RA-01. That supports a shared operational dependency without claiming the facilities have identical legal security.";
-    sources = ["Facility A agreement extract · scenario-authored", "Facility B agreement extract · scenario-authored"];
+    answer = hasVisibleEvidence(bundle, "cross-collateralization")
+      ? "The returned dependency review establishes that Facilities A and B rely on the same RA-01 revenue pool. That supports a shared operational dependency without claiming the facilities have identical legal security."
+      : "The current participant-visible record does not yet establish the full Facility A/B dependency. Request or await the relevant agreement extracts and dependency review; do not infer identical security or independence while that evidence is unresolved.";
   } else if (/disclos|confidential/.test(text)) {
-    answer = "The scenario legal opinion permits a redacted functional summary of account control, balances, and facility linkage. Full contract text requires consent. I can explain those boundaries, but the disclosure recommendation remains yours.";
-    sources = ["Kuvera Legal disclosure opinion · scenario-authored"];
+    answer = hasVisibleEvidence(bundle, "confidentiality-opinion")
+      ? "The returned scenario legal opinion permits a redacted functional summary of account control, balances, and facility linkage. Full contract text requires consent. I can explain those boundaries, but the disclosure recommendation remains yours."
+      : "The participant-visible record does not yet establish Kuvera's permitted disclosure boundary. Request or await the legal confidentiality opinion before treating redaction or full-text disclosure as authorized.";
   } else if (/assurance|board|maturity|deadline/.test(text)) {
-    answer = "Keep the deadlines and commitment states separate. The USD 750m maturity arrives in six weeks, before the eleven-week IMF Board horizon. An indicative creditor position is not yet a financing assurance, and an assurance is not implementation or cash-effective relief.";
-    sources = ["IMF technical clarification · participant-visible", "Creditor communication · participant-visible"];
+    answer = hasVisibleEvidence(bundle, "imf-clarification")
+      ? "Keep the deadlines and commitment states separate. The USD 750m maturity arrives in six weeks, before the eleven-week IMF Board horizon. The returned IMF clarification establishes that an assurance remains distinct from implementation and cash-effective relief."
+      : "The visible case file establishes a USD 750m maturity in six weeks and an eleven-week IMF Board horizon. The more detailed commitment-state distinction is not yet established in your returned evidence; request or await the IMF clarification before relying on it.";
   } else {
     answer = advisorId === "amara"
       ? "I can explain Kuvera's macro-fiscal setting, the two deadlines, creditor architecture, and the Common Framework sequence. Ask about a visible case fact or process dependency; I will not select your recommendation."
       : "I can explain the account-control evidence, Facility A/B dependency, confidentiality boundary, commitment states, and treatment-perimeter criteria. I will not classify unresolved evidence or choose your disclosure posture.";
-    sources = ["Kuvera case file · participant-visible"];
   }
   if (!greeting) answer = applyAdvisorFallbackCadence(advisorId, answer);
   return {

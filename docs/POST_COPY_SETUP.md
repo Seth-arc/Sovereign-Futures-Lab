@@ -238,7 +238,9 @@ npm run dev
 - [ ] Greet both advisors and confirm their distinct personalities and response cadence.
 - [ ] Confirm responses reveal progressively and appear immediately when reduced motion is enabled.
 - [ ] Play both advisor welcomes and confirm Amara and Daniel have distinct voices on the actual workshop devices while their transcripts remain visible.
-- [ ] Confirm that advisor answers include visible grounded citations.
+- [ ] Confirm that research-backed advisor answers include an expandable Sources section with claim ID, source ID, title, exact page reference, and source classification.
+- [ ] Confirm an ordinary process or contract question does not retrieve policy proposals, while an explicit policy/reform question may retrieve a proposal that is clearly labeled as such.
+- [ ] Confirm Supabase Edge Function logs show only approved research claim IDs and never `CLAIM-CF-PROGRESS-001` or `SRC-CF-PROGRESS`.
 - [ ] Test the scripted advisor fallback by temporarily making the selected provider unavailable.
 - [ ] Submit a participant recommendation.
 - [ ] Begin the facilitator debrief.

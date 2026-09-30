@@ -1,0 +1,334 @@
+schema_version: 1.0.0
+artifact:
+  id: RSR-001
+  title: Sovereign Room Source Ledger
+  status: ACTIVE
+  canonical_home: docs/research/source-ledger.yaml
+  owner: Research Governance
+  reserved_authority_decision_required: false
+  updated_at: '2026-09-30'
+source_use_rules:
+- Use original research and official institutional sources for external factual claims only within their evidenced scope.
+- Use the narrowest sufficient source set; broader contextual sources do not override narrower evidence.
+- Sample-based findings may not be universalized to all lenders, contracts, countries, or periods.
+- Illustrative templates and policy proposals may not be represented as universally binding process or law.
+- Contract text does not by itself establish enforcement, motive, or actual creditor behavior.
+- Participant behavior may inform Scenario Calibration or generate Research Hypotheses; it does not automatically modify the
+  Empirical Research Baseline.
+- If evidence is insufficient, classify the proposition as SOURCE GAP or RESEARCH HYPOTHESIS rather than filling it with model
+  knowledge.
+sources:
+- source_id: SRC-CF-2020
+  exact_title: Common Framework for Debt Treatments beyond the DSSI
+  authors_institution:
+  - G20
+  - Paris Club
+  publication_date: '2020-11-13'
+  source_class: OFFICIAL_INSTITUTIONAL_PROCESS
+  original_file: annex_common_framework_for_debt_treatments_beyond_the_dssi.pdf
+  repository_path: docs/research/sources/g20-paris-club/common-framework.pdf
+  checksum_sha256: 1b0198e5b2c2bd5890f93473eb7e1f0da5cd51ce66d6edab2b151a58482e7cfd
+  population_case_scope: DSSI-eligible debtor countries requesting case-by-case debt treatment under the Common Framework.
+  timeframe: Framework endorsed 13 November 2020; prospective process statement.
+  methodology_basis: Official G20/Paris Club framework statement.
+  authority_scope:
+  - Common Framework purpose and eligibility framing
+  - basis for debt-treatment need and restructuring envelope
+  - official bilateral creditor coordination
+  - key treatment parameters
+  - Comparability of Treatment principle
+  - non-binding MoU and bilateral implementation structure
+  allowed_uses:
+  - Common Framework process mechanics
+  - official-creditor coordination logic
+  - treatment-perimeter and Comparability of Treatment framing
+  - agreement-versus-implementation distinction
+  prohibited_uses:
+  - asserting a rigid universal chronology
+  - assuming all creditor classes provide identical assurances
+  - treating Comparability of Treatment as one haircut formula
+  - claiming an MoU itself creates realized cash relief
+  limitations:
+  - High-level framework statement; many operational details are case-specific.
+  - Later lessons-learned material is needed for observed implementation frictions and sequencing.
+  public_citation_restrictions: PUBLIC_WITH_EXACT_PAGE_OR_SECTION_TRACE
+- source_id: SRC-G20-LL-2024
+  exact_title: 'G20 Note — Common Framework: Lessons Learned and Ways Forward'
+  authors_institution:
+  - G20 International Financial Architecture Working Group
+  publication_date: 2024-10
+  source_class: OFFICIAL_INSTITUTIONAL_LESSONS
+  original_file: G20_NOTE_Lessons learned_IFA_.pdf
+  repository_path: docs/research/sources/g20-paris-club/common-framework-lessons-2024.pdf
+  checksum_sha256: 277e78d1892ea3be9c3a2a3d864fa29b385781d11042de6a3d6156abbb9b029e
+  population_case_scope: Common Framework experience in Chad, Zambia, Ghana, and Ethiopia through the note's publication.
+  timeframe: 2020-October 2024
+  methodology_basis: Official G20 synthesis of lessons from four Common Framework cases.
+  authority_scope:
+  - case-by-case coordination experience
+  - timeliness and predictability concerns
+  - debt reconciliation and internal approval frictions
+  - information-sharing needs
+  - DSA-versus-treatment-scope questions
+  - Comparability of Treatment sequencing and indicators
+  allowed_uses:
+  - dependency and timing mechanics
+  - process-friction design
+  - information-sharing mechanics
+  - bounded scenario calibration
+  prohibited_uses:
+  - turning summarized steps into a mandatory waterfall
+  - assigning all delay to one creditor group
+  - inferring causality from chronology alone
+  limitations:
+  - Draws from four cases and explicitly preserves case-by-case treatment.
+  - Recommendations and ways forward are not the same as binding rules.
+  public_citation_restrictions: PUBLIC_WITH_EXACT_PAGE_OR_SECTION_TRACE
+- source_id: SRC-G20-MOU-TEMPLATE
+  exact_title: Illustrative Template Memorandum of Understanding on Debt Treatment under the Common Framework
+  authors_institution:
+  - G20 / official creditor process; exact document owner not stated in supplied file
+  publication_date: null
+  source_class: OFFICIAL_ILLUSTRATIVE_TEMPLATE
+  original_file: Template MoU CF G20.pdf
+  repository_path: docs/research/sources/g20-paris-club/illustrative-mou-template.pdf
+  checksum_sha256: f5580b060a4cf4defc3f68519bb5ed856ee1623f91bdef24722d7e5c17373e6d
+  population_case_scope: Illustrative official bilateral Common Framework debt-treatment MoU modeled on recent cases.
+  timeframe: Undated supplied template; reflects post-2020 Common Framework practice.
+  methodology_basis: Illustrative non-binding template explicitly described as case-specific and evolving.
+  authority_scope:
+  - illustrative financing-assurances, agreement-in-principle, MoU, and bilateral implementation distinctions
+  - illustrative Comparability of Treatment information requirements
+  - illustrative treatment of security arrangements within covered debt
+  - illustrative conditions precedent and claw-back concepts
+  allowed_uses:
+  - state and lifecycle distinctions
+  - candidate information-sharing and CoT workbench inputs
+  - implementation-dependency mechanics
+  prohibited_uses:
+  - treating any provision as universally applicable
+  - treating the template as binding law
+  - claiming financing assurances are final commitments from every creditor
+  - claiming the MoU itself creates realized cash relief
+  limitations:
+  - The document explicitly says it is illustrative and non-binding.
+  - Exact publication/version metadata is not established in the supplied file.
+  public_citation_restrictions: PUBLIC_ONLY_IF_IDENTIFIED_AS_UNDATED_ILLUSTRATIVE_TEMPLATE
+- source_id: SRC-CF-PROGRESS
+  exact_title: Accessible summary – Progress of debt treatments under the Common Framework
+  authors_institution:
+  - SOURCE GAP — provenance/owner not established from supplied DOCX
+  publication_date: null
+  source_class: INTERNAL_OR_UNVERIFIED_CASE_TIMELINE
+  original_file: Progress debt treatments_CF.docx
+  repository_path: docs/research/sources/g20-paris-club/progress-debt-treatments.docx
+  checksum_sha256: 8c49b249659ba00071c8eeee6567d82318cf11f3486423ddbfde6d60ffd3a1f5
+  population_case_scope: Chronology table for Chad, Zambia, Ghana, and Ethiopia.
+  timeframe: Dates through 2025 as listed in the supplied file.
+  methodology_basis: Accessible timeline summary; provenance not established.
+  authority_scope:
+  - internal chronology cross-check only pending provenance validation
+  allowed_uses:
+  - internal cross-checking against verified official sources
+  prohibited_uses:
+  - public citation as an authoritative source
+  - using chronology as evidence of causality
+  limitations:
+  - Document provenance/owner is unresolved.
+  - Metadata does not establish an authoritative publisher.
+  public_citation_restrictions: BLOCKED_PENDING_PROVENANCE
+- source_id: SRC-HCL-2021
+  exact_title: 'How China Lends: A Rare Look into 100 Debt Contracts with Foreign Governments'
+  authors_institution:
+  - Anna Gelpern — Georgetown Law / Peterson Institute for International Economics
+  - Sebastian Horn — Kiel Institute for the World Economy
+  - Scott Morris — Center for Global Development
+  - Brad Parks — AidData, William & Mary / Center for Global Development
+  - Christoph Trebesch — Kiel Institute / Kiel University / CEPR
+  publication_date: 2021-03
+  source_class: EMPIRICAL_CONTRACT_ANALYSIS
+  original_file: How_China_Lends__A_Rare_Look_into_100_Debt_Contracts_with_Foreign_Governments.pdf
+  repository_path: docs/research/sources/aiddata/how-china-lends.pdf
+  checksum_sha256: 8d85f4900364eb989847185f1b3edea06c5d9d3867aa1d6b7cabdbeda5a50204
+  population_case_scope: 100 publicly available debt contracts between Chinese state-owned entities and government borrowers
+    in 24 developing countries; benchmark of 142 contracts.
+  timeframe: Chinese contracts signed 2000-2020.
+  methodology_basis: Systematic contract collection, coding of 100 variables, independent coding teams, and benchmark comparison.
+  authority_scope:
+  - terms in the studied contract sample
+  - confidentiality clauses
+  - special/revenue account arrangements
+  - No Paris Club clauses
+  - default/cancellation and enforcement terms
+  - sample and methodology limitations
+  allowed_uses:
+  - contractual-information mechanics
+  - restricted-account and verification mechanics
+  - creditor-specific contract feature scenarios where scope-matched
+  prohibited_uses:
+  - inferring actual creditor behavior or enforcement from clause existence
+  - claiming confidentiality implies illegality or bad faith
+  - universalizing sample findings to every Chinese loan
+  - claiming collateral inherently means seizure of physical infrastructure
+  limitations:
+  - Non-random public-availability sample; some documents/pages and related agreements are missing.
+  - The study does not systematically establish implementation or enforcement behavior.
+  public_citation_restrictions: PUBLIC_WITH_SAMPLE_SCOPE_AND_EXACT_PAGE_TRACE
+- source_id: SRC-HCC-2025
+  exact_title: How China Collateralizes
+  authors_institution:
+  - Anna Gelpern — Georgetown Law / Peterson Institute for International Economics
+  - Omar Haddad — Oxford University
+  - Sebastian Horn — Kiel Institute for the World Economy / University of Hamburg
+  - Paulina Kintzinger — Kiel Institute for the World Economy
+  - Bradley C. Parks — AidData, William & Mary / Center for Global Development
+  - Christoph Trebesch — Kiel Institute for the World Economy / CEPR
+  publication_date: 2025-06
+  source_class: EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS
+  original_file: WPS136_How_China_Collateralizes.pdf
+  repository_path: docs/research/sources/aiddata/how-china-collateralizes.pdf
+  checksum_sha256: b1181d48213c28551d145da5da36fae41e154079f21ea8f1ae1109e343d5e1e8
+  population_case_scope: 620 identified collateralized public and publicly guaranteed debt transactions from Chinese state-owned
+    institutions across 57 EMDEs.
+  timeframe: 2000-2021, with limited later contract-context references noted in the paper.
+  methodology_basis: AidData HCC Dataset v1.0 built from GCDF/TUFF sources with manual standardized coding of collateral structures.
+  authority_scope:
+  - incidence and types of collateralization in the HCC dataset
+  - bank-account and revenue-stream collateral/quasi-collateral
+  - related versus unrelated collateral
+  - cross-collateralization and cash pooling
+  - account control and funding mechanics within documented transactions
+  allowed_uses:
+  - usable-liquidity and encumbrance mechanics
+  - verification and visibility mechanics
+  - cross-collateralization dependencies
+  - bounded creditor-specific scenario construction
+  prohibited_uses:
+  - claiming all Chinese PPG loans are collateralized
+  - equating collateral with physical-asset seizure
+  - inferring practitioner behavior from the dataset
+  - using participant behavior to revise the empirical dataset
+  limitations:
+  - Collateralization estimate is explicitly described as a lower bound based on available documentation.
+  - Transparency limitations remain; source coverage varies by transaction.
+  - The paper does not establish that every contractual right is exercised in practice.
+  public_citation_restrictions: PUBLIC_WITH_DATASET_SCOPE_AND_EXACT_PAGE_TRACE
+- source_id: SRC-CHASING-CHINA-2025
+  exact_title: 'Chasing China: Learning to Play by Beijing''s Global Lending Rules'
+  authors_institution:
+  - Bradley C. Parks, Sheng Zhang, Brooke Escobar, Katherine Walsh, Rory Fedorochko, Lydia Vlasto, Jacqueline Zimmerman, Julie
+    Sickell, Emma Bury, Ameya Joshi, Lea Thome, Oshin Pandey, and Pavan Raghavendra Raja Manuri Venkata — AidData at William
+    & Mary
+  publication_date: 2025-11
+  source_class: EMPIRICAL_AND_CONTEXTUAL_RESEARCH_REPORT
+  original_file: Chasing_China_Full_Report.pdf
+  repository_path: docs/research/sources/aiddata/chasing-china.pdf
+  checksum_sha256: b2930d7680c9bfab9547ba07ccac4cb71ca8eed8e7e327c16d8c113028461ed0
+  population_case_scope: AidData CLG-Global evidence on more than 30,000 projects/activities across 217 countries and territories.
+  timeframe: 2000-2023 for the principal portfolio analysis.
+  methodology_basis: Large-scale TUFF-based data collection and synthesis drawing on over 246,000 sources as described in
+    the report.
+  authority_scope:
+  - broader evolution, scale, composition, and opacity context of Chinese overseas finance as established in the report
+  allowed_uses:
+  - contextual product/research narrative
+  - future scenario-family research when narrower sources are insufficient
+  prohibited_uses:
+  - loading by default for Financing Assurances mechanics when HCL/HCC suffice
+  - using broad context to override narrower evidence
+  limitations:
+  - Broad portfolio report; not every finding is directly relevant to Common Framework Financing Assurances.
+  public_citation_restrictions: PUBLIC_WITH_EXACT_PAGE_TRACE
+- source_id: SRC-WB-STATUTORY-2022
+  exact_title: Potential Statutory Options to Encourage Private Sector Creditor Participation in the Common Framework
+  authors_institution:
+  - Blanca Ximena Talero — World Bank
+  publication_date: '2022'
+  source_class: POLICY_OPTIONS_NOTE
+  original_file: Potential Statutory Options to Encourage Private Sector Creditor Participation in the Common Framework.pdf
+  repository_path: docs/research/sources/world-bank/private-creditor-statutory-options.pdf
+  checksum_sha256: e56441b154778d6d52533414e8f643ae50b3a37162e1de1c64655ad2175d01c9
+  population_case_scope: Policy options concerning private-sector creditor participation and holdouts in Common Framework
+    restructurings.
+  timeframe: Published/copyright 2022; references then-current Common Framework experience.
+  methodology_basis: World Bank policy note reviewing contractual/statutory approaches and proposing four statutory options.
+  authority_scope:
+  - private-sector participation problem framing
+  - distinction between contractual and statutory approaches
+  - four proposed statutory options and considerations
+  allowed_uses:
+  - private-creditor/holdout context
+  - future legal-instrument scenario variants with jurisdiction-specific controls
+  prohibited_uses:
+  - treating proposed options as current universal law
+  - ignoring instrument and jurisdiction conditions
+  limitations:
+  - Policy proposals and legal analysis; not a statement that proposed statutes exist universally.
+  public_citation_restrictions: PUBLIC_IF_LABELED_AS_POLICY_OPTIONS
+- source_id: SRC-IDOS-2024
+  exact_title: 'Input to the UN-DESA Elements Paper on Financing for Development — Action area: Debt and Debt Sustainability
+    — Reforming the Global Debt Governance System: Exploring Effective and Feasible Policy Solutions'
+  authors_institution:
+  - Kathrin Berensmann — German Institute of Development and Sustainability (IDOS)
+  publication_date: '2024-10-15'
+  source_class: POLICY_SYNTHESIS_AND_REFORM_PROPOSAL
+  original_file: IDOS_FfD4 input elements paper_Debt and Debt Sustainability__Kathirn Berensmann_15-10-2024.pdf
+  repository_path: docs/research/sources/idos/debt-and-debt-sustainability-2024.pdf
+  checksum_sha256: 9dbebdd01e0c565443d4e08cbcdf923c11145fa6d1e7b2aab96aa3f059969930
+  population_case_scope: Global debt governance reform discussion focused on developing countries and Common Framework reform.
+  timeframe: October 2024 policy context.
+  methodology_basis: Policy synthesis and reform proposals drawing on cited literature and institutional sources.
+  authority_scope:
+  - broader debt-governance reform context
+  - reform proposals as presented by the author
+  allowed_uses:
+  - contextual research narrative
+  - future reform-option scenario exploration
+  prohibited_uses:
+  - treating recommendations as current binding Common Framework rules
+  - using proposals to overwrite official G20 process sources
+  limitations:
+  - Normative/policy proposal paper, not an official G20 rulebook.
+  public_citation_restrictions: PUBLIC_IF_LABELED_AS_POLICY_PROPOSAL
+source_gaps:
+- gap_id: SG-001
+  description: Existing Financing Assurances research brief referenced by the bootstrap was not supplied as a repository file.
+  impact: NONBLOCKING
+  handling: Do not cite or depend on it; derive current architecture only from ACTIVE canonical semantics and the supplied
+    original external sources.
+- gap_id: SG-002
+  description: Existing Financing Assurances mechanics-options brief referenced by the bootstrap was not supplied as a repository
+    file.
+  impact: NONBLOCKING
+  handling: Do not treat candidate mechanics as accepted engine semantics; derive future mechanics through claim-controlled
+    RTLF records.
+- gap_id: SG-003
+  description: Provenance/owner of the supplied Common Framework progress DOCX is not established.
+  impact: NONBLOCKING_FOR_ARCHITECTURE; BLOCKING_FOR_PUBLIC_CITATION
+  handling: Use only as an internal chronology cross-check until provenance is verified.
+- gap_id: SG-004
+  description: Exact publication/version metadata for the illustrative Common Framework MoU template is not established in
+    the supplied file.
+  impact: NONBLOCKING
+  handling: Cite as an undated illustrative, non-binding template and never as a universal process.
+source_selection_guidance:
+  approved_retrieval_artifact: docs/research/research-cards.yaml
+  runtime_retrieval:
+    method: DETERMINISTIC_TOPIC_AND_KEYWORD
+    policy_proposal_gate: EXPLICIT_POLICY_OR_REFORM_QUESTION_ONLY
+    blocked_sources:
+    - SRC-CF-PROGRESS
+  financing_assurances_core:
+    preferred_sources:
+    - SRC-CF-2020
+    - SRC-G20-LL-2024
+    - SRC-G20-MOU-TEMPLATE
+    - SRC-HCL-2021
+    - SRC-HCC-2025
+    supplementary_sources:
+    - SRC-WB-STATUTORY-2022
+    - SRC-IDOS-2024
+    - SRC-CHASING-CHINA-2025
+    blocked_sources:
+    - SRC-CF-PROGRESS
+  rule: Load approved Research Cards for retrieval; use the Source Ledger, Claim Register, and exact original source to audit or extend a card.

@@ -1,0 +1,520 @@
+schema_version: 1.0.0
+artifact:
+  id: RSR-003
+  title: Sovereign Room Approved Research Cards
+  status: ACTIVE
+  canonical_home: docs/research/research-cards.yaml
+  owner: Research Governance
+  updated_at: '2026-09-30'
+  approved_card_count: 21
+  excluded_claim_count: 1
+card_control_rules:
+- Each card is a bounded retrieval unit, not permission to use unregistered facts from the same source.
+- Scope conditions and prohibited inferences travel with the claim whenever it is retrieved or cited.
+- Scenario facts and deterministic engine outputs outrank external research when describing the live workshop state.
+- Policy proposals must be labeled as proposals; illustrative templates must be labeled as illustrative and non-binding.
+- Supporting excerpts are short verification anchors. Advisors should paraphrase the bounded claim and cite its source rather
+  than expand the excerpt beyond the registered scope.
+- Only cards with an approved public-use status may enter advisor retrieval.
+- Claims with blocked public-use status, including the unverified progress chronology, must never enter the runtime index.
+- Policy-proposal cards may be retrieved only when the participant explicitly asks a policy or reform question.
+- Initial advisor retrieval uses deterministic topic and keyword matching over this bounded card set; embeddings are not required.
+cards:
+- claim_id: CLAIM-CF-001
+  source_id: SRC-CF-2020
+  source_title: Common Framework for Debt Treatments beyond the DSSI
+  source_class: OFFICIAL_INSTITUTIONAL_PROCESS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    Under the Common Framework, the process is initiated at the debtor country's request; the need for treatment and
+    restructuring envelope are based on the IMF-WBG DSA and participating official creditors' collective assessment and
+    are to be consistent with parameters of an upper-credit-tranche IMF-supported program.
+  exact_page_reference: "PDF p. 1, 'Need for Debt Treatment and Debt eligible to the Treatment'"
+  scope_conditions:
+  - Applies to Common Framework debt-treatment requests within the framework's eligibility and institutional scope.
+  prohibited_inferences:
+  - Do not turn this dependency statement into a rigid universal chronology.
+  - Do not claim that one institution alone determines the restructuring envelope.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: The process will be initiated at the request of a debtor country.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework.pdf
+    verified_pdf_page: 1
+  advisor_tags: [amara]
+  topic_tags: [common-framework, debt-treatment-request, dsa, restructuring-envelope, imf-program]
+- claim_id: CLAIM-CF-002
+  source_id: SRC-CF-2020
+  source_title: Common Framework for Debt Treatments beyond the DSSI
+  source_class: OFFICIAL_INSTITUTIONAL_PROCESS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The 2020 Common Framework states that eligible debt includes public and publicly guaranteed debt with original maturity
+    of more than one year, while taking account of the DSSI cut-off date protecting new financing after 24 March 2020.
+  exact_page_reference: "PDF p. 1, 'Need for Debt Treatment and Debt eligible to the Treatment'"
+  scope_conditions:
+  - Use as the 2020 framework baseline; later case-specific treatment scope and cut-off decisions can differ.
+  prohibited_inferences:
+  - Do not imply every later Official Creditor Committee uses exactly the same cut-off date or treatment perimeter.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      Debt eligible to the treatment will include all public and publicly guaranteed debts which have an original maturity
+      of more than one year.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework.pdf
+    verified_pdf_page: 1
+  advisor_tags: [amara, daniel]
+  topic_tags: [treatment-perimeter, eligible-debt, cut-off-date, ppg-debt]
+- claim_id: CLAIM-CF-003
+  source_id: SRC-CF-2020
+  source_title: Common Framework for Debt Treatments beyond the DSSI
+  source_class: OFFICIAL_INSTITUTIONAL_PROCESS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    A debtor requesting treatment is expected to provide the IMF, World Bank Group, and participating creditors necessary
+    information regarding public-sector financial commitments while respecting commercially sensitive information.
+  exact_page_reference: "PDF p. 1, final paragraph under 'Need for Debt Treatment and Debt eligible to the Treatment'"
+  scope_conditions:
+  - Common Framework process; precise disclosure content and legal ability can remain case- and contract-specific.
+  prohibited_inferences:
+  - Do not infer that all creditors or participants automatically possess all contract details.
+  - Do not infer that commercial sensitivity implies bad faith.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      necessary information regarding all public sector financial commitments (debt), while respecting commercially
+      sensitive information.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework.pdf
+    verified_pdf_page: 1
+  advisor_tags: [amara, daniel]
+  topic_tags: [information-sharing, disclosure, confidentiality, verification]
+- claim_id: CLAIM-CF-004
+  source_id: SRC-CF-2020
+  source_title: Common Framework for Debt Treatments beyond the DSSI
+  source_class: OFFICIAL_INSTITUTIONAL_PROCESS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The framework provides for coordinated official bilateral treatment and requires the debtor to seek from other official
+    bilateral and private creditors treatment at least as favorable; comparable efforts are assessed using changes in
+    nominal debt service, debt stock in NPV terms, and duration of treated claims.
+  exact_page_reference: "PDF pp. 1-2, 'Coordination among Official Bilateral Creditors' and 'Comparability of Treatment with Other Creditors'"
+  scope_conditions:
+  - Common Framework baseline; assessment remains case-specific and later guidance recognizes flexibility across indicators.
+  prohibited_inferences:
+  - Do not collapse Comparability of Treatment into a single haircut formula.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      Assessment of comparable efforts will be based on changes in nominal debt service, debt stock in net present value
+      terms and duration of the treated claims.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework.pdf
+    verified_pdf_page: 2
+  advisor_tags: [amara, daniel]
+  topic_tags: [comparability-of-treatment, official-creditor-coordination, nominal-debt-service, npv, duration]
+- claim_id: CLAIM-CF-005
+  source_id: SRC-CF-2020
+  source_title: Common Framework for Debt Treatments beyond the DSSI
+  source_class: OFFICIAL_INSTITUTIONAL_PROCESS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    Key treatment parameters are recorded in a legally non-binding MoU, while participating creditors implement the MoU
+    through bilateral agreements with the debtor country.
+  exact_page_reference: "PDF p. 1, final paragraph under 'Coordination among Official Bilateral Creditors'"
+  scope_conditions:
+  - Common Framework official bilateral treatment.
+  prohibited_inferences:
+  - Do not claim an MoU itself creates realized cash relief.
+  - Do not claim that signing the MoU completes all bilateral implementation.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: Creditors will implement the MoU through bilateral agreements signed with the debtor country.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework.pdf
+    verified_pdf_page: 1
+  advisor_tags: [amara, daniel]
+  topic_tags: [mou, bilateral-implementation, legal-effect, cash-relief]
+- claim_id: CLAIM-G20-001
+  source_id: SRC-G20-LL-2024
+  source_title: "G20 Note — Common Framework: Lessons Learned and Ways Forward"
+  source_class: OFFICIAL_INSTITUTIONAL_LESSONS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The 2024 G20 lessons note describes the Common Framework as a case-by-case coordination platform and summarizes major
+    process steps while calling for improved timeliness, predictability, clarity, and information sharing.
+  exact_page_reference: "PDF pp. 2-5, Summary and section 1.1"
+  scope_conditions:
+  - Lessons from Chad, Zambia, Ghana, and Ethiopia through October 2024.
+  prohibited_inferences:
+  - Do not represent the summarized steps as a fixed waterfall.
+  - Do not treat four cases as a universal causal model.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      case-by-case basis, tailored to each borrower country's debt structure and to creditors' specific constraints.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework-lessons-2024.pdf
+    verified_pdf_page: 3
+  advisor_tags: [amara]
+  topic_tags: [case-by-case, process-sequence, timeliness, predictability, information-sharing]
+- claim_id: CLAIM-G20-002
+  source_id: SRC-G20-LL-2024
+  source_title: "G20 Note — Common Framework: Lessons Learned and Ways Forward"
+  source_class: OFFICIAL_INSTITUTIONAL_LESSONS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The G20 note states that restructurings are time-consuming at each stage because creditors examine commitments, solve
+    technical issues, and obtain internal approvals, while debtors assemble data including individual cashflows for debt
+    reconciliation.
+  exact_page_reference: PDF p. 6, text below Table 1
+  scope_conditions:
+  - Observed lessons from the cases synthesized by the G20 note.
+  prohibited_inferences:
+  - Do not assign all delay to one creditor.
+  - Do not infer a universal duration for any step.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: Restructurings are time consuming at each stage.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework-lessons-2024.pdf
+    verified_pdf_page: 6
+  advisor_tags: [amara]
+  topic_tags: [delay, approvals, reconciliation, cashflows, process-friction]
+- claim_id: CLAIM-G20-003
+  source_id: SRC-G20-LL-2024
+  source_title: "G20 Note — Common Framework: Lessons Learned and Ways Forward"
+  source_class: OFFICIAL_INSTITUTIONAL_LESSONS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The 2024 G20 note lists three Comparability of Treatment indicators - change in debt stock NPV, change in duration, and
+    change in nominal debt service over the IMF program period - and states that assessment includes flexibility because
+    greater effort on one parameter can be mitigated by smaller effort on another.
+  exact_page_reference: PDF p. 11, section 1.4
+  scope_conditions:
+  - Common Framework Comparability of Treatment implementation as discussed in the 2024 note.
+  prohibited_inferences:
+  - Do not infer that any one indicator is dispositive in every case.
+  - Do not infer that the note defines a single haircut formula.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: The assessment of the CoT based on the three indicators includes a certain degree of flexibility.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/common-framework-lessons-2024.pdf
+    verified_pdf_page: 11
+  advisor_tags: [amara, daniel]
+  topic_tags: [comparability-of-treatment, npv, duration, nominal-debt-service, flexibility]
+- claim_id: CLAIM-MOU-001
+  source_id: SRC-G20-MOU-TEMPLATE
+  source_title: Illustrative Template Memorandum of Understanding on Debt Treatment under the Common Framework
+  source_class: OFFICIAL_ILLUSTRATIVE_TEMPLATE
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The illustrative MoU template depicts financing assurances as a step that can pave the way for IMF Executive Board
+    approval, followed separately by quantified treatment terms, agreement in principle, and MoU agreement.
+  exact_page_reference: PDF p. 1, preamble paragraphs 2-3
+  scope_conditions:
+  - Illustrative only; the template expressly states that provisions are not universally applicable and cases remain tailored.
+  prohibited_inferences:
+  - Do not claim every Common Framework case follows this exact sequence.
+  - Do not claim that financing assurances are final commitments from every creditor.
+  public_use_status: APPROVED_WITH_SCOPE
+  required_public_label: Undated illustrative, non-binding template
+  supporting_excerpt:
+    text: >-
+      the OCC provided financing assurances [...] paving the way for the approval [...] by the IMF Executive Board
+    kind: VERBATIM_WITH_OMISSIONS
+    verified_source_path: docs/research/sources/g20-paris-club/illustrative-mou-template.pdf
+    verified_pdf_page: 1
+  advisor_tags: [amara]
+  topic_tags: [financing-assurances, imf-board, agreement-in-principle, mou, lifecycle]
+- claim_id: CLAIM-MOU-002
+  source_id: SRC-G20-MOU-TEMPLATE
+  source_title: Illustrative Template Memorandum of Understanding on Debt Treatment under the Common Framework
+  source_class: OFFICIAL_ILLUSTRATIVE_TEMPLATE
+  retrieval_tier: CORE
+  bounded_claim: The illustrative template states that debts covered by its debt-treatment article include debts with security arrangements.
+  exact_page_reference: PDF p. 2, footnote 3
+  scope_conditions:
+  - Illustrative template; actual treatment perimeter remains subject to Official Creditor Committee decisions and case-specific terms.
+  prohibited_inferences:
+  - Do not infer that every secured claim is treated identically.
+  - Do not infer that security is irrelevant to comparability and implementation.
+  public_use_status: APPROVED_WITH_SCOPE
+  required_public_label: Undated illustrative, non-binding template
+  supporting_excerpt:
+    text: >-
+      All debts covered under Article II-1 a) and b), including those with security arrangements, shall be subject to the treatment.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/g20-paris-club/illustrative-mou-template.pdf
+    verified_pdf_page: 2
+  advisor_tags: [daniel]
+  topic_tags: [secured-debt, treatment-perimeter, security-arrangements, occ-discretion]
+- claim_id: CLAIM-MOU-003
+  source_id: SRC-G20-MOU-TEMPLATE
+  source_title: Illustrative Template Memorandum of Understanding on Debt Treatment under the Common Framework
+  source_class: OFFICIAL_ILLUSTRATIVE_TEMPLATE
+  retrieval_tier: CORE
+  bounded_claim: >-
+    For illustrative Comparability of Treatment information sharing, the template identifies typical financial parameters
+    and also notes non-financial terms that could affect comparability, including financial covenants, collateral, negative
+    pledges, embedded options, contingencies, and other provisions that could confer a material benefit.
+  exact_page_reference: PDF p. 5, footnote 7
+  scope_conditions:
+  - Illustrative template; exact information and legal disclosure constraints remain case-specific.
+  prohibited_inferences:
+  - Do not claim every listed term changes Comparability of Treatment in every case.
+  - Do not claim that contract clauses determine creditor behavior.
+  public_use_status: APPROVED_WITH_SCOPE
+  required_public_label: Undated illustrative, non-binding template
+  supporting_excerpt:
+    text: >-
+      Other relevant parameters also include, non-financial terms which could impact CoT, such as financial covenants,
+      offers of collateral, negative pledge clauses
+    kind: VERBATIM_EXCERPT
+    verified_source_path: docs/research/sources/g20-paris-club/illustrative-mou-template.pdf
+    verified_pdf_page: 5
+  advisor_tags: [daniel]
+  topic_tags: [comparability-of-treatment, information-sharing, collateral, negative-pledge, covenants, embedded-options]
+- claim_id: CLAIM-HCL-001
+  source_id: SRC-HCL-2021
+  source_title: "How China Lends: A Rare Look into 100 Debt Contracts with Foreign Governments"
+  source_class: EMPIRICAL_CONTRACT_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The study analyzes 100 publicly available loan contracts signed between 2000 and 2020 between Chinese state-owned
+    entities and government borrowers in 24 developing countries; the sample is informative but not random and is a small
+    part of the broader lending universe.
+  exact_page_reference: PDF/report pp. 4-5 and 11-15, Introduction and Dataset
+  scope_conditions:
+  - All uses must preserve the sample, period, creditor, and public-availability boundaries.
+  prohibited_inferences:
+  - Do not universalize frequencies or terms to every Chinese loan, country, or period.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      100 debt contracts between Chinese state-owned entities and government borrowers in 24 countries [...] signed between 2000 and 2020.
+    kind: VERBATIM_WITH_OMISSION
+    verified_source_path: docs/research/sources/aiddata/how-china-lends.pdf
+    verified_pdf_page: 4
+  advisor_tags: [daniel]
+  topic_tags: [empirical-scope, chinese-lending, contracts, methodology, sample-limitations]
+- claim_id: CLAIM-HCL-002
+  source_id: SRC-HCL-2021
+  source_title: "How China Lends: A Rare Look into 100 Debt Contracts with Foreign Governments"
+  source_class: EMPIRICAL_CONTRACT_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    In the study's Chinese contract sample, borrower-facing confidentiality clauses are unusually broad relative to its
+    benchmark sample, particularly in post-2014 China Eximbank contracts.
+  exact_page_reference: PDF/report pp. 6-8 and 22-25, Summary and section 3.1
+  scope_conditions:
+  - Contract sample and periods analyzed by the study; individual contract wording and legal carve-outs matter.
+  prohibited_inferences:
+  - Do not infer illegality, bad faith, or actual nondisclosure in every case.
+  - Do not infer actual creditor conduct from the existence of a clause.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      All of the post-2014 contracts with Chinese state-owned entities in our sample contain or reference far-reaching confidentiality clauses.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/aiddata/how-china-lends.pdf
+    verified_pdf_page: 6
+  advisor_tags: [daniel]
+  topic_tags: [confidentiality, disclosure, china-eximbank, contract-terms, sample-limitations]
+- claim_id: CLAIM-HCL-003
+  source_id: SRC-HCL-2021
+  source_title: "How China Lends: A Rare Look into 100 Debt Contracts with Foreign Governments"
+  source_class: EMPIRICAL_CONTRACT_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The study finds special or escrow accounts used as repayment security in a meaningful subset of its Chinese contract
+    sample and reports little evidence in that sample that Chinese state-owned banks routinely use physical infrastructure
+    such as seaports or power plants as collateral.
+  exact_page_reference: PDF/report pp. 26-31, section 3.2
+  scope_conditions:
+  - Study sample only; account details are sometimes contained in unavailable related agreements.
+  prohibited_inferences:
+  - Do not translate collateral into physical asset seizure.
+  - Do not infer that all account arrangements operate identically.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      We find little evidence in our contract sample that China's state-owned banks routinely use physical infrastructure [...] as collateral.
+    kind: VERBATIM_WITH_OMISSION
+    verified_source_path: docs/research/sources/aiddata/how-china-lends.pdf
+    verified_pdf_page: 31
+  advisor_tags: [daniel]
+  topic_tags: [escrow, special-accounts, collateral, physical-assets, effective-control]
+- claim_id: CLAIM-HCC-001
+  source_id: SRC-HCC-2025
+  source_title: How China Collateralizes
+  source_class: EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    The HCC dataset identifies 620 collateralized PPG loan commitments by Chinese state-owned creditors to 158 borrowers in
+    57 EMDEs during 2000-2021; 46% of the studied PPG lending volume is classified as collateralized, which the authors
+    describe as a lower-bound estimate.
+  exact_page_reference: report pp. 10-13 (PDF pp. 11-14), section 3.1
+  scope_conditions:
+  - HCC Dataset v1.0, 2000-2021, public and publicly guaranteed lending to emerging markets and developing economies.
+  prohibited_inferences:
+  - Do not claim all Chinese public and publicly guaranteed lending is collateralized.
+  - Do not extend the percentage outside the dataset or timeframe without new evidence.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      we identify 620 collateralized PPG loan commitments [...] to 158 borrowers in 57 EMDEs between 2000 and 2021.
+    kind: VERBATIM_WITH_OMISSION
+    verified_source_path: docs/research/sources/aiddata/how-china-collateralizes.pdf
+    verified_pdf_page: 11
+  advisor_tags: [daniel]
+  topic_tags: [dataset-scope, collateralization, ppg-debt, lower-bound]
+- claim_id: CLAIM-HCC-002
+  source_id: SRC-HCC-2025
+  source_title: How China Collateralizes
+  source_class: EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    In the HCC collateralized PPG lending portfolio, bank deposits and revenue claims are the dominant forms of collateral
+    or quasi-collateral by lending volume, while physical and illiquid assets account for much smaller shares.
+  exact_page_reference: report pp. 14-17 (PDF pp. 15-18), Box 3.1 and Figure 3
+  scope_conditions:
+  - HCC Dataset v1.0 definitions and classification; shares can overlap because a loan may have multiple collateral types.
+  prohibited_inferences:
+  - Do not infer that every secured transaction uses an offshore bank account.
+  - Do not infer that physical assets are never used.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: '"Bank Deposits" dominate, making up 84% of total lending volume.'
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/aiddata/how-china-collateralizes.pdf
+    verified_pdf_page: 16
+  advisor_tags: [daniel]
+  topic_tags: [bank-accounts, revenue-claims, physical-assets, collateral-taxonomy]
+- claim_id: CLAIM-HCC-003
+  source_id: SRC-HCC-2025
+  source_title: How China Collateralizes
+  source_class: EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    Nearly two-thirds of the HCC collateralized PPG lending volume draws on assets unrelated to the financed project, and
+    more than 70% of the portfolio collateralized against revenues relies on quasi-collateral arrangements providing
+    effective control rather than only formal security grants.
+  exact_page_reference: report pp. 17-20 (PDF pp. 18-21), Figure 3 Panel B and surrounding text
+  scope_conditions:
+  - HCC Dataset v1.0 classification of related/unrelated collateral and formal/quasi-collateral.
+  prohibited_inferences:
+  - Do not infer that effective control guarantees enforcement.
+  - Do not infer that all such arrangements have identical legal effect.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      nearly two-thirds (62%) of the collateralized PPG lending portfolio relies on assets unrelated to the purpose of the loan.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/aiddata/how-china-collateralizes.pdf
+    verified_pdf_page: 19
+  advisor_tags: [daniel]
+  topic_tags: [effective-control, quasi-collateral, unrelated-assets, revenue-control]
+- claim_id: CLAIM-HCC-004
+  source_id: SRC-HCC-2025
+  source_title: How China Collateralizes
+  source_class: EMPIRICAL_SECURED_LENDING_DATASET_AND_ANALYSIS
+  retrieval_tier: CORE
+  bounded_claim: >-
+    For nearly half of collateralized PPG lending in the HCC dataset, the same asset or asset pool supports more than one
+    loan; the paper identifies 52 cash collateral pools securing multiple debts and describes long-lived control implications.
+  exact_page_reference: report pp. 21-24 (PDF pp. 22-25), section 3.3
+  scope_conditions:
+  - HCC Dataset v1.0; predominantly same-creditor cross-collateralization in the documented cases.
+  prohibited_inferences:
+  - Do not infer competing creditor claims where the dataset instead shows the same creditor or group.
+  - Do not infer a specific restructuring outcome from cross-collateralization alone.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      For nearly half of the collateralized PPG lending portfolio, the same asset or pool of assets acts as collateral for more than one loan.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/aiddata/how-china-collateralizes.pdf
+    verified_pdf_page: 22
+  advisor_tags: [daniel]
+  topic_tags: [cross-collateralization, cash-pooling, dependency, duration]
+- claim_id: CLAIM-WB-001
+  source_id: SRC-WB-STATUTORY-2022
+  source_title: Potential Statutory Options to Encourage Private Sector Creditor Participation in the Common Framework
+  source_class: POLICY_OPTIONS_NOTE
+  retrieval_tier: SUPPLEMENTAL
+  bounded_claim: >-
+    The World Bank note presents four statutory approaches that jurisdictions could consider to encourage private-sector
+    creditor participation: a duty to cooperate, limits on recoveries, additional immunity from attachment, and retrofitting
+    collective action mechanisms.
+  exact_page_reference: "report p. 3 and pp. 7-11 (PDF p. 4 and pp. 8-12), Background summary and 'Potential Statutory Options'"
+  scope_conditions:
+  - The note presents options and legal considerations as of 2022; applicability depends on jurisdiction and instrument.
+  prohibited_inferences:
+  - Do not represent these options as current universally applicable law.
+  - Do not represent these options as existing Common Framework requirements.
+  public_use_status: APPROVED_IF_LABELED_PROPOSAL
+  required_public_label: World Bank policy options, not current universal law
+  supporting_excerpt:
+    text: This note presents four statutory approaches that countries can consider adopting.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/world-bank/private-creditor-statutory-options.pdf
+    verified_pdf_page: 4
+  advisor_tags: [daniel]
+  topic_tags: [policy-proposal, private-creditors, holdouts, statutory-options, collective-action]
+- claim_id: CLAIM-IDOS-001
+  source_id: SRC-IDOS-2024
+  source_title: >-
+    Input to the UN-DESA Elements Paper on Financing for Development — Action area: Debt and Debt Sustainability —
+    Reforming the Global Debt Governance System: Exploring Effective and Feasible Policy Solutions
+  source_class: POLICY_SYNTHESIS_AND_REFORM_PROPOSAL
+  retrieval_tier: SUPPLEMENTAL
+  bounded_claim: >-
+    The IDOS paper recommends reforms to the Common Framework and proposes a universal code of conduct for sovereign debtors
+    and creditors, including transparency, participation, and governance measures.
+  exact_page_reference: PDF/report pp. 2-5, sections 2.1-2.2
+  scope_conditions:
+  - Author's 2024 policy proposals; not an official Common Framework amendment.
+  prohibited_inferences:
+  - Do not treat recommendations as current binding G20 rules.
+  - Do not use the recommendations as evidence of how every restructuring currently operates.
+  public_use_status: APPROVED_IF_LABELED_PROPOSAL
+  required_public_label: IDOS policy proposal, not an official Common Framework amendment
+  supporting_excerpt:
+    text: >-
+      We therefore propose the establishment of a universal code of conduct linked to the G20 Common Framework.
+    kind: VERBATIM
+    verified_source_path: docs/research/sources/idos/debt-and-debt-sustainability-2024.pdf
+    verified_pdf_page: 2
+  advisor_tags: [amara]
+  topic_tags: [policy-proposal, debt-governance, common-framework-reform, code-of-conduct]
+- claim_id: CLAIM-CHASING-001
+  source_id: SRC-CHASING-CHINA-2025
+  source_title: "Chasing China: Learning to Play by Beijing's Global Lending Rules"
+  source_class: EMPIRICAL_AND_CONTEXTUAL_RESEARCH_REPORT
+  retrieval_tier: SUPPLEMENTAL
+  bounded_claim: >-
+    Chasing China presents broad evidence that China's overseas lending portfolio is large, globally distributed, and
+    increasingly difficult to track in official sources over the study period.
+  exact_page_reference: PDF pp. 4-6 (Executive Summary) and PDF pp. 20-22 (Chapter 1, report pp. 7-9)
+  scope_conditions:
+  - Use only for broad contextual framing unless a more precise report section is separately registered.
+  prohibited_inferences:
+  - Do not use broad portfolio claims to replace contract-specific HCL/HCC evidence for Financing Assurances.
+  public_use_status: APPROVED_WITH_SCOPE
+  supporting_excerpt:
+    text: >-
+      more than 30,000 projects and activities across 217 countries and territories
+    kind: VERBATIM_EXCERPT
+    verified_source_path: docs/research/sources/aiddata/chasing-china.pdf
+    verified_pdf_page: 4
+  advisor_tags: [amara]
+  topic_tags: [china-overseas-finance, portfolio-context, opacity, transparency, empirical-context]
+excluded_claims:
+- claim_id: CLAIM-CF-PROGRESS-001
+  source_id: SRC-CF-PROGRESS
+  public_use_status: BLOCKED_PENDING_PROVENANCE
+  reason: The supplied chronology's provenance and authoritative publisher have not been established.
+  permitted_use: Internal chronology cross-check only; never public advisor retrieval or citation.

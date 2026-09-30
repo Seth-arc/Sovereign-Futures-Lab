@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const participantSource = read("./ParticipantApp.tsx");
 const advisorFunctionSource = read("../supabase/functions/advisor-chat/index.ts");
+const dataSource = read("./data.ts");
+const reportSource = read("./report.ts");
+const typesSource = read("./types.ts");
 const facilitatorSource = read("./FacilitatorApp.tsx");
 const referenceExperienceSource = read("./ReferenceExperience.tsx");
 const themeButtonSource = read("./ThemeButton.tsx");
@@ -234,8 +237,19 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toMatch(/async function exitWorkshop\(\) \{\r?\n\s+if \(!bundle \|\| !decisions\) return;/);
   });
 
-  it('keeps citations out of participant chat and sizes the conversation proportionally', () => {
-    expect(styles).toContain('.advisor-conversation .citations { display: none; }');
+  it('shows expandable structured research sources and sizes the conversation proportionally', () => {
+    expect(participantSource).toContain('function AdvisorSources');
+    expect(participantSource).toContain('<details className="advisor-sources">');
+    expect(participantSource).toContain('source.claimId');
+    expect(participantSource).toContain('source.sourceId');
+    expect(participantSource).toContain('source.pageReference');
+    expect(participantSource).toContain('source.sourceClass');
+    expect(typesSource).toContain('sources: AdvisorCitation[]');
+    expect(dataSource).toContain('function mapAdvisorSources');
+    expect(reportSource).toContain('source.claimId');
+    expect(reportSource).toContain('source.pageReference');
+    expect(styles).toContain('.advisor-sources summary');
+    expect(styles).not.toContain('.advisor-conversation .citations { display: none; }');
     expect(styles).toContain('.advisor-conversation .question { width: 64%; margin-left: auto;');
     expect(styles).toContain('.advisor-conversation .answer { width: 74%; margin-right: auto;');
     expect(styles).toContain('.advisor-conversation .question, .advisor-conversation .answer { padding: 8px 10px;');

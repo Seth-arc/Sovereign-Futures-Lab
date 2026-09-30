@@ -25,6 +25,10 @@ function filename(report: AfterActionReport, extension: string): string {
 
 const label = (value: string | undefined) => value?.replaceAll("_", " ").toLowerCase() ?? "Not recorded";
 
+const advisorSourcesText = (turn: AfterActionReport["advisorUsage"][number]) => turn.sources.length
+  ? turn.sources.map((source) => `${source.claimId} · ${source.sourceId} · ${source.sourceTitle} · ${source.pageReference} · ${source.sourceClass}`).join("; ")
+  : "No external research cited";
+
 export function afterActionReportHtml(report: AfterActionReport, identified = true): string {
   const identity = identified
     ? `<p><strong>${escapeHtml(report.participant.name)}</strong><br>${escapeHtml(report.participant.organization)}<br>${escapeHtml(report.participant.email)}</p>`
@@ -53,7 +57,7 @@ body{font:15px/1.55 Arial,sans-serif;color:#182522;max-width:940px;margin:48px a
 <section><h2>Unresolved risks</h2><ul>${report.unresolvedRisks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("") || "<li>No blocking uncertainty recorded in the bounded exercise.</li>"}</ul></section>
 <section><h2>Counterfactual pathways</h2>${report.counterfactuals.map((item) => `<article><h3>${escapeHtml(item.alternative)}</h3><p>${escapeHtml(item.projectedDifference)}</p><p class="meta">Held fixed: ${escapeHtml(item.fixedAssumptions)}</p></article>`).join("")}</section>
 <section><h2>Submission history and information available</h2><ol>${report.submissions.map((item) => { const available = report.evidenceRequestHistory.filter((request) => (request.releasedAt ? new Date(request.releasedAt) : new Date(request.availableAt)).getTime() <= new Date(item.submittedAt).getTime()).map((request) => report.evidenceRequested.find((definition) => definition.id === request.evidenceId)?.title).filter(Boolean); return `<li><strong>Version ${item.version}</strong>, ${escapeHtml(new Date(item.submittedAt).toLocaleString())} — ${escapeHtml(label(item.decisions.readiness))}<br><span class="meta">Evidence then available: ${escapeHtml(available.join("; ") || "No requested evidence had returned")}</span></li>`; }).join("") || "<li>No recommendation submitted.</li>"}</ol></section>
-<section><h2>AI-advisor record</h2>${report.advisorUsage.map((turn) => `<article><p><strong>${escapeHtml(turn.advisorId)}:</strong> ${escapeHtml(turn.question)}</p><p>${escapeHtml(turn.answer)}</p><p class="meta">Sources: ${escapeHtml(turn.sources.join("; "))} · ${escapeHtml(turn.mode)}</p></article>`).join("") || "<p>No advisor interaction recorded.</p>"}</section>
+<section><h2>AI-advisor record</h2>${report.advisorUsage.map((turn) => `<article><p><strong>${escapeHtml(turn.advisorId)}:</strong> ${escapeHtml(turn.question)}</p><p>${escapeHtml(turn.answer)}</p><p class="meta">Sources: ${escapeHtml(advisorSourcesText(turn))} · ${escapeHtml(turn.mode)}</p></article>`).join("") || "<p>No advisor interaction recorded.</p>"}</section>
 <section><h2>Facilitator interventions</h2>${report.facilitatorInjects.map((inject) => `<article><p><strong>${escapeHtml(inject.title)}</strong></p><p>${escapeHtml(inject.body)}</p><p class="meta">${escapeHtml(new Date(inject.sentAt).toLocaleString())}</p></article>`).join("") || "<p>No global facilitator inject recorded.</p>"}</section>
 <section><h2>Participant reflection</h2><p>${escapeHtml(report.decisions.reflection || "Not recorded")}</p></section>
 <section><h2>Decision timeline</h2><table><thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead><tbody>${timelineRows}</tbody></table></section>
@@ -104,7 +108,7 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add("Submission history", 15, 6);
   add(report.submissions.length ? report.submissions.map((item) => `Version ${item.version} · ${new Date(item.submittedAt).toLocaleString()} · ${label(item.decisions.readiness)}`).join("\n") : "No recommendation submitted.", 10, 14);
   add("AI-advisor usage and citations", 15, 6);
-  add(report.advisorUsage.length ? report.advisorUsage.map((turn) => `${turn.advisorId}: ${turn.question}\n${turn.answer}\nSources: ${turn.sources.join("; ")} · ${turn.mode}`).join("\n\n") : "No advisor interaction recorded.", 10, 14);
+  add(report.advisorUsage.length ? report.advisorUsage.map((turn) => `${turn.advisorId}: ${turn.question}\n${turn.answer}\nSources: ${advisorSourcesText(turn)} · ${turn.mode}`).join("\n\n") : "No advisor interaction recorded.", 10, 14);
   add("Facilitator interventions", 15, 6);
   add(report.facilitatorInjects.length ? report.facilitatorInjects.map((inject) => `${inject.title}: ${inject.body}`).join("\n") : "No global facilitator inject recorded.", 10, 14);
   add("Participant reflection", 15, 6);

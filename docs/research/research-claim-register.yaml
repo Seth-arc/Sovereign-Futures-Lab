@@ -1,0 +1,380 @@
+schema_version: 1.0.0
+artifact:
+  id: RSR-002
+  title: Sovereign Room Research Claim Register
+  status: ACTIVE
+  canonical_home: docs/research/research-claim-register.yaml
+  owner: Research Governance
+  reserved_authority_decision_required: false
+  updated_at: '2026-09-30'
+claim_control_rules:
+- Every material external factual proposition used in simulation content, rules, mechanics, assessment, or public writing
+  must reference an approved claim_id.
+- A claim remains bounded by its source population, timeframe, methodology, and page/section trace.
+- Contract clauses establish contractual text or structure, not actual behavior, enforcement, motive, or legality unless a
+  separate source supports that proposition.
+- Policy proposals remain proposals; illustrative templates remain illustrative.
+- Training observations do not promote themselves into the Empirical Research Baseline.
+page_reference_convention: Claim traces use physical PDF page numbers unless the document has a different printed/report page
+  number; where those differ, both are stated explicitly. DOCX traces use the visible page/table location.
+claims:
+- claim_id: CLAIM-CF-001
+  source_id: SRC-CF-2020
+  exact_page_section: PDF p. 1, 'Need for Debt Treatment and Debt eligible to the Treatment'
+  bounded_claim: Under the Common Framework, the process is initiated at the debtor country's request; the need for treatment
+    and restructuring envelope are based on the IMF-WBG DSA and participating official creditors' collective assessment and
+    are to be consistent with parameters of an upper-credit-tranche IMF-supported program.
+  claim_type: OFFICIAL_PROCESS
+  scope_conditions:
+  - Applies to Common Framework debt-treatment requests within the framework's eligibility and institutional scope.
+  approved_downstream_use:
+  - Scenario dependency graph
+  - Financing Assurances process context
+  - DSA/collective-assessment state representation
+  prohibited_inference:
+  - Do not turn this dependency statement into a rigid universal chronology or claim that one institution alone determines
+    the envelope.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-CF-002
+  source_id: SRC-CF-2020
+  exact_page_section: PDF p. 1, 'Need for Debt Treatment and Debt eligible to the Treatment'
+  bounded_claim: The 2020 Common Framework states that eligible debt includes public and publicly guaranteed debt with original
+    maturity of more than one year, while taking account of the DSSI cut-off date protecting new financing after 24 March
+    2020.
+  claim_type: OFFICIAL_PROCESS
+  scope_conditions:
+  - Use as the 2020 framework baseline; later case-specific treatment scope and cut-off decisions can differ.
+  approved_downstream_use:
+  - Treatment-perimeter mechanics
+  - claim classification
+  prohibited_inference:
+  - Do not imply every later OCC uses exactly the same cut-off date or treatment perimeter.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-CF-003
+  source_id: SRC-CF-2020
+  exact_page_section: PDF p. 1, final paragraph under 'Need for Debt Treatment and Debt eligible to the Treatment'
+  bounded_claim: A debtor requesting treatment is expected to provide the IMF, World Bank Group, and participating creditors
+    necessary information regarding public-sector financial commitments while respecting commercially sensitive information.
+  claim_type: OFFICIAL_INFORMATION_REQUIREMENT
+  scope_conditions:
+  - Common Framework process; precise disclosure content and legal ability can remain case- and contract-specific.
+  approved_downstream_use:
+  - Information-state mechanics
+  - verification requests
+  - disclosure constraints
+  prohibited_inference:
+  - Do not infer that all creditors or participants automatically possess all contract details, or that commercial sensitivity
+    implies bad faith.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-CF-004
+  source_id: SRC-CF-2020
+  exact_page_section: PDF pp. 1-2, 'Coordination among Official Bilateral Creditors' and 'Comparability of Treatment with
+    Other Creditors'
+  bounded_claim: The framework provides for coordinated official bilateral treatment and requires the debtor to seek from
+    other official bilateral and private creditors treatment at least as favorable; comparable efforts are assessed using
+    changes in nominal debt service, debt stock in NPV terms, and duration of treated claims.
+  claim_type: OFFICIAL_PROCESS
+  scope_conditions:
+  - Common Framework baseline; assessment remains case-specific and later guidance recognizes flexibility across indicators.
+  approved_downstream_use:
+  - CoT workbench inputs
+  - creditor-coordination mechanics
+  prohibited_inference:
+  - Do not collapse Comparability of Treatment into a single haircut formula.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-CF-005
+  source_id: SRC-CF-2020
+  exact_page_section: PDF p. 1, final paragraph under 'Coordination among Official Bilateral Creditors'
+  bounded_claim: Key treatment parameters are recorded in a legally non-binding MoU, while participating creditors implement
+    the MoU through bilateral agreements with the debtor country.
+  claim_type: OFFICIAL_IMPLEMENTATION_DISTINCTION
+  scope_conditions:
+  - Common Framework official bilateral treatment.
+  approved_downstream_use:
+  - Implementation lifecycle
+  - agreement/effectiveness distinction
+  - Record Line explanation
+  prohibited_inference:
+  - Do not claim an MoU itself creates realized cash relief or that signing completes all bilateral implementation.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-G20-001
+  source_id: SRC-G20-LL-2024
+  exact_page_section: PDF pp. 2-5, Summary and §1.1
+  bounded_claim: The 2024 G20 lessons note describes the Common Framework as a case-by-case coordination platform and summarizes
+    major process steps while calling for improved timeliness, predictability, clarity, and information sharing.
+  claim_type: OFFICIAL_LESSONS
+  scope_conditions:
+  - Lessons from Chad, Zambia, Ghana, and Ethiopia through October 2024.
+  approved_downstream_use:
+  - Scenario dependency design
+  - process-friction calibration
+  - facilitator/debrief explanation
+  prohibited_inference:
+  - Do not represent the summarized steps as a fixed waterfall or treat four cases as a universal causal model.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-G20-002
+  source_id: SRC-G20-LL-2024
+  exact_page_section: PDF p. 6, text below Table 1
+  bounded_claim: The G20 note states that restructurings are time-consuming at each stage because creditors examine commitments,
+    solve technical issues, and obtain internal approvals, while debtors assemble data including individual cashflows for
+    debt reconciliation.
+  claim_type: OFFICIAL_LESSONS
+  scope_conditions:
+  - Observed lessons from the cases synthesized by the G20 note.
+  approved_downstream_use:
+  - Authority-delay calibration
+  - data-reconciliation mechanics
+  - dependency timing
+  prohibited_inference:
+  - Do not assign all delay to one creditor or infer a universal duration for any step.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-G20-003
+  source_id: SRC-G20-LL-2024
+  exact_page_section: PDF p. 11, §1.4
+  bounded_claim: The 2024 G20 note lists three Comparability of Treatment indicators—change in debt stock NPV, change in duration,
+    and change in nominal debt service over the IMF program period—and states that assessment includes flexibility because
+    greater effort on one parameter can be mitigated by smaller effort on another.
+  claim_type: OFFICIAL_LESSONS
+  scope_conditions:
+  - Common Framework CoT implementation as discussed in the 2024 note.
+  approved_downstream_use:
+  - CoT workbench
+  - misconception target against single-formula comparisons
+  prohibited_inference:
+  - Do not infer that any one indicator is dispositive in every case or that the note defines a single haircut formula.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-MOU-001
+  source_id: SRC-G20-MOU-TEMPLATE
+  exact_page_section: PDF p. 1, preamble ¶¶2-3
+  bounded_claim: The illustrative MoU template depicts financing assurances as a step that can pave the way for IMF Executive
+    Board approval, followed separately by quantified treatment terms, agreement in principle, and MoU agreement.
+  claim_type: ILLUSTRATIVE_PROCESS
+  scope_conditions:
+  - Illustrative only; the template expressly states that provisions are not universally applicable and cases remain tailored.
+  approved_downstream_use:
+  - State-machine examples for assurance/agreement/implementation
+  - scenario authoring
+  prohibited_inference:
+  - Do not claim every Common Framework case follows this exact sequence or that financing assurances are final commitments
+    from every creditor.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-MOU-002
+  source_id: SRC-G20-MOU-TEMPLATE
+  exact_page_section: PDF p. 2, footnote 3
+  bounded_claim: The illustrative template states that debts covered by its debt-treatment article include debts with security
+    arrangements.
+  claim_type: ILLUSTRATIVE_TREATMENT_SCOPE
+  scope_conditions:
+  - Illustrative template; actual treatment perimeter remains subject to OCC decisions and case-specific terms.
+  approved_downstream_use:
+  - Treatment-perimeter mechanic
+  - secured-claim representation
+  prohibited_inference:
+  - Do not infer that every secured claim is treated identically or that security is irrelevant to comparability and implementation.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-MOU-003
+  source_id: SRC-G20-MOU-TEMPLATE
+  exact_page_section: PDF p. 5, footnote 7
+  bounded_claim: For illustrative CoT information sharing, the template identifies typical financial parameters and also notes
+    non-financial terms that could affect CoT, including financial covenants, collateral, negative pledges, embedded options,
+    contingencies, and other provisions that could confer a material benefit.
+  claim_type: ILLUSTRATIVE_INFORMATION_REQUIREMENT
+  scope_conditions:
+  - Illustrative template; exact information and legal disclosure constraints remain case-specific.
+  approved_downstream_use:
+  - CoT evidence model
+  - verification mechanics
+  - contract-detail decision significance
+  prohibited_inference:
+  - Do not claim every listed term changes CoT in every case or that contract clauses determine creditor behavior.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCL-001
+  source_id: SRC-HCL-2021
+  exact_page_section: PDF/report pp. 4-5 and 11-15, Introduction and Dataset
+  bounded_claim: The study analyzes 100 publicly available loan contracts signed between 2000 and 2020 between Chinese state-owned
+    entities and government borrowers in 24 developing countries; the sample is informative but not random and is a small
+    part of the broader lending universe.
+  claim_type: EMPIRICAL_SAMPLE_SCOPE
+  scope_conditions:
+  - All uses must preserve the sample, period, creditor, and public-availability boundaries.
+  approved_downstream_use:
+  - Source-scope controls
+  - scenario provenance
+  - public caveats
+  prohibited_inference:
+  - Do not universalize frequencies or terms to every Chinese loan, country, or period.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCL-002
+  source_id: SRC-HCL-2021
+  exact_page_section: PDF/report pp. 6-8 and 22-25, Summary and §3.1
+  bounded_claim: In the study's Chinese contract sample, borrower-facing confidentiality clauses are unusually broad relative
+    to its benchmark sample, particularly in post-2014 China Eximbank contracts.
+  claim_type: EMPIRICAL_CONTRACT_FEATURE
+  scope_conditions:
+  - Contract sample and periods analyzed by HCL; individual contract wording and legal carve-outs matter.
+  approved_downstream_use:
+  - information-visibility mechanic
+  - disclosure/verification constraint
+  - source-controlled creditor-specific scenario content
+  prohibited_inference:
+  - Do not infer illegality, bad faith, actual nondisclosure in every case, or actual creditor conduct from clause existence.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCL-003
+  source_id: SRC-HCL-2021
+  exact_page_section: PDF/report pp. 26-31, §3.2
+  bounded_claim: The study finds special or escrow accounts used as repayment security in a meaningful subset of its Chinese
+    contract sample and reports little evidence in that sample that Chinese state-owned banks routinely use physical infrastructure
+    such as seaports or power plants as collateral.
+  claim_type: EMPIRICAL_CONTRACT_FEATURE
+  scope_conditions:
+  - HCL sample only; account details are sometimes contained in unavailable related agreements.
+  approved_downstream_use:
+  - restricted-liquidity mechanic
+  - verification need
+  - misconception target for physical-asset collateral
+  prohibited_inference:
+  - Do not translate 'collateral' into physical asset seizure or infer that all account arrangements operate identically.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCC-001
+  source_id: SRC-HCC-2025
+  exact_page_section: report pp. 10-13 (PDF pp. 11-14), §3.1
+  bounded_claim: The HCC dataset identifies 620 collateralized PPG loan commitments by Chinese state-owned creditors to 158
+    borrowers in 57 EMDEs during 2000-2021; 46% of the studied PPG lending volume is classified as collateralized, which the
+    authors describe as a lower-bound estimate.
+  claim_type: EMPIRICAL_DATASET_FINDING
+  scope_conditions:
+  - HCC Dataset v1.0, 2000-2021, PPG lending to EMDEs.
+  approved_downstream_use:
+  - empirical baseline
+  - scenario calibration bounds
+  - source-backed contextual briefing
+  prohibited_inference:
+  - Do not claim all Chinese PPG lending is collateralized or extend the percentage outside the dataset/timeframe without
+    new evidence.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCC-002
+  source_id: SRC-HCC-2025
+  exact_page_section: report pp. 14-17 (PDF pp. 15-18), Box 3.1 and Figure 3
+  bounded_claim: In the HCC collateralized PPG lending portfolio, bank deposits and revenue claims are the dominant forms
+    of collateral or quasi-collateral by lending volume, while physical and illiquid assets account for much smaller shares.
+  claim_type: EMPIRICAL_DATASET_FINDING
+  scope_conditions:
+  - HCC Dataset v1.0 definitions and classification; shares can overlap because a loan may have multiple collateral types.
+  approved_downstream_use:
+  - usable-liquidity mechanic
+  - restricted-account representation
+  - collateral taxonomy
+  prohibited_inference:
+  - Do not infer that every secured transaction uses an offshore bank account or that physical assets are never used.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCC-003
+  source_id: SRC-HCC-2025
+  exact_page_section: report pp. 17-20 (PDF pp. 18-21), Figure 3 Panel B and surrounding text
+  bounded_claim: Nearly two-thirds of the HCC collateralized PPG lending volume draws on assets unrelated to the financed
+    project, and more than 70% of the portfolio collateralized against revenues relies on quasi-collateral arrangements providing
+    effective control rather than only formal security grants.
+  claim_type: EMPIRICAL_DATASET_FINDING
+  scope_conditions:
+  - HCC Dataset v1.0 classification of related/unrelated collateral and formal/quasi-collateral.
+  approved_downstream_use:
+  - treatment-perimeter reasoning
+  - liquidity/encumbrance model
+  - mechanic design
+  prohibited_inference:
+  - Do not infer that effective control guarantees enforcement or that all such arrangements have identical legal effect.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-HCC-004
+  source_id: SRC-HCC-2025
+  exact_page_section: report pp. 21-24 (PDF pp. 22-25), §3.3
+  bounded_claim: For nearly half of collateralized PPG lending in the HCC dataset, the same asset or asset pool supports more
+    than one loan; the paper identifies 52 cash collateral pools securing multiple debts and describes long-lived control
+    implications.
+  claim_type: EMPIRICAL_DATASET_FINDING
+  scope_conditions:
+  - HCC Dataset v1.0; predominantly same-creditor cross-collateralization in the documented cases.
+  approved_downstream_use:
+  - dependency graphs
+  - claim/asset linkage
+  - scenario-time and encumbrance mechanics
+  prohibited_inference:
+  - Do not infer competing creditor claims where the dataset instead shows the same creditor or group, or infer a specific
+    restructuring outcome from cross-collateralization alone.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-WB-001
+  source_id: SRC-WB-STATUTORY-2022
+  exact_page_section: report p. 3 and pp. 7-11 (PDF p. 4 and pp. 8-12), Background summary and 'Potential Statutory Options'
+  bounded_claim: 'The World Bank note presents four statutory approaches that jurisdictions could consider to encourage private-sector
+    creditor participation: a duty to cooperate, limits on recoveries, additional immunity from attachment, and retrofitting
+    collective action mechanisms.'
+  claim_type: POLICY_PROPOSAL
+  scope_conditions:
+  - The note presents options and legal considerations as of 2022; applicability depends on jurisdiction and instrument.
+  approved_downstream_use:
+  - future scenario variants
+  - policy-option context
+  prohibited_inference:
+  - Do not represent these options as current universally applicable law or as existing Common Framework requirements.
+  confidence: HIGH
+  public_use_status: APPROVED_IF_LABELED_PROPOSAL
+- claim_id: CLAIM-IDOS-001
+  source_id: SRC-IDOS-2024
+  exact_page_section: PDF/report pp. 2-5, §§2.1-2.2
+  bounded_claim: The IDOS paper recommends reforms to the Common Framework and proposes a universal code of conduct for sovereign
+    debtors and creditors, including transparency, participation, and governance measures.
+  claim_type: POLICY_PROPOSAL
+  scope_conditions:
+  - Author's 2024 policy proposals; not an official Common Framework amendment.
+  approved_downstream_use:
+  - broader reform context
+  - future scenario/research options
+  prohibited_inference:
+  - Do not treat recommendations as current binding G20 rules or evidence of how every restructuring currently operates.
+  confidence: HIGH
+  public_use_status: APPROVED_IF_LABELED_PROPOSAL
+- claim_id: CLAIM-CHASING-001
+  source_id: SRC-CHASING-CHINA-2025
+  exact_page_section: PDF pp. 4-6 (Executive Summary) and PDF pp. 20-22 (Chapter 1, report pp. 7-9)
+  bounded_claim: Chasing China presents broad evidence that China's overseas lending portfolio is large, globally distributed,
+    and increasingly difficult to track in official sources over the study period.
+  claim_type: EMPIRICAL_CONTEXT
+  scope_conditions:
+  - Use only for broad contextual framing unless a more precise report section is separately registered.
+  approved_downstream_use:
+  - product context
+  - future scenario-family research
+  prohibited_inference:
+  - Do not use broad portfolio claims to replace contract-specific HCL/HCC evidence for Financing Assurances.
+  confidence: HIGH
+  public_use_status: APPROVED_WITH_SCOPE
+- claim_id: CLAIM-CF-PROGRESS-001
+  source_id: SRC-CF-PROGRESS
+  exact_page_section: DOCX single-page table
+  bounded_claim: The supplied progress summary lists chronological milestones for Chad, Zambia, Ghana, and Ethiopia under
+    the Common Framework and associated IMF programs.
+  claim_type: UNVERIFIED_INTERNAL_CHRONOLOGY
+  scope_conditions:
+  - Internal cross-check only until provenance is established and dates are reconciled against authoritative sources.
+  approved_downstream_use:
+  - internal chronology comparison only
+  prohibited_inference:
+  - Do not cite publicly, infer causality from dates, or treat chronology as a universal process sequence.
+  confidence: LOW
+  public_use_status: BLOCKED_PENDING_PROVENANCE

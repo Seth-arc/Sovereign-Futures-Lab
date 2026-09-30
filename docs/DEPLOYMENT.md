@@ -299,15 +299,17 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 9. Request every evidence type and release at least one early.
 10. Send every preset inject and answer an exceptional institutional request.
 11. Verify both AI advisors, welcome playback, suggested questions, typed chat, push-to-talk, editable transcripts, spoken replies, and fallback behavior.
-12. Confirm participant chat does not display citation chips while source references remain in the facilitator report.
-13. Submit at least two recommendation versions and confirm both remain in the AAR.
-14. Begin debrief and confirm further submission is blocked.
-15. Export and open every individual and workshop-level format.
-16. Preview the anonymized projected comparison while identified reports remain facilitator-only.
-17. Delete a disposable rehearsal session and confirm related application records disappear.
-18. Verify local emergency mode separately and download its handoff file.
-19. Compare the participant and facilitator shells with the preserved interface references at a 1440px Chrome or Edge viewport.
-20. Confirm Escape, dialog focus trapping, focus return, keyboard-only operation, and no horizontal shell shift when opening or closing every modal workspace.
+12. Ask a research-backed question and confirm its expandable Sources section shows the claim ID, source ID, source title, exact page reference, and source classification; confirm the same fields remain in the facilitator report.
+13. Ask an ordinary process or contract question and confirm no policy-proposal source is retrieved. Then ask an explicit policy-reform question and confirm any policy source is labeled as a proposal.
+14. Inspect the `advisor-chat` Edge Function logs for `advisor_retrieval_completed`; confirm the selected claim IDs come from the approved 21-card registry and never include `CLAIM-CF-PROGRESS-001` or `SRC-CF-PROGRESS`.
+15. Submit at least two recommendation versions and confirm both remain in the AAR.
+16. Begin debrief and confirm further submission is blocked.
+17. Export and open every individual and workshop-level format.
+18. Preview the anonymized projected comparison while identified reports remain facilitator-only.
+19. Delete a disposable rehearsal session and confirm related application records disappear.
+20. Verify local emergency mode separately and download its handoff file.
+21. Compare the participant and facilitator shells with the preserved interface references at a 1440px Chrome or Edge viewport.
+22. Confirm Escape, dialog focus trapping, focus return, keyboard-only operation, and no horizontal shell shift when opening or closing every modal workspace.
 
 ## 12. Capacity rehearsal for 20–50 participants
 
