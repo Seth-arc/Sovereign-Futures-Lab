@@ -5356,7 +5356,7 @@
   <div aria-hidden="true" aria-labelledby="onboardingTitle" aria-modal="true" class="learning-overlay"
     id="onboardingModal" role="dialog">
     <section class="learning-panel">
-      <button aria-label="Close orientation" class="modal-close" id="closeOnboardingX" title="Close" type="button"><svg
+      <button aria-label="Close orientation and return to preparation" class="modal-close" id="closeOnboardingX" title="Close and return to preparation" type="button"><svg
           width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -5372,7 +5372,7 @@
         <div class="learning-where" id="onboardingWhere"></div>
       </div>
       <div class="learning-foot">
-        <button class="btn quiet" id="skipOnboarding" type="button">Skip orientation</button>
+        <button class="btn quiet" id="skipOnboarding" type="button">Skip for now</button>
         <div class="learning-nav">
           <button class="btn quiet" id="onboardingBack" type="button">Back</button>
           <button class="btn primary" id="onboardingNext" type="button">Next</button>
@@ -5384,7 +5384,7 @@
   <div aria-hidden="true" aria-labelledby="bridgeTitle" aria-modal="true" class="learning-overlay" id="learningBridge"
     role="dialog">
     <section class="learning-panel bridge-panel bridge-interactive">
-      <button aria-label="Close learning bridge" class="modal-close" id="closeBridgeX" title="Close" type="button"><svg
+      <button aria-label="Close learning bridge and return to preparation" class="modal-close" id="closeBridgeX" title="Close and return to preparation" type="button"><svg
           width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -5392,10 +5392,10 @@
         </svg></button>
       <div class="learning-top bridge-top">
         <div>
-          <div class="eyebrow">Learning bridge · subject-matter grounding · 3–4 minutes</div>
+          <div class="eyebrow">Learning bridge · subject-matter grounding · About 6 minutes</div>
           <h2 id="bridgeTitle" style="margin-top:7px">Enter the case with a shared operating frame</h2>
           <p class="bridge-lead">Every chapter works the same way: read the model, make one call on a practice case,
-            then read why. Five chapters, about six minutes.</p>
+            then read why. Five chapters prepare you for the case.</p>
         </div>
       </div>
       <div aria-label="Learning bridge chapters" class="bridge-tabs" id="bridgeDots" role="tablist"></div>
@@ -5417,6 +5417,7 @@
       <div class="learning-foot bridge-foot">
         <div class="bridge-meta">
           <span class="bridge-position" id="bridgePosition">1 / 5</span>
+          <button class="btn quiet" id="skipBridge" type="button">Skip for now</button>
           <button class="btn quiet" id="bridgeBackToOrientation" type="button">Review orientation</button>
         </div>
         <div class="learning-nav">
@@ -5433,8 +5434,8 @@
         <div class="brand-copy"><strong>Sovereign</strong><span>Role · Debt Management Office</span></div>
       </div>
       <div class="topmeta">
-        <span class="pill warn" id="masterClock" title="Scenario time to the IMF Board meeting"><span
-            class="dot"></span><span id="clockLabel">IMF Board · 11 weeks</span></span>
+        <span class="pill warn" id="masterClock" title="The 20-minute casework clock starts only when the facilitator begins the exercise"><span
+            class="dot"></span><span id="clockLabel">Casework · 20:00 · waiting</span></span>
         <button class="btn quiet comm-launch" id="openCommunications" type="button" aria-label="Communications"
           style="padding:10px;display:flex;align-items:center;justify-content:center;" title="Communications"><svg
             width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -6264,8 +6265,11 @@
             <div class="shock-step"><span class="year">Current case</span><strong>Common Framework request</strong>
               <p>IMF staff assess debt as unsustainable. The government formally requests treatment.</p>
             </div>
+            <div class="shock-step"><span class="year">T + 6 weeks</span><strong>USD 750m maturity</strong>
+              <p>The institutional maturity is a case fact; it is not derived from the workshop clock.</p>
+            </div>
             <div class="shock-step"><span class="year">T + 11 weeks</span><strong>IMF Board deadline</strong>
-              <p>The participant team must assemble a financing-assurances package before the Board meeting.</p>
+              <p>The Board horizon is a separate case fact; workshop minutes do not convert into scenario weeks.</p>
             </div>
           </div>
           <h4 class="ref-subtitle">Sovereign financing structure visible at scenario start</h4>
@@ -7325,7 +7329,7 @@
       qa('[data-ask-advisor]').forEach(b => b.addEventListener('click', () => { openAdvisor(b.dataset.askAdvisor); const input = document.getElementById('advisorInput'); input.value = b.dataset.askQuestion || ''; if (input.value) sendAdvisorQuestion(); }));
       qa('[data-open-comm]').forEach(b => b.addEventListener('click', () => openCommunications(b.dataset.openComm)));
       renderEvidenceSelects();
-      q('[data-action="ackMandate"]').addEventListener('click', () => { q('#s0status').textContent = 'Complete'; q('#s0status').className = 'status-tag ok'; startClock(); complete(0) });
+      q('[data-action="ackMandate"]').addEventListener('click', () => { q('#s0status').textContent = 'Complete'; q('#s0status').className = 'status-tag ok'; complete(0) });
       q('[data-action="commitLiquidity"]').addEventListener('click', () => { if (!recordReady('liquidity')) return; q('#s1status').textContent = 'Recorded'; q('#s1status').className = 'status-tag ok'; if (S.choices.liquidity === 'verify') { addCommMessage('team', { from: 'Debt Management Office · internal note', initials: 'DMO', time: commTime(), text: 'Verification request received. We are reconciling the revenue-account control terms, restricted balance, and any linkage across the two policy-bank facilities.' }, true); } else { addCommMessage('occ', { from: 'Élise Fournier · OCC Secretariat', initials: 'OCC', time: commTime(), text: 'Please clarify whether the reported liquidity position contains restricted or creditor-controlled cash. The current treatment file does not resolve that point.' }, true); } complete(1); setTimeout(() => prepareVerification(), 300) });
       /* Verification takes 1.6 scenario weeks to come back. Requested early it lands
          with room to act on it; requested late it lands after the OCC has already asked. */
@@ -7407,21 +7411,19 @@
       /* ======================================================================
          MASTER CLOCK, INBOUND ARRIVALS AND REQUEST LATENCY
 
-         Scenario time runs from entry to the IMF Board meeting: 11 scenario
-         weeks compressed into roughly eight minutes of session time. Two things
-         depend on it. Counterparts send scripted messages as the weeks pass, so
-         the room pushes back whether or not the participant acts. And requests
-         to other roles return on the clock rather than instantly, so an early
-         request and a late one cost different amounts.
+         The workshop clock and the institutional case deadlines are separate.
+         The facilitator alone starts the 20-minute casework clock. The USD 750m
+         maturity in six weeks and IMF Board horizon in eleven weeks remain case
+         facts; no real-time second maps to a scenario day or week.
 
          Elapsed time, request latency and arrival order are process evidence
          for the replay only. Do NOT derive engagement, competence, coordination
          quality or learning from how fast anyone moved.
          ====================================================================== */
-      const CLOCK = { totalWeeks: 11, secondsPerWeek: 45, elapsed: 0, running: false, timer: null, fired: {}, milestones: {} };
+      const CLOCK = { totalWeeks: 11, durationSeconds: 1200, elapsed: 0, running: false, timer: null, fired: {}, milestones: {} };
       const PENDING = [];
 
-      function scenarioWeek() { return CLOCK.elapsed / CLOCK.secondsPerWeek; }
+      function scenarioWeek() { return Math.min(CLOCK.totalWeeks, S.stage * (CLOCK.totalWeeks / Math.max(1, FLOW.length - 1))); }
       function weeksLeft() { return Math.max(0, CLOCK.totalWeeks - scenarioWeek()); }
       function weekLabel(w) { return 'Week ' + (Math.floor(w * 10) / 10).toFixed(1); }
       function logScenarioEvent(kind, text) { S.scenarioLog.push({ week: scenarioWeek(), kind: kind, text: text }); }
@@ -7429,12 +7431,11 @@
       function renderClock() {
         const pill = q('#masterClock'), label = q('#clockLabel');
         if (!pill || !label) return;
-        const left = weeksLeft();
-        if (S.deadlinePassed) { label.textContent = 'IMF Board · deadline passed'; pill.className = 'pill bad clock-alert'; return; }
-        if (!CLOCK.running) { label.textContent = 'IMF Board · 11 weeks'; pill.className = 'pill warn'; return; }
-        const weeks = Math.floor(left), days = Math.floor((left - weeks) * 7);
-        label.textContent = 'IMF Board · ' + weeks + 'w ' + days + 'd';
-        pill.className = 'pill ' + (left <= 2 ? 'bad clock-alert' : 'warn');
+        const remaining = Math.max(0, CLOCK.durationSeconds - CLOCK.elapsed);
+        const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+        const seconds = String(remaining % 60).padStart(2, '0');
+        label.textContent = 'Casework · ' + minutes + ':' + seconds + (CLOCK.running ? '' : ' · waiting');
+        pill.className = 'pill ' + (remaining <= 120 && CLOCK.running ? 'bad clock-alert' : 'warn');
       }
 
       function startClock() {
@@ -7442,7 +7443,7 @@
         CLOCK.running = true;
         CLOCK.timer = setInterval(tickClock, 1000);
         renderClock(); renderPendingQueue();
-        commSystem('team', 'Scenario clock started. Eleven weeks to the IMF Board meeting.');
+        commSystem('team', 'The facilitator started the 20-minute casework clock. Institutional case deadlines remain separate.');
       }
       function stopClock() { CLOCK.running = false; if (CLOCK.timer) { clearInterval(CLOCK.timer); CLOCK.timer = null; } renderClock(); }
 
@@ -7452,10 +7453,10 @@
         processPending(w);
         processArrivals(w);
         processMilestones();
-        if (w >= CLOCK.totalWeeks && !S.deadlinePassed) {
+        if (CLOCK.elapsed >= CLOCK.durationSeconds && !S.deadlinePassed) {
           S.deadlinePassed = true;
-          logScenarioEvent('deadline', 'Scenario clock expired before the package was closed.');
-          commSystem('team', 'Scenario clock expired. Anything not already with the Lead misses this Board window. You can still finish the flow; the replay records what was outstanding at expiry.');
+          logScenarioEvent('deadline', 'Casework clock expired before the package was closed.');
+          commSystem('team', 'The 20-minute casework clock expired. The replay records what was outstanding at expiry.');
           stopClock();
         }
         renderClock(); renderPendingQueue();
@@ -7608,9 +7609,9 @@
           where: "Role \u00b7 Debt Management Office"
         },
         {
-          title: "The clock is running",
-          body: "Eleven scenario weeks separate you from the IMF Board meeting, and the counter in the top right is live. It starts the moment you confirm your mandate.<br><br>Two things run on it. <b>Counterparts write to you whether or not you act</b> \u2014 Treasury corrects its own ledger note, Legal flags a covenant, the OCC asks what it needs, the Lead sets a deadline. And <b>requests to other roles come back on the clock, not instantly</b>. The same request sent in week one and week seven costs you very different amounts.<br><br>Missing the deadline does not lock you out. It is recorded, and you keep going.",
-          where: "Look top right \u00b7 Scenario clock",
+          title: "Casework starts with the facilitator",
+          body: "Orientation and the Learning Bridge do <b>not</b> use casework time. The top-right counter remains <b>Casework \u00b7 20:00 \u00b7 waiting</b> until the facilitator begins the exercise.<br><br>Inside the case, the USD 750m maturity in six weeks and the IMF Board horizon in eleven weeks remain separate institutional facts. Workshop minutes do not convert into scenario days or weeks.",
+          where: "Look top right \u00b7 Casework clock",
           highlight: "#masterClock",
           lift: ".topbar"
         },
@@ -7921,7 +7922,7 @@
         document.getElementById("onboardingWhere").innerHTML = '<span class="mk"></span>' + s.where;
         Array.prototype.forEach.call(document.querySelectorAll("#onboardingDots span"), function (d, j) { d.classList.toggle("on", j <= index) });
         document.getElementById("onboardingBack").disabled = index === 0;
-        document.getElementById("onboardingNext").textContent = index === steps.length - 1 ? (replayOnly ? "Close orientation" : "Enter decision room") : "Next";
+        document.getElementById("onboardingNext").textContent = index === steps.length - 1 ? (replayOnly ? "Close orientation" : "Continue to Learning Bridge") : "Next";
         var content = document.getElementById("onboardingStep");
         content.style.opacity = "0";
         requestAnimationFrame(function () { requestAnimationFrame(function () { content.style.opacity = "1" }) });
@@ -8039,7 +8040,7 @@
 
         var next = document.getElementById("bridgeNext");
         var answered = bridgeAnswers[bridgeIndex] !== undefined;
-        if (s.recap) { next.disabled = false; next.textContent = "Enter decision room"; }
+        if (s.recap) { next.disabled = false; next.textContent = "Continue to Mandate"; }
         else if (bridgePhase === 0) { next.disabled = false; next.textContent = bridgeHasCheck(s) ? "Make the call" : "Next chapter"; }
         else if (!answered) { next.disabled = true; next.textContent = "Pick an answer to continue"; }
         else { next.disabled = false; next.textContent = "Next chapter"; }
@@ -8068,11 +8069,13 @@
       }
       function openBridge() {
         onboarding.classList.remove("open"); onboarding.setAttribute("aria-hidden", "true");
+        delete bridge.dataset.preparationExit;
         bridge.classList.add("open"); bridge.setAttribute("aria-hidden", "false");
         setBodyLocked(true); buildBridgeDots(); renderBridge(0, 0);
         setTimeout(function () { document.getElementById("bridgeNext").focus(); }, 40);
       }
-      function closeBridge() {
+      function closeBridge(completed) {
+        bridge.dataset.preparationExit = completed ? "complete" : "incomplete";
         bridge.classList.remove("open"); bridge.setAttribute("aria-hidden", "true");
         setBodyLocked(false);
         var workspace = document.getElementById("workspace");
@@ -8080,11 +8083,12 @@
       }
 
       buildDots(); buildBridgeDots();
-      document.getElementById("onboardingNext").addEventListener("click", function () { if (index === steps.length - 1) closeOnboarding(); else renderStep(index + 1); });
+      document.getElementById("onboardingNext").addEventListener("click", function () { if (index === steps.length - 1) { if (replayOnly) closeOnboarding(); else openBridge(); } else renderStep(index + 1); });
       document.getElementById("onboardingBack").addEventListener("click", function () { if (index > 0) renderStep(index - 1); });
       document.getElementById("skipOnboarding").addEventListener("click", function () { replayOnly = false; closeOnboarding(); });
       document.getElementById("closeOnboardingX").addEventListener("click", function () { replayOnly = false; closeOnboarding(); });
-      document.getElementById("closeBridgeX").addEventListener("click", closeBridge);
+      document.getElementById("closeBridgeX").addEventListener("click", function () { closeBridge(false); });
+      document.getElementById("skipBridge").addEventListener("click", function () { closeBridge(false); });
       document.getElementById("bridgePrev").addEventListener("click", function () {
         if (bridgePhase === 1) { renderBridge(bridgeIndex, 0); return; }
         if (bridgeIndex === 0) return;
@@ -8095,7 +8099,7 @@
         if (document.getElementById("bridgeNext").disabled) return;
         var s = bridgeSteps[bridgeIndex];
         if (bridgePhase === 0 && bridgeHasCheck(s)) { renderBridge(bridgeIndex, 1); return; }
-        if (bridgeIndex === bridgeSteps.length - 1) { closeBridge(); return; }
+        if (bridgeIndex === bridgeSteps.length - 1) { closeBridge(true); return; }
         renderBridge(bridgeIndex + 1, 0);
       });
       document.getElementById("bridgeBackToOrientation").addEventListener("click", function () { openOnboarding(false); });
@@ -8104,7 +8108,7 @@
       document.addEventListener("keydown", function (e) {
         if (e.key !== "Escape") return;
         if (onboarding.classList.contains("open") && replayOnly) { closeOnboarding(); }
-        else if (bridge.classList.contains("open")) { closeBridge(); }
+        else if (bridge.classList.contains("open")) { closeBridge(false); }
       });
 
       /* First-run sequence: onboarding -> learning bridge content module -> live guided flow. */

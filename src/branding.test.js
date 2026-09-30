@@ -26,7 +26,8 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain("--bg: #0c0f0e");
     expect(styles).toContain("--recorded: #a9c6b7");
     expect(styles).toContain("--attention: #c9a468");
-    expect(styles).toContain("grid-template-columns: 268px minmax(0, 1fr)");
+    expect(styles).toContain("--process-rail-width: 268px");
+    expect(styles).toContain("grid-template-columns: var(--process-rail-width) minmax(0, 1fr)");
     expect(styles).toContain("grid-template-columns: 220px minmax(0, 1fr)");
   });
 
@@ -119,7 +120,7 @@ describe("reference interface fidelity", () => {
     }
   });
 
-  it("opens orientation after every successful workshop sign-in", () => {
+  it("opens preparation only until the participant has completed it", () => {
     const cloudJoin = participantSource.slice(
       participantSource.indexOf("async function handleJoin"),
       participantSource.indexOf("function handleLocalJoin"),
@@ -128,9 +129,80 @@ describe("reference interface fidelity", () => {
       participantSource.indexOf("function handleLocalJoin"),
       participantSource.indexOf("async function persist"),
     );
-    expect(cloudJoin).toContain('setReferenceSurface("orientation")');
-    expect(localJoin).toContain('setReferenceSurface("orientation")');
-    expect(participantSource).not.toContain("futureslab-orientation-seen:");
+    expect(cloudJoin).toContain("preparationIsComplete(joined)");
+    expect(cloudJoin).toContain('setReferenceSurface(complete ? null : "orientation")');
+    expect(localJoin).toContain("preparationIsComplete(joined)");
+    expect(localJoin).toContain('setReferenceSurface(complete ? null : "orientation")');
+    expect(participantSource).toContain('const PREPARATION_KEY_PREFIX = "futureslab-preparation-v1:"');
+  });
+
+  it("chains Orientation to the Learning Bridge and hands completed preparation to Mandate", () => {
+    const completionHandler = participantSource.slice(
+      participantSource.indexOf("function completePreparationSurface"),
+      participantSource.indexOf("async function exitWorkshop"),
+    );
+    expect(runtimeParticipantReference).toContain('"Continue to Learning Bridge"');
+    expect(runtimeParticipantReference).toContain("else openBridge();");
+    expect(referenceExperienceSource).toContain('surface === "orientation" && bridge.classList.contains("open")');
+    expect(referenceExperienceSource).toContain('bridge.dataset.preparationExit === "complete"');
+    expect(completionHandler).toContain('setReferenceSurface("bridge")');
+    expect(completionHandler).toContain('localStorage.setItem(preparationKey(bundle.participant.id), "complete")');
+    expect(completionHandler).toContain("setStage(0)");
+    expect(completionHandler).toContain("setRoleBriefOpen(true)");
+    expect(completionHandler).not.toContain("setDecisions");
+  });
+
+  it("keeps Skip and Close in an incomplete preparation state without touching decisions", () => {
+    const preparationControls = participantSource.slice(
+      participantSource.indexOf('<div className="orientation-tools"'),
+      participantSource.indexOf('<div className="shell">'),
+    );
+    const referenceHandlers = runtimeParticipantReference.slice(
+      runtimeParticipantReference.indexOf('document.getElementById("onboardingNext")'),
+      runtimeParticipantReference.indexOf("/* First-run sequence"),
+    );
+    expect(runtimeParticipantReference).toContain('id="skipOnboarding" type="button">Skip for now</button>');
+    expect(runtimeParticipantReference).toContain('id="skipBridge" type="button">Skip for now</button>');
+    expect(referenceHandlers).toContain('closeBridge(false)');
+    expect(referenceHandlers).toContain('closeBridge(true)');
+    expect(participantSource).toContain("Preparation incomplete · casework waiting");
+    expect(preparationControls).not.toContain("setDecisions");
+    expect(referenceHandlers).not.toContain("setDecisions");
+  });
+
+  it("uses one honest bridge duration and separates preparation, casework, and institutional deadlines", () => {
+    expect(runtimeParticipantReference.match(/About 6 minutes/g)).toHaveLength(1);
+    expect(runtimeParticipantReference).not.toMatch(/3[–-]4 minutes/i);
+    expect(runtimeParticipantReference).not.toMatch(/about six minutes/i);
+    expect(participantSource).toContain("Casework · ${formatClock(displayedClock)}");
+    expect(participantSource).toContain('" · waiting"');
+    expect(referenceExperienceSource).toContain("until the facilitator begins the exercise");
+    expect(referenceExperienceSource).toContain("USD 750m maturity in six weeks");
+    expect(referenceExperienceSource).toContain("IMF Board horizon in eleven weeks");
+    expect(runtimeParticipantReference).toContain("Casework · 20:00 · waiting");
+    expect(runtimeParticipantReference).not.toContain('title: "The clock is running"');
+    expect(runtimeParticipantReference).not.toContain("It starts the moment you confirm your mandate");
+    expect(runtimeParticipantReference).not.toContain("secondsPerWeek");
+  });
+
+  it("restores completed or already-started casework without forcing preparation on refresh", () => {
+    const restoration = participantSource.slice(
+      participantSource.indexOf("const participantId = localStorage.getItem(PARTICIPANT_KEY)"),
+      participantSource.indexOf("if (!entryHandoff", participantSource.indexOf("const participantId = localStorage.getItem(PARTICIPANT_KEY)")),
+    );
+    expect(restoration).toContain("preparationIsComplete(loaded)");
+    expect(restoration).toContain("setPreparationComplete(complete)");
+    expect(restoration).not.toContain('setReferenceSurface("orientation")');
+    expect(participantSource).toContain("hasCaseworkData(bundle)");
+  });
+
+  it("keeps the preparation status and controls inside the process rail", () => {
+    expect(styles).toContain("--process-rail-width: 268px; --process-rail-gutter: 18px");
+    expect(styles).toContain("width: calc(var(--process-rail-width) - var(--process-rail-gutter) - var(--process-rail-gutter))");
+    expect(styles).toContain(".participant-reference.app { --process-rail-width: 230px; }");
+    expect(styles).toContain(".participant-reference .preparation-status { min-width: 0; width: 100%");
+    expect(styles).toContain("overflow-wrap: anywhere");
+    expect(styles).toContain("width: auto; max-width: none");
   });
 
   it("keeps the embedded Case File to one accessible scroll region", () => {
@@ -152,7 +224,7 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toContain('className="role-lens"');
     expect(referenceExperienceSource).toContain("function alignOrientationCopy");
     expect(referenceExperienceSource).toContain('body>.app{visibility:hidden!important;pointer-events:none!important}');
-    expect(styles).toContain("grid-template-columns: 268px minmax(0, 1fr)");
+    expect(styles).toContain("grid-template-columns: var(--process-rail-width) minmax(0, 1fr)");
     expect(styles).toContain(".reference-experience-orientation iframe { background: transparent; }");
     expect(styles).toContain("width: 80%; padding: 38px clamp(24px, 4vw, 54px) 56px; zoom: 1.25");
   });

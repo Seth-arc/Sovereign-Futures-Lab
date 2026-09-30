@@ -29,11 +29,11 @@ function alignOrientationCopy(referenceDocument: Document) {
       "You are the <b>Debt Management Office</b> inside Kuvera’s Finance Ministry. You maintain the claims record, request evidence, map dependencies, and prepare a recommendation. Treasury, Legal, creditors, the OCC, and IMF staff are simulated by the platform or facilitator.<br><br>The live room uses the eight-stage process shown behind this orientation. The facilitator unlocks each new stage; every earlier unlocked stage remains available for revision.",
       "Role · Debt Management Office",
     );
-  } else if (title.textContent === "The clock is running") {
+  } else if (title.textContent === "Casework starts with the facilitator") {
     setContent(
-      "The clock is running",
-      "The top-right counter is the live <b>20-minute workshop clock</b>. The facilitator starts and pauses it for the room.<br><br>Inside the case, two institutional deadlines still matter: a USD 750m maturity in six weeks and the IMF Board horizon in eleven weeks. Evidence requests use authored exercise delays, so a late request can still constrain your recommendation.",
-      "Look top right · Exercise clock",
+      "Casework starts with the facilitator",
+      "Orientation and the Learning Bridge do <b>not</b> use casework time. The top-right counter remains <b>Casework · 20:00 · waiting</b> until the facilitator begins the exercise.<br><br>Inside the case, two separate institutional deadlines still matter: a USD 750m maturity in six weeks and the IMF Board horizon in eleven weeks. Workshop minutes do not convert into scenario days or weeks.",
+      "Look top right · Casework clock",
     );
   } else if (title.textContent === "Every step is open") {
     setContent(
@@ -74,7 +74,7 @@ function alignOrientationCopy(referenceDocument: Document) {
   }
 }
 
-export function ReferenceExperience({ surface, onClose }: { surface: ReferenceSurface; onClose: () => void }) {
+export function ReferenceExperience({ surface, onClose, onComplete }: { surface: ReferenceSurface; onClose: () => void; onComplete: () => void }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const observerRef = useRef<MutationObserver | null>(null);
   const [referenceDocument, setReferenceDocument] = useState("");
@@ -172,9 +172,14 @@ export function ReferenceExperience({ surface, onClose }: { surface: ReferenceSu
     }
 
     observerRef.current?.disconnect();
+    let exitReported = false;
     observerRef.current = new MutationObserver(() => {
       if (surface === "orientation") alignOrientationCopy(referenceDocument);
-      if (!activeSurface.classList.contains("open")) onClose();
+      if (activeSurface.classList.contains("open") || exitReported) return;
+      exitReported = true;
+      if (surface === "orientation" && bridge.classList.contains("open")) onComplete();
+      else if (surface === "bridge" && bridge.dataset.preparationExit === "complete") onComplete();
+      else onClose();
     });
     observerRef.current.observe(activeSurface, surface === "orientation"
       ? { attributes: true, attributeFilter: ["class"], childList: true, characterData: true, subtree: true }
@@ -184,7 +189,7 @@ export function ReferenceExperience({ surface, onClose }: { surface: ReferenceSu
   return (
     <div className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]}>
       <button type="button" className="reference-experience-dismiss" onClick={onClose}>
-        Return to workshop
+        Close and return to preparation
       </button>
       {loadError ? (
         <div className="reference-experience-error" role="alert">

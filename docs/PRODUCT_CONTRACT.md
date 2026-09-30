@@ -6,7 +6,8 @@
 - Platform: **Sovereign Room**
 - Exercise: **Kuvera Financing Assurances**
 - Human role: **Debt Management Office**
-- Duration: **20 minutes**
+- Timed casework: **20 minutes**, started and paused only by the facilitator
+- Preparation: **Orientation plus a Learning Bridge labeled About 6 minutes**, outside the casework clock
 - Capacity: **20–50 individual participants and one facilitator**
 - Site icon: **AidData Brandmark** from `public/assets/AidData Brandmark.png` on every deployable page
 
@@ -21,20 +22,26 @@
 
 ## Participant journey
 
-1. Complete the Debt Management Office orientation and subject-matter Learning Bridge.
-2. Review the role-visible Kuvera Case File: country profile, indicators and DSA, creditor architecture, contracts and escrow, Common Framework process, and evidence basis.
-3. Confirm mandate.
-4. Diagnose the USD 780 million liquidity claim.
-5. Request evidence or proceed with uncertainty.
-6. Update the debt record.
-7. Assess Facility A/B linkage and account control.
-8. Prepare disclosure and treatment-perimeter recommendations.
-9. Submit a versioned DMO recommendation.
-10. Complete a short reflection.
+1. Complete the Debt Management Office Orientation.
+2. Continue directly into the subject-matter Learning Bridge (About 6 minutes).
+3. Return to the live room for the casework-readiness handoff at Mandate.
+4. When the facilitator begins the exercise, enter the 20-minute casework and review the role-visible Kuvera Case File: country profile, indicators and DSA, creditor architecture, contracts and escrow, Common Framework process, and evidence basis.
+5. Confirm mandate.
+6. Diagnose the USD 780 million liquidity claim.
+7. Request evidence or proceed with uncertainty.
+8. Update the debt record.
+9. Assess Facility A/B linkage and account control.
+10. Prepare disclosure and treatment-perimeter recommendations.
+11. Submit a versioned DMO recommendation.
+12. Complete a short reflection.
 
-Orientation, the Learning Bridge, and the complete Case File remain available throughout the exercise without resetting participant work. Participants may revisit unlocked steps. Facilitator pacing determines which new step is available. A participant may submit `READY`, `READY_WITH_CONDITIONS`, or `NOT_READY`; unresolved evidence never blocks an honest non-ready recommendation.
+On first entry, completing Orientation opens the Learning Bridge automatically; completing the bridge returns the participant to the live room at Mandate. Skip for now and Close return to an explicitly incomplete preparation state and do not mark either resource complete. Orientation, the Learning Bridge, and the complete Case File remain available throughout the exercise without resetting participant work. Preparation completion is stored separately from decision data, so reopening preparation cannot clear work and a normal refresh after casework entry restores the room without forcing preparation to restart. Participants may revisit unlocked steps. Facilitator pacing determines which new step is available. A participant may submit `READY`, `READY_WITH_CONDITIONS`, or `NOT_READY`; unresolved evidence never blocks an honest non-ready recommendation.
 
-The live participant room has one navigation model: the accepted eight-stage process flow on the left and the decision workspace in the center. Orientation retains the reference modal styling and motion but is rendered transparently over that live room, so it never presents a second or obsolete rail. It opens automatically after every successful landing-page sign-in, including a participant rejoining the same workshop, while a normal page refresh restores the room without interrupting the participant with orientation again. The prototype's right-hand current-step guide is intentionally absent because it duplicates the active stage heading and does not map cleanly to the facilitator-paced build. The top bar shows the enlarged Sovereign identity without repeating the participant role, followed by the clock, Communications, Case File, and a hamburger menu for the Glossary, light/dark mode, and Exit. Light mode uses a low-glare neutral-grey canvas with subtly separated shell, card, and input surfaces rather than a uniform off-white field. Exit saves current work before clearing the local participant session and returning to the landing page. Orientation, Learning Bridge, and AI-advisor controls remain at lower left.
+The participant clock reads `Casework · 20:00 · waiting` before the facilitator starts the exercise. Orientation and the Learning Bridge never start or consume that clock. Once started, it measures only the twenty-minute workshop casework. The USD 750 million maturity in six weeks and the IMF Board horizon in eleven weeks are institutional case facts, remain visible as such, and are never presented as a conversion from real-time seconds or workshop minutes.
+
+The current Vitest stack runs in Node and has no browser DOM renderer, so the embedded reference-to-React handoff is pinned with narrow source-contract tests. Release verification still requires the manual browser gate: complete Orientation, complete the bridge, confirm Mandate, reopen both preparation surfaces, refresh during casework, and confirm the waiting clock remains at 20:00 before facilitator start.
+
+The live participant room has one navigation model: the accepted eight-stage process flow on the left and the decision workspace in the center. Orientation retains the reference modal styling and motion but is rendered transparently over that live room, so it never presents a second or obsolete rail. It opens automatically for a participant whose preparation is not complete; on the same browser, a normal page refresh or later sign-in restores an already-entered case without interrupting it with preparation. Existing decision data also identifies legacy in-progress cases so the new preparation prerequisite does not displace their work. The prototype's right-hand current-step guide is intentionally absent because it duplicates the active stage heading and does not map cleanly to the facilitator-paced build. The top bar shows the enlarged Sovereign identity without repeating the participant role, followed by the casework clock, Communications, Case File, and a hamburger menu for the Glossary, light/dark mode, and Exit. Light mode uses a low-glare neutral-grey canvas with subtly separated shell, card, and input surfaces rather than a uniform off-white field. Exit saves current work before clearing the local participant session and returning to the landing page. A preparation status plus Orientation, Learning Bridge, and AI-advisor controls remain at lower left.
 
 Communications is a separate full-screen workspace and never changes the participant's current process stage. It retains the reference channel rail, central correspondence thread, and channel-context panel while consolidating facilitator broadcasts, requested-evidence status and returned content, and exceptional institutional requests and replies. On supported laptop layouts, the workspace uses the reference interface's 150% visual scale while compensating its layout dimensions so it remains within one viewport. Routine requests are still initiated from the Evidence stage so the decision record retains the correct stage context.
 

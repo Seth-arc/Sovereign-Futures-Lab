@@ -216,7 +216,7 @@ label { display: grid; gap: 7px; margin: 15px 0; color: var(--muted); font-size:
 
 /* Participant room: one accepted eight-stage process model. Orientation is
    rendered over this live shell instead of showing a second prototype shell. */
-.participant-reference.app { min-height: 100vh; display: flex; flex-direction: column; }
+.participant-reference.app { --process-rail-width: 268px; --process-rail-gutter: 18px; min-height: 100vh; display: flex; flex-direction: column; }
 .participant-reference .topbar { min-height: 64px; padding: 12px clamp(16px, 3vw, 30px); }
 .participant-reference .topbar .brand-copy strong { font-size: 1.2rem; font-weight: 600; letter-spacing: -.02em; }
 .participant-reference .topmeta { gap: 10px; }
@@ -237,10 +237,13 @@ label { display: grid; gap: 7px; margin: 15px 0; color: var(--muted); font-size:
 .menu-item:hover:not(:disabled) { background: var(--surface-2); }
 .menu-divider { height: 1px; margin: 6px 0; background: var(--edge); }
 .menu-item.text-bad { color: var(--blocking); }
-.participant-reference .orientation-tools { position: fixed; bottom: 24px; left: 18px; z-index: 18; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 250px; }
+.participant-reference .orientation-tools { position: fixed; bottom: 24px; left: var(--process-rail-gutter); z-index: 18; width: calc(var(--process-rail-width) - var(--process-rail-gutter) - var(--process-rail-gutter)); max-width: calc(100vw - var(--process-rail-gutter) - var(--process-rail-gutter)); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .participant-reference .reference-tool-button { min-height: 36px; padding: 9px 12px; background: var(--shell); backdrop-filter: blur(18px); }
+.participant-reference .preparation-status { min-width: 0; width: 100%; padding: 7px 10px; overflow-wrap: anywhere; border: 1px solid var(--edge); border-radius: var(--radius); background: var(--shell); color: var(--muted); font-size: .62rem; line-height: 1.35; }
+.participant-reference .preparation-status.complete { border-color: var(--recorded); color: var(--recorded); }
+.participant-reference .preparation-status.incomplete { border-color: var(--attention); color: var(--attention); }
 
-.participant-reference .shell { display: grid; grid-template-columns: 268px minmax(0, 1fr); min-height: calc(100vh - 64px); }
+.participant-reference .shell { display: grid; grid-template-columns: var(--process-rail-width) minmax(0, 1fr); min-height: calc(100vh - 64px); }
 .participant-reference .process { position: sticky; top: 64px; height: calc(100vh - 64px); overflow: auto; padding: 24px 16px; border-right: 1px solid var(--edge); background: var(--surface); }
 .participant-reference .process:focus-visible { outline: 3px solid var(--recorded); outline-offset: -3px; }
 .participant-reference .rail-title { padding: 0 8px 16px; border-bottom: 1px solid var(--edge); }
@@ -273,6 +276,14 @@ label { display: grid; gap: 7px; margin: 15px 0; color: var(--muted); font-size:
 .participant-reference .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 
 .participant-reference .role-lens { padding: 24px; border: 1px solid var(--edge); border-left: 3px solid var(--recorded); border-radius: 2px; background: var(--surface); box-shadow: inset 0 1px 0 var(--edge-lit); }
+.participant-reference .preparation-state { max-width: 760px; padding: 28px; border: 1px solid var(--edge); border-left: 3px solid var(--attention); border-radius: 2px; background: var(--surface); box-shadow: inset 0 1px 0 var(--edge-lit); }
+.participant-reference .preparation-state h1 { margin: 8px 0 14px; }
+.participant-reference .preparation-state > p { color: var(--muted); }
+.participant-reference .preparation-deadlines { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 22px; background: var(--edge); }
+.participant-reference .preparation-deadlines > div { display: grid; gap: 3px; padding: 16px; background: var(--bg); }
+.participant-reference .preparation-deadlines strong { color: var(--text); font-size: .9rem; }
+.participant-reference .preparation-deadlines span { color: var(--muted); font-size: .72rem; }
+.participant-reference .preparation-deadline-note { font-size: .72rem; }
 .participant-reference .role-lens-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--edge); }
 .participant-reference .role-lens-id { display: flex; align-items: center; gap: 12px; }
 .participant-reference .role-lens-avatar { display: grid; width: 46px; height: 46px; place-items: center; border: 1px solid var(--edge-lit); border-radius: var(--pill); background: var(--surface-2); color: var(--recorded); font-size: .7rem; font-weight: 700; }
@@ -506,7 +517,7 @@ td strong, td small { display: block; }
 .report-modal footer { display: flex; justify-content: flex-end; gap: 8px; padding: 13px; border-top: 1px solid var(--edge); }
 
 @media (max-width: 1180px) {
-  .participant-reference .shell { grid-template-columns: 230px minmax(0, 1fr); }
+  .participant-reference.app { --process-rail-width: 230px; }
   .participant-reference .workspace { padding-right: 30px; }
   .communications-layout { grid-template-columns: 215px minmax(0, 1fr); }
   .communications-context { display: none; }
@@ -525,6 +536,7 @@ td strong, td small { display: block; }
   .participant-reference .stage-head { display: block; }
   .participant-reference .stage-index { justify-items: start; margin-top: 10px; }
   .participant-reference .role-lens-grid { grid-template-columns: 1fr; }
+  .participant-reference .preparation-deadlines { grid-template-columns: 1fr; }
   .participant-reference .role-lens-foot { align-items: stretch; flex-direction: column; }
   .communications-scrim { padding: 0; }
   .communications-dialog { width: 100vw; height: 100vh; height: 100dvh; border: 0; zoom: 1; }
@@ -544,7 +556,7 @@ td strong, td small { display: block; }
 }
 
 @media (max-width: 800px) {
-  .participant-reference .orientation-tools { display: none; }
+  .participant-reference .orientation-tools { position: relative; bottom: auto; left: auto; z-index: 18; width: auto; max-width: none; padding: 8px 14px; border-bottom: 1px solid var(--edge); background: var(--shell); }
 }
 
 @media (max-width: 1100px) {

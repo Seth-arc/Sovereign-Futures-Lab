@@ -24,6 +24,7 @@ import type { AdvisorCitation, AdvisorId, DecisionState, InstitutionRole } from 
 
 const PARTICIPANT_KEY = "futureslab-participant-id";
 const ENTRY_HANDOFF_KEY = "futureslab-entry-handoff-v1";
+const PREPARATION_KEY_PREFIX = "futureslab-preparation-v1:";
 const GLOSSARY_TERMS = [
   { term: "Debt Management Office (DMO)", definition: "The Finance Ministry function that maintains the debt record, reconciles claims, maps dependencies, and prepares recommendations without creating sovereign or creditor commitments." },
   { term: "Usable liquidity", definition: "Cash that is actually available after restrictions, protected balances, and control arrangements are accounted for." },
@@ -126,6 +127,31 @@ function remainingFor(bundle: ParticipantBundle, now: number): number {
   return Math.max(0, bundle.session.remainingSeconds - Math.floor((now - new Date(bundle.session.clockStartedAt).getTime()) / 1000));
 }
 
+function preparationKey(participantId: string): string {
+  return `${PREPARATION_KEY_PREFIX}${participantId}`;
+}
+
+function hasCaseworkData(bundle: ParticipantBundle): boolean {
+  const decisions = bundle.decisions;
+  return bundle.participant.currentStage > 0
+    || decisions.mandateConfirmed
+    || decisions.mandateRationale.trim().length > 0
+    || decisions.liquidityRationale.trim().length > 0
+    || decisions.liquidityBasisRationale.trim().length > 0
+    || decisions.linkageRationale.trim().length > 0
+    || decisions.disclosureRationale.trim().length > 0
+    || decisions.unresolvedRisks.trim().length > 0
+    || decisions.finalRationale.trim().length > 0
+    || decisions.reflection.trim().length > 0
+    || bundle.evidenceRequests.length > 0
+    || bundle.messages.length > 0
+    || bundle.submissions.length > 0;
+}
+
+function preparationIsComplete(bundle: ParticipantBundle): boolean {
+  return localStorage.getItem(preparationKey(bundle.participant.id)) === "complete" || hasCaseworkData(bundle);
+}
+
 export function ParticipantApp() {
   const [entryHandoff] = useState<JoinInput | null>(() => consumeEntryHandoff());
   const [bundle, setBundle] = useState<ParticipantBundle | null>(null);
@@ -140,11 +166,13 @@ export function ParticipantApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [referenceSurface, setReferenceSurface] = useState<ReferenceSurface | null>(null);
+  const [preparationComplete, setPreparationComplete] = useState(false);
   const [roleBriefOpen, setRoleBriefOpen] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const handoffAttempted = useRef(false);
   const communicationsTrigger = useRef<HTMLButtonElement>(null);
   const advisorTrigger = useRef<HTMLButtonElement>(null);
+  const mainContent = useRef<HTMLElement>(null);
   const menuContainer = useRef<HTMLDivElement>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null);
 
@@ -158,9 +186,12 @@ export function ParticipantApp() {
     if (participantId) {
       void loadParticipantBundle(participantId)
         .then((loaded) => {
+          const complete = preparationIsComplete(loaded);
+          if (complete) localStorage.setItem(preparationKey(loaded.participant.id), "complete");
           setBundle(loaded);
           setDecisions(loaded.decisions);
           setStage(Math.min(loaded.participant.currentStage, loaded.session.currentStage));
+          setPreparationComplete(complete);
         })
         .catch(() => localStorage.removeItem(PARTICIPANT_KEY))
         .finally(() => setInitializing(false));
@@ -212,10 +243,12 @@ export function ParticipantApp() {
     try {
       const joined = await joinWorkshop(input);
       localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
+      const complete = preparationIsComplete(joined);
       setBundle(joined);
       setDecisions(joined.decisions);
       setStage(0);
-      setReferenceSurface("orientation");
+      setPreparationComplete(complete);
+      setReferenceSurface(complete ? null : "orientation");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to join the workshop.");
     } finally { setBusy(false); }
@@ -224,10 +257,12 @@ export function ParticipantApp() {
   function handleLocalJoin(input: { name: string; organization: string; email: string }) {
     const joined = joinLocalWorkshop(input);
     localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
+    const complete = preparationIsComplete(joined);
     setBundle(joined);
     setDecisions(joined.decisions);
     setStage(0);
-    setReferenceSurface("orientation");
+    setPreparationComplete(complete);
+    setReferenceSurface(complete ? null : "orientation");
     setError("");
   }
 
@@ -247,6 +282,9 @@ export function ParticipantApp() {
   const availableStage = Math.max(bundle.session.currentStage, bundle.participant.currentStage);
   const latestInject = bundle.injects.at(-1);
   const clock = remainingFor(bundle, now);
+  const caseworkRunning = preparationComplete && bundle.session.status === "RUNNING";
+  const displayedClock = preparationComplete ? clock : bundle.session.durationSeconds;
+  const caseworkClockLabel = `Casework · ${formatClock(displayedClock)}${caseworkRunning ? "" : " · waiting"}`;
   const pendingRequests = bundle.evidenceRequests.filter((request) => !evidenceIsAvailable(request, new Date(now)));
   const pendingCommunications = pendingRequests.length + bundle.messages.filter((message) => message.status === "PENDING").length;
 
@@ -263,6 +301,28 @@ export function ParticipantApp() {
   function closeAdvisor() {
     setAdvisorOpen(false);
     window.requestAnimationFrame(() => advisorTrigger.current?.focus());
+  }
+
+  function completePreparationSurface() {
+    if (referenceSurface === "orientation") {
+      setReferenceSurface("bridge");
+      return;
+    }
+    if (referenceSurface !== "bridge" || !bundle) return;
+    localStorage.setItem(preparationKey(bundle.participant.id), "complete");
+    if (isLocalBundle(bundle)) {
+      setBundle({ ...bundle, session: { ...bundle.session, status: "RUNNING", remainingSeconds: bundle.session.durationSeconds, clockStartedAt: new Date().toISOString() } });
+    }
+    setPreparationComplete(true);
+    setStage(0);
+    setRoleBriefOpen(true);
+    setReferenceSurface(null);
+    window.requestAnimationFrame(() => mainContent.current?.focus());
+  }
+
+  function closePreparationSurface() {
+    setReferenceSurface(null);
+    window.requestAnimationFrame(() => mainContent.current?.focus());
   }
 
   async function exitWorkshop() {
@@ -286,7 +346,7 @@ export function ParticipantApp() {
       <header className="topbar">
         <div className="brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><div className="brand-copy"><strong>Sovereign</strong></div></div>
         <div className="topmeta">
-          <span className={`pill clock ${bundle.session.status === "RUNNING" ? "warn" : "ok"}`} id="masterClock" aria-label={`${clock} seconds remaining`} title="Live workshop exercise clock"><span className={`status-dot ${bundle.session.status.toLowerCase()}`} /><span>Exercise · {formatClock(clock)}</span></span>
+          <span className={`pill clock ${caseworkRunning ? "warn" : "ok"}`} id="masterClock" aria-label={caseworkClockLabel} title="The 20-minute casework clock starts only when the facilitator begins the exercise"><span className={`status-dot ${caseworkRunning ? "running" : "paused"}`} /><span>{caseworkClockLabel}</span></span>
           <button ref={communicationsTrigger} type="button" className="reference-icon-button comm-launch" id="openCommunications" aria-label="Open communications" title="Communications" aria-haspopup="dialog" aria-expanded={communicationsOpen} onClick={() => { setError(""); setCommunicationsOpen(true); }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             {pendingCommunications > 0 && <span className="comm-unread" aria-label={`${pendingCommunications} communications awaiting resolution`}>{pendingCommunications}</span>}
@@ -307,8 +367,9 @@ export function ParticipantApp() {
       )}
 
       <div className="orientation-tools" aria-label="Orientation and learning resources">
-        <button type="button" className="secondary-button reference-tool-button" onClick={() => setReferenceSurface("orientation")}>Orientation</button>
-        <button type="button" className="secondary-button reference-tool-button" id="replayBridge" onClick={() => setReferenceSurface("bridge")}>Learning bridge</button>
+        <span className={`preparation-status ${preparationComplete ? "complete" : "incomplete"}`} role="status" aria-live="polite">{preparationComplete ? (caseworkRunning ? "Casework in progress" : "Preparation complete · waiting for facilitator") : "Preparation incomplete · casework waiting"}</span>
+        <button type="button" className="secondary-button reference-tool-button" aria-haspopup="dialog" aria-expanded={referenceSurface === "orientation"} onClick={() => setReferenceSurface("orientation")}>Orientation</button>
+        <button type="button" className="secondary-button reference-tool-button" id="replayBridge" aria-haspopup="dialog" aria-expanded={referenceSurface === "bridge"} onClick={() => setReferenceSurface("bridge")}>Learning bridge</button>
         <button ref={advisorTrigger} type="button" className="secondary-button reference-tool-button" id="openAdvisors" aria-haspopup="dialog" aria-expanded={advisorOpen} onClick={() => setAdvisorOpen(true)}>AI advisors</button>
       </div>
 
@@ -326,8 +387,8 @@ export function ParticipantApp() {
           <div className="mode-note"><strong>{isLocalBundle(bundle) ? "Local emergency mode" : "Live workshop mode"}</strong><span>{isLocalBundle(bundle) ? "This browser retains your work. Download the handoff file when finished." : "Your activity is synchronized with the facilitator."}</span></div>
         </aside>
 
-        <main className={`workspace ${stage === 0 && roleBriefOpen ? "role-brief-open" : ""}`} id="main-content">
-          {stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
+        <main ref={mainContent} className={`workspace ${stage === 0 && roleBriefOpen ? "role-brief-open" : ""}`} id="main-content" tabIndex={-1}>
+          {!preparationComplete ? <PreparationState onOrientation={() => setReferenceSurface("orientation")} onBridge={() => setReferenceSurface("bridge")} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
             <div className="stage-head"><div><div className="eyebrow">Step {stage + 1} · {STAGES[stage].short}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className="autosave-state">{busy ? "Saving…" : "Saved on action"}</span></div></div>
             {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
             <StageContent stage={stage} decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />
@@ -343,7 +404,7 @@ export function ParticipantApp() {
       {communicationsOpen && <CommunicationsPanel bundle={bundle} setBundle={setBundle} setError={setError} error={error} now={now} onClose={closeCommunications} />}
       {glossaryOpen && <GlossaryDialog onClose={closeGlossary} />}
       {advisorOpen && <AdvisorPanel bundle={bundle} setBundle={setBundle} onClose={closeAdvisor} />}
-      {referenceSurface && <ReferenceExperience surface={referenceSurface} onClose={() => setReferenceSurface(null)} />}
+      {referenceSurface && <ReferenceExperience key={referenceSurface} surface={referenceSurface} onClose={closePreparationSurface} onComplete={completePreparationSurface} />}
     </div>
   );
 }
@@ -370,6 +431,10 @@ function GlossaryDialog({ onClose }: { onClose: () => void }) {
 function WorkshopEntryState({ initializing, busy, error, entryHandoff, onRetry, onJoinLocal }: { initializing: boolean; busy: boolean; error: string; entryHandoff: JoinInput | null; onRetry: () => void; onJoinLocal: () => void }) {
   const inProgress = initializing || busy;
   return <main className="entry-page participant-reference"><div className="entry-brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><span><strong>Sovereign</strong><small>Futureslab workshop</small></span></div><section className="entry-copy"><span className="eyebrow">Kuvera · Financing assurances</span><h1>{WORKSHOP_TITLE}</h1><p>Enter the Kuvera financing-assurances case as a member of the Debt Management Office. Your evidence requests, decisions, and rationale will form a facilitator-led after-action review.</p><div className="method-line"><span>Evidence</span><i /> <span>Decision</span><i /> <span>Consequence</span><i /> <span>Reflection</span></div></section><section className="join-card" aria-labelledby="entry-state-title" aria-live="polite"><h2 id="entry-state-title">{inProgress ? "Joining the workshop" : "Enter through the main page"}</h2>{inProgress ? <p>Your participant details are being verified. Keep this page open.</p> : <p>The participant sign-in is on the Sovereign landing page so your details are entered only once.</p>}{error && <div className="error-panel" role="alert">{error}</div>}{!inProgress && entryHandoff && <><button className="primary-button full" type="button" onClick={onRetry}>Try again</button><button className="secondary-button full" type="button" onClick={onJoinLocal}>Continue in local emergency mode</button></>}{!inProgress && <p><a href="/">Return to participant sign-in</a></p>}</section></main>;
+}
+
+function PreparationState({ onOrientation, onBridge }: { onOrientation: () => void; onBridge: () => void }) {
+  return <section className="preparation-state" aria-labelledby="preparation-state-title"><span className="eyebrow">Preparation · incomplete</span><h1 id="preparation-state-title">Finish preparation before casework</h1><p>Orientation and the Learning Bridge are outside the timed case. The 20-minute casework clock starts only when the facilitator begins the exercise.</p><p>Skipping or closing preparation keeps you here. You can reopen either resource without changing any casework decisions, evidence requests, or messages.</p><div className="preparation-deadlines" aria-label="Institutional case deadlines"><div><strong>Six weeks</strong><span>USD 750m maturity</span></div><div><strong>Eleven weeks</strong><span>IMF Board horizon</span></div></div><p className="preparation-deadline-note">These are institutional case facts, not a conversion from workshop minutes.</p><div className="actions"><button className="primary-button" type="button" aria-haspopup="dialog" onClick={onOrientation}>Continue orientation</button><button className="secondary-button" type="button" aria-haspopup="dialog" onClick={onBridge}>Open Learning Bridge</button></div></section>;
 }
 
 function RoleBrief({ onContinue }: { onContinue: () => void }) {
