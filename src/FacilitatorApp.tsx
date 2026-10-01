@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   answerInstitutionalRequest,
   cloudEnabled,
@@ -32,6 +32,18 @@ import type { AfterActionReport, DecisionState, ParticipantProfile, WorkshopSess
 
 type FacilitatorData = Awaited<ReturnType<typeof loadFacilitatorSession>>;
 type ConsoleView = "overview" | "participants" | "communications" | "injects" | "analytics" | "replay";
+
+function modalBackgroundSiblings(root: HTMLElement): HTMLElement[] {
+  const siblings = new Set<HTMLElement>();
+  let current: HTMLElement = root;
+  while (current.parentElement && current.parentElement !== document.documentElement) {
+    Array.from(current.parentElement.children).forEach((element) => {
+      if (element !== current && element instanceof HTMLElement) siblings.add(element);
+    });
+    current = current.parentElement;
+  }
+  return [...siblings];
+}
 
 const emptyData: FacilitatorData = { participants: [], evidence: [], submissions: [], injects: [], messages: [], turns: [], events: [] };
 
@@ -261,7 +273,40 @@ function ReportDesk({ reports }: { reports: AfterActionReport[] }) {
 }
 
 function ReportModal({ report, onClose }: { report: AfterActionReport; onClose: () => void }) {
-  return <div className="modal-scrim" role="presentation"><section className="report-modal" role="dialog" aria-modal="true" aria-label={`After-action report for ${report.participant.name}`}><header><div><span className="eyebrow">Facilitator-only report</span><h2>{report.participant.name}</h2><p>{report.participant.organization} · {report.participant.email}</p></div><button type="button" className="icon-button" onClick={onClose}>×</button></header><iframe title="After-action report preview" srcDoc={afterActionReportHtml(report)} sandbox="allow-same-origin" /><footer><button type="button" onClick={() => void downloadReportPdf(report)}>Download PDF</button><button type="button" onClick={() => downloadReportHtml(report)}>Download HTML</button><button type="button" onClick={() => downloadReportJson(report)}>Download JSON</button><button type="button" className="primary-button" onClick={onClose}>Close</button></footer></section></div>;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const returnTarget = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    const siblings = modalBackgroundSiblings(root);
+    document.body.style.overflow = "hidden";
+    siblings.forEach((element) => { element.inert = true; element.setAttribute("aria-hidden", "true"); });
+    window.requestAnimationFrame(() => closeRef.current?.focus());
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      siblings.forEach((element) => { element.inert = false; element.removeAttribute("aria-hidden"); });
+      window.requestAnimationFrame(() => returnTarget?.focus());
+    };
+  }, []);
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'));
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+  function connectFrameKeyboard(frame: HTMLIFrameElement) {
+    frame.contentDocument?.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    });
+  }
+  return <div ref={rootRef} className="modal-scrim" role="presentation"><section className="report-modal" role="dialog" aria-modal="true" aria-label={`After-action report for ${report.participant.name}`} tabIndex={-1} onKeyDown={handleKeyDown}><header><div><span className="eyebrow">Facilitator-only report</span><h2>{report.participant.name}</h2><p>{report.participant.organization} · {report.participant.email}</p></div><button ref={closeRef} type="button" className="icon-button" aria-label="Close after-action report" onClick={onClose}>×</button></header><iframe title="After-action report preview" srcDoc={afterActionReportHtml(report)} sandbox="allow-same-origin" onLoad={(event) => connectFrameKeyboard(event.currentTarget)} /><footer><button type="button" onClick={() => void downloadReportPdf(report)}>Download PDF</button><button type="button" onClick={() => downloadReportHtml(report)}>Download HTML</button><button type="button" onClick={() => downloadReportJson(report)}>Download JSON</button><button type="button" className="primary-button" onClick={onClose}>Close</button></footer></section></div>;
 }
 
 function reportFor(participant: ParticipantProfile, decisions: DecisionState, session: WorkshopSession, data: FacilitatorData): AfterActionReport {

@@ -195,9 +195,9 @@ describe("reference interface fidelity", () => {
     expect(runtimeParticipantReference).toContain("Contracts & Escrow");
     expect(runtimeParticipantReference).toContain("Common Framework");
     expect(runtimeParticipantReference).toContain("Evidence Basis");
-    expect(participantSource).toContain('setReferenceSurface("orientation")');
-    expect(participantSource).toContain('setReferenceSurface("bridge")');
-    expect(participantSource).toContain('setReferenceSurface("case-file")');
+    expect(participantSource).toContain('openReference("orientation"');
+    expect(participantSource).toContain('openReference("bridge"');
+    expect(participantSource).toContain('openReference("case-file"');
     for (const script of runtimeParticipantReference.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
       const hash = createHash("sha256").update(script[1].replace(/\r\n/g, "\n"), "utf8").digest("base64");
       expect(vercelConfig).toContain(`'sha256-${hash}'`);
@@ -391,8 +391,14 @@ describe("reference interface fidelity", () => {
     const communicationsStart = participantSource.indexOf('id="openCommunications"');
     const communicationsEnd = participantSource.indexOf("</button>", communicationsStart);
     const communicationsControl = participantSource.slice(communicationsStart, communicationsEnd);
-    expect(communicationsControl).toContain("setCommunicationsOpen(true)");
+    const communicationsOpener = participantSource.slice(
+      participantSource.indexOf("function openCommunications"),
+      participantSource.indexOf("function openGlossary"),
+    );
+    expect(communicationsControl).toContain("openCommunications(event.currentTarget)");
+    expect(communicationsOpener).toContain("setCommunicationsOpen(true)");
     expect(communicationsControl).not.toContain("setStage(");
+    expect(communicationsOpener).not.toContain("setStage(");
     expect(participantSource).toContain("function CommunicationsPanel");
     expect(participantSource).toContain('role="dialog" aria-modal="true" aria-labelledby="communications-title"');
     expect(participantSource).toContain('className="communications-sidebar"');
@@ -445,7 +451,7 @@ describe("reference interface fidelity", () => {
   });
 
   it('matches the advisor action controls to the reference-tool button dimensions', () => {
-    expect(styles).toContain('.advisor-workspace-head .secondary-button, .advisor-compose .voice-button, .advisor-compose .primary-button { min-height: 36px; padding: 9px 12px; font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; }');
+    expect(styles).toContain('.advisor-workspace-head .secondary-button, .advisor-compose .voice-button, .advisor-compose .primary-button { min-height: 40px; padding: 9px 12px; font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; }');
   });
 
   it('guards the asynchronous exit save against an unavailable participant bundle', () => {
@@ -470,5 +476,80 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain('.advisor-conversation .question, .advisor-conversation .answer { padding: 8px 10px;');
     expect(styles).toContain('.advisor-conversation p { margin: 4px 0 0; white-space: pre-wrap; font-size: .6rem; line-height: 1.45; }');
     expect(referenceExperienceSource).not.toContain('include sources');
+  });
+
+  it("keeps every essential participant tool and the labeled clock available on mobile", () => {
+    const participantMenu = participantSource.slice(
+      participantSource.indexOf('className="user-menu-dropdown"'),
+      participantSource.indexOf('<div className="menu-divider"'),
+    );
+    for (const label of ["Communications", "Case file", "Orientation", "Learning Bridge", "AI Advisors", "Glossary", "Exit"]) {
+      if (label !== "Exit") expect(participantMenu).toContain(`>${label}`);
+    }
+    expect(participantMenu.match(/mobile-menu-item/g)).toHaveLength(5);
+    expect(participantMenu).toContain('<ThemeButton variant="menu"');
+    expect(participantSource).toContain('className="menu-item text-bad"');
+    expect(participantSource).toContain('className="clock-label">Casework');
+    expect(participantSource).toContain('className="clock-value">{formatClock(displayedClock)}');
+    expect(styles).toContain(".mobile-menu-item { display: block; }");
+    expect(styles).toContain(".participant-reference .orientation-tools { display: none; }");
+    expect(styles).not.toContain(".topmeta .pill:first-child, .top-actions .persona-pill { display: none; }");
+  });
+
+  it("pins focus containment, Escape, and focus return across participant workspaces", () => {
+    expect(participantSource).toContain("function trapDialogFocus");
+    expect(participantSource).toContain('event.key === "Escape"');
+    expect(participantSource).toContain("useDialogLifecycle(rootRef, closeRef)");
+    expect(participantSource).toContain("communicationsReturnTarget.current?.focus()");
+    expect(participantSource).toContain("glossaryReturnTarget.current?.focus()");
+    expect(participantSource).toContain("advisorReturnTarget.current?.focus()");
+    expect(participantSource).toContain("referenceReturnTarget.current");
+    expect(participantSource).toContain('openReference("orientation"');
+    expect(participantSource).toContain('openReference("bridge"');
+    expect(participantSource).toContain('openReference("case-file"');
+    expect(referenceExperienceSource).toContain("trapWrapperFocus");
+    expect(referenceExperienceSource).toContain("dismissRef.current?.focus()");
+    expect(referenceExperienceSource).toContain('referenceDocument.addEventListener("keydown", handleFrameKeyDown)');
+    expect(facilitatorSource).toContain("returnTarget?.focus()");
+    expect(landingSource).toContain("trapModalFocus(e, overlay)");
+    expect(landingSource).toContain("trapModalFocus(e, aboutOverlay)");
+  });
+
+  it("states dirty and persistence outcomes without relying on color", () => {
+    expect(participantSource).toContain('type SaveState = "DIRTY" | "SAVING" | "SAVED" | "ERROR"');
+    expect(participantSource).toContain('"Unsaved changes"');
+    expect(participantSource).toContain('"Saving…"');
+    expect(participantSource).toContain('"Save failed · changes unsaved"');
+    expect(participantSource).toContain(': "Saved"');
+    expect(participantSource).toContain('id="submission-requirements"');
+    expect(participantSource).toContain("missingSubmissionFields.join");
+    expect(participantSource).toContain('className="step-state">{stepState}');
+  });
+
+  it("keeps communication indicators semantically distinct and dismissal stable", () => {
+    expect(participantSource).toContain("availableEvidenceRequests");
+    expect(participantSource).toContain("pendingInstitutionalReplies");
+    expect(participantSource).not.toContain("pendingRequests.length +");
+    expect(participantSource).not.toContain("comm-unread");
+    expect(participantSource).toContain("dismissedInjectId");
+    expect(participantSource).toContain("seenInjectId.current = latest.id");
+    expect(participantSource).toContain("latest.id !== seenInjectId.current");
+    expect(participantSource).toContain("localStorage.setItem(dismissedInjectKey(bundle.participant.id), visibleInject.id)");
+    expect(participantSource).toContain("latestInject?.id === dismissedInjectId ? null : latestInject");
+    expect(participantSource).not.toContain("(notice || latestInject)");
+    expect(participantSource).toContain("Evidence returned:");
+    expect(participantSource).toContain("Save succeeded. Your work is saved.");
+    expect(participantSource).toContain("Save failed. Your changes remain unsaved.");
+    expect(participantSource).toContain("Facilitator update:");
+    expect(participantSource).toContain("Debrief opened.");
+    expect(participantSource).toContain("setReplyAnnouncement");
+  });
+
+  it("preserves reduced-motion content across the embedded references and landing page", () => {
+    expect(referenceExperienceSource).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(styles).toContain("animation-iteration-count: 1 !important");
+    expect(styles).toContain(".advisor-stream-cursor { display: none; }");
+    expect(landingSource).toContain("if (!reducedMotion.matches) requestAnimationFrame(drawTopography)");
+    expect(landingSource).toContain("return reducedMotion.matches ? 0 : milliseconds");
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import {
   activateEmergencyMode,
   askAdvisor,
@@ -19,13 +19,74 @@ import { buildNegotiationPreparationBrief, buildParticipantDebrief, evidenceIsAv
 import { EVIDENCE_CATALOG, STAGES, WORKSHOP_TITLE } from "./scenario";
 import { ReferenceExperience, type ReferenceSurface } from "./ReferenceExperience";
 import { ThemeButton } from "./ThemeButton";
-import { ADVISOR_RESPONSE_REVEAL_INTERVAL_MS, revealAdvisorResponse, sourceClassLabel, splitAdvisorResponse } from "./advisorPresentation";
+import { ADVISOR_RESPONSE_REVEAL_INTERVAL_MS, advisorResponseUsesInstantReveal, revealAdvisorResponse, sourceClassLabel, splitAdvisorResponse } from "./advisorPresentation";
 import { ADVISOR_VOICE_PROFILES, selectAdvisorVoice } from "./advisorVoice";
 import type { AdvisorCitation, AdvisorId, DecisionState, InstitutionRole } from "./types";
 
 const PARTICIPANT_KEY = "futureslab-participant-id";
 const ENTRY_HANDOFF_KEY = "futureslab-entry-handoff-v1";
 const PREPARATION_KEY_PREFIX = "futureslab-preparation-v1:";
+const DIALOG_FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
+
+type SaveState = "DIRTY" | "SAVING" | "SAVED" | "ERROR";
+
+function backgroundSiblings(root: HTMLElement): HTMLElement[] {
+  const siblings = new Set<HTMLElement>();
+  let current: HTMLElement = root;
+  while (current.parentElement && current.parentElement !== document.documentElement) {
+    Array.from(current.parentElement.children).forEach((element) => {
+      if (element !== current && element instanceof HTMLElement) siblings.add(element);
+    });
+    current = current.parentElement;
+  }
+  return [...siblings];
+}
+
+function trapDialogFocus(event: ReactKeyboardEvent<HTMLElement>, onClose: () => void) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    onClose();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE)).filter((element) => !element.hidden);
+  if (!focusable.length) {
+    event.preventDefault();
+    event.currentTarget.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last?.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function useDialogLifecycle(rootRef: RefObject<HTMLElement | null>, initialFocusRef: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const previousOverflow = document.body.style.overflow;
+    const siblings = backgroundSiblings(root);
+    document.body.style.overflow = "hidden";
+    siblings.forEach((element) => {
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
+    });
+    window.requestAnimationFrame(() => (initialFocusRef.current ?? root).focus());
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      siblings.forEach((element) => {
+        element.inert = false;
+        element.removeAttribute("aria-hidden");
+      });
+    };
+  }, [initialFocusRef, rootRef]);
+}
 const GLOSSARY_TERMS = [
   { term: "Debt Management Office (DMO)", definition: "The Finance Ministry function that maintains the debt record, reconciles claims, maps dependencies, and prepares recommendations without creating sovereign or creditor commitments." },
   { term: "Usable liquidity", definition: "Cash that is actually available after restrictions, protected balances, and control arrangements are accounted for." },
@@ -139,6 +200,10 @@ function preparationKey(participantId: string): string {
   return `${PREPARATION_KEY_PREFIX}${participantId}`;
 }
 
+function dismissedInjectKey(participantId: string): string {
+  return `futureslab-dismissed-inject-v1:${participantId}`;
+}
+
 function hasCaseworkData(bundle: ParticipantBundle): boolean {
   const decisions = bundle.decisions;
   return bundle.participant.currentStage > 0
@@ -167,8 +232,11 @@ export function ParticipantApp() {
   const [stage, setStage] = useState(0);
   const [decisions, setDecisions] = useState<DecisionState | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("SAVED");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
+  const [dismissedInjectId, setDismissedInjectId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [advisorOpen, setAdvisorOpen] = useState(false);
   const [communicationsOpen, setCommunicationsOpen] = useState(false);
@@ -179,8 +247,13 @@ export function ParticipantApp() {
   const [roleBriefOpen, setRoleBriefOpen] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const handoffAttempted = useRef(false);
-  const communicationsTrigger = useRef<HTMLButtonElement>(null);
-  const advisorTrigger = useRef<HTMLButtonElement>(null);
+  const communicationsReturnTarget = useRef<HTMLElement | null>(null);
+  const glossaryReturnTarget = useRef<HTMLElement | null>(null);
+  const advisorReturnTarget = useRef<HTMLElement | null>(null);
+  const referenceReturnTarget = useRef<HTMLElement | null>(null);
+  const evidenceAvailability = useRef<{ participantId: string; ids: Set<string> } | null>(null);
+  const seenInjectId = useRef<string | null>(null);
+  const seenSessionStatus = useRef<string | null>(null);
   const mainContent = useRef<HTMLElement>(null);
   const menuContainer = useRef<HTMLDivElement>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null);
@@ -198,6 +271,9 @@ export function ParticipantApp() {
           const complete = loaded.session.status === "DEBRIEF" || loaded.session.status === "CLOSED" || preparationIsComplete(loaded);
           if (complete) localStorage.setItem(preparationKey(loaded.participant.id), "complete");
           setBundle(loaded);
+          seenInjectId.current = loaded.injects.at(-1)?.id ?? null;
+          seenSessionStatus.current = loaded.session.status;
+          setDismissedInjectId(localStorage.getItem(dismissedInjectKey(loaded.participant.id)));
           setDecisions(loaded.decisions);
           setStage(participantEntryStage(loaded.session, loaded.participant));
           setPreparationComplete(complete);
@@ -220,21 +296,46 @@ export function ParticipantApp() {
     if (!bundle) return;
     return subscribeToWorkshop(bundle.session.id, bundle.participant.id, () => {
       void loadParticipantBundle(bundle.participant.id).then((fresh) => {
-        const previousInject = bundle.injects.at(-1)?.id;
+        const debriefJustOpened = (fresh.session.status === "DEBRIEF" || fresh.session.status === "CLOSED")
+          && seenSessionStatus.current !== "DEBRIEF"
+          && seenSessionStatus.current !== "CLOSED";
+        seenSessionStatus.current = fresh.session.status;
         const latest = fresh.injects.at(-1);
-        if (latest && latest.id !== previousInject) setNotice(`${latest.title}: ${latest.body}`);
+        if (latest && latest.id !== seenInjectId.current) {
+          seenInjectId.current = latest.id;
+          setDismissedInjectId(null);
+          setLiveAnnouncement(`Facilitator update: ${latest.title}. ${latest.body}`);
+        }
         setBundle(fresh);
         setDecisions(fresh.decisions);
         if (fresh.session.status === "DEBRIEF" || fresh.session.status === "CLOSED") {
           setPreparationComplete(true);
           setStage(participantEntryStage(fresh.session, fresh.participant));
           setRoleBriefOpen(false);
-          setNotice("Debrief and transfer is now open. Your submitted recommendation has been preserved.");
-          window.requestAnimationFrame(() => mainContent.current?.focus());
+          if (debriefJustOpened) {
+            setNotice("Debrief and transfer is now open. Your submitted recommendation has been preserved.");
+            setLiveAnnouncement("Debrief opened. Your submitted recommendation is preserved and your transfer reflection is available.");
+            window.requestAnimationFrame(() => mainContent.current?.focus());
+          }
         }
       });
     });
   }, [bundle?.participant.id, bundle?.session.id]);
+
+  useEffect(() => {
+    if (!bundle) return;
+    const available = new Set(bundle.evidenceRequests.filter((request) => evidenceIsAvailable(request, new Date(now))).map((request) => request.evidenceId));
+    const previous = evidenceAvailability.current;
+    if (!previous || previous.participantId !== bundle.participant.id) {
+      evidenceAvailability.current = { participantId: bundle.participant.id, ids: available };
+      return;
+    }
+    const returned = [...available].filter((id) => !previous.ids.has(id));
+    evidenceAvailability.current = { participantId: bundle.participant.id, ids: available };
+    if (!returned.length) return;
+    const titles = returned.map((id) => EVIDENCE_CATALOG.find((item) => item.id === id)?.title ?? "Requested evidence");
+    setLiveAnnouncement(`Evidence returned: ${titles.join(", ")}. Open Communications or the Evidence stage to review it.`);
+  }, [bundle, now]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -261,6 +362,9 @@ export function ParticipantApp() {
       localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
       const complete = joined.session.status === "DEBRIEF" || joined.session.status === "CLOSED" || preparationIsComplete(joined);
       setBundle(joined);
+      seenInjectId.current = joined.injects.at(-1)?.id ?? null;
+      seenSessionStatus.current = joined.session.status;
+      setDismissedInjectId(localStorage.getItem(dismissedInjectKey(joined.participant.id)));
       setDecisions(joined.decisions);
       setStage(participantEntryStage(joined.session, joined.participant));
       setPreparationComplete(complete);
@@ -275,6 +379,9 @@ export function ParticipantApp() {
     localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
     const complete = preparationIsComplete(joined);
     setBundle(joined);
+    seenInjectId.current = joined.injects.at(-1)?.id ?? null;
+    seenSessionStatus.current = joined.session.status;
+    setDismissedInjectId(localStorage.getItem(dismissedInjectKey(joined.participant.id)));
     setDecisions(joined.decisions);
     setStage(0);
     setPreparationComplete(complete);
@@ -284,12 +391,17 @@ export function ParticipantApp() {
 
   async function persist(nextStage = stage) {
     if (!bundle || !decisions) return;
-    setBusy(true); setError("");
+    setBusy(true); setSaveState("SAVING"); setError("");
     try {
       const saved = await saveDecisions(bundle, decisions, nextStage);
       setBundle(saved);
-      setNotice("Your work has been saved.");
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Save failed."); }
+      setSaveState("SAVED");
+      setLiveAnnouncement("Save succeeded. Your work is saved.");
+    } catch (caught) {
+      setSaveState("ERROR");
+      setError(caught instanceof Error ? caught.message : "Save failed.");
+      setLiveAnnouncement("Save failed. Your changes remain unsaved.");
+    }
     finally { setBusy(false); }
   }
 
@@ -302,22 +414,54 @@ export function ParticipantApp() {
   const displayedClock = preparationComplete ? clock : bundle.session.durationSeconds;
   const caseworkClockState = bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED" ? "paused for debrief" : caseworkRunning ? "" : "waiting";
   const caseworkClockLabel = `Casework · ${formatClock(displayedClock)}${caseworkClockState ? ` · ${caseworkClockState}` : ""}`;
-  const pendingRequests = bundle.evidenceRequests.filter((request) => !evidenceIsAvailable(request, new Date(now)));
-  const pendingCommunications = pendingRequests.length + bundle.messages.filter((message) => message.status === "PENDING").length;
+  const availableEvidenceRequests = bundle.evidenceRequests.filter((request) => evidenceIsAvailable(request, new Date(now)));
+  const pendingInstitutionalReplies = bundle.messages.filter((message) => message.status === "PENDING").length;
+  const visibleInject = latestInject?.id === dismissedInjectId ? null : latestInject;
+  const bannerMessage = notice || (visibleInject ? `${visibleInject.title}: ${visibleInject.body}` : "");
+
+  function rememberReturnTarget(target: EventTarget | null, fallback: HTMLElement | null): HTMLElement | null {
+    if (!(target instanceof HTMLElement)) return fallback;
+    return target.closest("#participantMenu") ? menuTrigger.current : target;
+  }
+
+  function openCommunications(target: EventTarget | null) {
+    communicationsReturnTarget.current = rememberReturnTarget(target, menuTrigger.current);
+    setMenuOpen(false);
+    setError("");
+    setCommunicationsOpen(true);
+  }
+
+  function openGlossary(target: EventTarget | null) {
+    glossaryReturnTarget.current = rememberReturnTarget(target, menuTrigger.current);
+    setMenuOpen(false);
+    setGlossaryOpen(true);
+  }
+
+  function openAdvisor(target: EventTarget | null) {
+    advisorReturnTarget.current = rememberReturnTarget(target, menuTrigger.current);
+    setMenuOpen(false);
+    setAdvisorOpen(true);
+  }
+
+  function openReference(surface: ReferenceSurface, target: EventTarget | null) {
+    referenceReturnTarget.current = rememberReturnTarget(target, menuTrigger.current);
+    setMenuOpen(false);
+    setReferenceSurface(surface);
+  }
 
   function closeCommunications() {
     setCommunicationsOpen(false);
-    window.requestAnimationFrame(() => communicationsTrigger.current?.focus());
+    window.requestAnimationFrame(() => communicationsReturnTarget.current?.focus());
   }
 
   function closeGlossary() {
     setGlossaryOpen(false);
-    window.requestAnimationFrame(() => menuTrigger.current?.focus());
+    window.requestAnimationFrame(() => glossaryReturnTarget.current?.focus());
   }
 
   function closeAdvisor() {
     setAdvisorOpen(false);
-    window.requestAnimationFrame(() => advisorTrigger.current?.focus());
+    window.requestAnimationFrame(() => advisorReturnTarget.current?.focus());
   }
 
   function completePreparationSurface() {
@@ -334,17 +478,17 @@ export function ParticipantApp() {
     setStage(0);
     setRoleBriefOpen(true);
     setReferenceSurface(null);
-    window.requestAnimationFrame(() => mainContent.current?.focus());
+    window.requestAnimationFrame(() => (referenceReturnTarget.current ?? mainContent.current)?.focus());
   }
 
   function closePreparationSurface() {
     setReferenceSurface(null);
-    window.requestAnimationFrame(() => mainContent.current?.focus());
+    window.requestAnimationFrame(() => (referenceReturnTarget.current ?? mainContent.current)?.focus());
   }
 
   async function exitWorkshop() {
     if (!bundle || !decisions) return;
-    setMenuOpen(false); setBusy(true); setError("");
+    setMenuOpen(false); setBusy(true); setSaveState("SAVING"); setError("");
     try {
       const saved = bundle.session.status === "CLOSED"
         ? bundle
@@ -356,7 +500,9 @@ export function ParticipantApp() {
       sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
       window.location.assign("/");
     } catch (caught) {
+      setSaveState("ERROR");
       setError(caught instanceof Error ? caught.message : "Your work could not be saved. The workshop remains open.");
+      setLiveAnnouncement("Save failed. Your changes remain unsaved and the workshop remains open.");
       setBusy(false);
     }
   }
@@ -367,31 +513,41 @@ export function ParticipantApp() {
       <header className="topbar">
         <div className="brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><div className="brand-copy"><strong>Sovereign</strong></div></div>
         <div className="topmeta">
-          <span className={`pill clock ${caseworkRunning ? "warn" : "ok"}`} id="masterClock" aria-label={caseworkClockLabel} title="The 20-minute casework clock starts only when the facilitator begins the exercise"><span className={`status-dot ${caseworkRunning ? "running" : "paused"}`} /><span>{caseworkClockLabel}</span></span>
-          <button ref={communicationsTrigger} type="button" className="reference-icon-button comm-launch" id="openCommunications" aria-label="Open communications" title="Communications" aria-haspopup="dialog" aria-expanded={communicationsOpen} onClick={() => { setError(""); setCommunicationsOpen(true); }}>
+          <span className={`pill clock ${caseworkRunning ? "warn" : "ok"}`} id="masterClock" aria-label={caseworkClockLabel} title="The 20-minute casework clock starts only when the facilitator begins the exercise"><span className={`status-dot ${caseworkRunning ? "running" : "paused"}`} /><span className="clock-label">Casework</span><strong className="clock-value">{formatClock(displayedClock)}</strong>{caseworkClockState && <span className="clock-state">{caseworkClockState}</span>}</span>
+          <button type="button" className="reference-icon-button comm-launch" id="openCommunications" aria-label={`Open communications${availableEvidenceRequests.length ? `; ${availableEvidenceRequests.length} evidence item${availableEvidenceRequests.length === 1 ? "" : "s"} returned` : ""}`} title="Communications" aria-haspopup="dialog" aria-expanded={communicationsOpen} onClick={(event) => openCommunications(event.currentTarget)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-            {pendingCommunications > 0 && <span className="comm-unread" aria-label={`${pendingCommunications} communications awaiting resolution`}>{pendingCommunications}</span>}
+            {availableEvidenceRequests.length > 0 && <span className="comm-evidence-returned" aria-hidden="true">{availableEvidenceRequests.length}</span>}
           </button>
-          <button type="button" className="secondary-button reference-top-button" id="openReference" onClick={() => setReferenceSurface("case-file")}>Case file</button>
+          <button type="button" className="secondary-button reference-top-button" id="openReference" aria-haspopup="dialog" onClick={(event) => openReference("case-file", event.currentTarget)}>Case file</button>
           <div className="participant-menu" ref={menuContainer}>
             <button ref={menuTrigger} type="button" className="reference-icon-button menu-trigger" id="participantMenuButton" aria-label="Open participant menu" aria-expanded={menuOpen} aria-controls="participantMenu" onClick={() => setMenuOpen((open) => !open)}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg></button>
-            <div className="user-menu-dropdown" id="participantMenu" hidden={!menuOpen}><button className="menu-item" type="button" onClick={() => { setMenuOpen(false); setGlossaryOpen(true); }}>Glossary</button><ThemeButton variant="menu" onToggle={() => setMenuOpen(false)} /><div className="menu-divider" /><button className="menu-item text-bad" type="button" disabled={busy} onClick={() => void exitWorkshop()}>Exit</button></div>
+            <div className="user-menu-dropdown" id="participantMenu" hidden={!menuOpen}>
+              <button className="menu-item mobile-menu-item" type="button" onClick={(event) => openCommunications(event.currentTarget)}>Communications{pendingInstitutionalReplies > 0 ? ` · ${pendingInstitutionalReplies} awaiting reply` : ""}</button>
+              <button className="menu-item mobile-menu-item" type="button" onClick={(event) => openReference("case-file", event.currentTarget)}>Case file</button>
+              <button className="menu-item mobile-menu-item" type="button" onClick={(event) => openReference("orientation", event.currentTarget)}>Orientation</button>
+              <button className="menu-item mobile-menu-item" type="button" onClick={(event) => openReference("bridge", event.currentTarget)}>Learning Bridge</button>
+              <button className="menu-item mobile-menu-item" type="button" onClick={(event) => openAdvisor(event.currentTarget)}>AI Advisors</button>
+              <button className="menu-item" type="button" onClick={(event) => openGlossary(event.currentTarget)}>Glossary</button>
+              <ThemeButton variant="menu" onToggle={() => setMenuOpen(false)} />
+              <div className="menu-divider" />
+              <button className="menu-item text-bad" type="button" disabled={busy} onClick={() => void exitWorkshop()}>Exit</button>
+            </div>
           </div>
         </div>
       </header>
 
-      {(notice || latestInject) && (
+      {bannerMessage && (
         <div className="inject-banner" role="status">
-          <div><strong>Facilitator update</strong><span>{notice || `${latestInject?.title}: ${latestInject?.body}`}</span></div>
-          <button type="button" className="icon-button" aria-label="Dismiss update" onClick={() => setNotice("")}>×</button>
+          <div><strong>{notice ? "Workshop status" : "Facilitator update"}</strong><span>{bannerMessage}</span></div>
+          <button type="button" className="icon-button" aria-label="Dismiss update" onClick={() => { setNotice(""); if (!notice && visibleInject) { setDismissedInjectId(visibleInject.id); localStorage.setItem(dismissedInjectKey(bundle.participant.id), visibleInject.id); } }}>×</button>
         </div>
       )}
 
       <div className="orientation-tools" aria-label="Orientation and learning resources">
         <span className={`preparation-status ${preparationComplete ? "complete" : "incomplete"}`} role="status" aria-live="polite">{preparationComplete ? (caseworkRunning ? "Casework in progress" : "Preparation complete · waiting for facilitator") : "Preparation incomplete · casework waiting"}</span>
-        <button type="button" className="secondary-button reference-tool-button" aria-haspopup="dialog" aria-expanded={referenceSurface === "orientation"} onClick={() => setReferenceSurface("orientation")}>Orientation</button>
-        <button type="button" className="secondary-button reference-tool-button" id="replayBridge" aria-haspopup="dialog" aria-expanded={referenceSurface === "bridge"} onClick={() => setReferenceSurface("bridge")}>Learning bridge</button>
-        <button ref={advisorTrigger} type="button" className="secondary-button reference-tool-button" id="openAdvisors" aria-haspopup="dialog" aria-expanded={advisorOpen} onClick={() => setAdvisorOpen(true)}>AI advisors</button>
+        <button type="button" className="secondary-button reference-tool-button" aria-haspopup="dialog" aria-expanded={referenceSurface === "orientation"} onClick={(event) => openReference("orientation", event.currentTarget)}>Orientation</button>
+        <button type="button" className="secondary-button reference-tool-button" id="replayBridge" aria-haspopup="dialog" aria-expanded={referenceSurface === "bridge"} onClick={(event) => openReference("bridge", event.currentTarget)}>Learning bridge</button>
+        <button type="button" className="secondary-button reference-tool-button" id="openAdvisors" aria-haspopup="dialog" aria-expanded={advisorOpen} onClick={(event) => openAdvisor(event.currentTarget)}>AI advisors</button>
       </div>
 
       <div className="shell">
@@ -400,19 +556,19 @@ export function ParticipantApp() {
           <ol className="steps">
             {STAGES.map((item, index) => {
               const unlocked = index <= availableStage && (!bundle.session.submissionsClosed || index === 7);
-              const complete = index < bundle.participant.currentStage;
-              const stepClass = ["step", stage === index ? "current" : "", complete ? "complete" : "", unlocked ? "available" : "locked"].filter(Boolean).join(" ");
-              return <li key={item.short}><button type="button" className={stepClass} disabled={!unlocked} aria-current={stage === index ? "step" : undefined} onClick={() => { setRoleBriefOpen(index === 0); setStage(index); }}><span className="step-num">{index + 1}</span><span className="step-copy"><strong>{item.short}</strong><span>{unlocked ? item.title : "Await facilitator"}</span></span></button></li>;
+              const stepState = stage === index ? "Current" : unlocked ? "Available" : "Locked";
+              const stepClass = ["step", stage === index ? "current" : "", unlocked ? "available" : "locked"].filter(Boolean).join(" ");
+              return <li key={item.short}><button type="button" className={stepClass} disabled={!unlocked} aria-current={stage === index ? "step" : undefined} onClick={() => { setRoleBriefOpen(index === 0); setStage(index); }}><span className="step-num">{index + 1}</span><span className="step-copy"><strong>{item.short}</strong><span>{item.title}</span><em className="step-state">{stepState}</em></span></button></li>;
             })}
           </ol>
           <div className="mode-note"><strong>{isLocalBundle(bundle) ? "Local emergency mode" : "Live workshop mode"}</strong><span>{isLocalBundle(bundle) ? "This browser retains your work. Download the handoff file when finished." : "Your activity is synchronized with the facilitator."}</span></div>
         </aside>
 
         <main ref={mainContent} className={`workspace ${stage === 0 && roleBriefOpen ? "role-brief-open" : ""}`} id="main-content" tabIndex={-1}>
-          {!preparationComplete ? <PreparationState onOrientation={() => setReferenceSurface("orientation")} onBridge={() => setReferenceSurface("bridge")} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
-            <div className="stage-head"><div><div className="eyebrow">Step {stage + 1} · {STAGES[stage].short}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className="autosave-state">{busy ? "Saving…" : "Saved on action"}</span></div></div>
+          {!preparationComplete ? <PreparationState onOrientation={(target) => openReference("orientation", target)} onBridge={(target) => openReference("bridge", target)} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
+            <div className="stage-head"><div><div className="eyebrow">Current stage · Step {stage + 1} · {STAGES[stage].short}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className={`autosave-state save-${saveState.toLowerCase()}`} role="status" aria-live="polite">{saveState === "DIRTY" ? "Unsaved changes" : saveState === "SAVING" ? "Saving…" : saveState === "ERROR" ? "Save failed · changes unsaved" : "Saved"}</span></div></div>
             {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
-            <StageContent stage={stage} decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />
+            <StageContent stage={stage} decisions={decisions} setDecisions={(value) => { setDecisions(value); setSaveState("DIRTY"); }} bundle={bundle} setBundle={setBundle} setError={setError} setSaveState={setSaveState} now={now} />
             {stage < 7 && <div className="stage-actions actions">
               <button type="button" className="secondary-button" disabled={stage === 0 || busy} onClick={() => { void persist(stage); setRoleBriefOpen(false); setStage((value) => value - 1); }}>Previous</button>
               <button type="button" className="primary-button" disabled={busy} onClick={() => void persist(stage)}>Save work</button>
@@ -426,27 +582,16 @@ export function ParticipantApp() {
       {glossaryOpen && <GlossaryDialog onClose={closeGlossary} />}
       {advisorOpen && <AdvisorPanel bundle={bundle} setBundle={setBundle} onClose={closeAdvisor} />}
       {referenceSurface && <ReferenceExperience key={referenceSurface} surface={referenceSurface} onClose={closePreparationSurface} onComplete={completePreparationSurface} />}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">{liveAnnouncement}</div>
     </div>
   );
 }
 
 function GlossaryDialog({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, []);
-
-  return <div className="modal-scrim glossary-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="glossary-dialog" role="dialog" aria-modal="true" aria-labelledby="glossary-title" onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
-    if (event.key !== "Tab") return;
-    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-  }}><header><div><span className="eyebrow">Workshop reference</span><h2 id="glossary-title">Glossary</h2><p>Terms used in the Kuvera financing-assurances exercise.</p></div><button type="button" className="icon-button" aria-label="Close glossary" autoFocus onClick={onClose}>×</button></header><div className="glossary-body" role="region" aria-label="Glossary terms" tabIndex={0}><dl>{GLOSSARY_TERMS.map((item) => <div key={item.term}><dt>{item.term}</dt><dd>{item.definition}</dd></div>)}</dl></div></section></div>;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useDialogLifecycle(rootRef, closeRef);
+  return <div ref={rootRef} className="modal-scrim glossary-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="glossary-dialog" role="dialog" aria-modal="true" aria-labelledby="glossary-title" tabIndex={-1} onKeyDown={(event) => trapDialogFocus(event, onClose)}><header><div><span className="eyebrow">Workshop reference</span><h2 id="glossary-title">Glossary</h2><p>Terms used in the Kuvera financing-assurances exercise.</p></div><button ref={closeRef} type="button" className="icon-button" aria-label="Close glossary" onClick={onClose}>×</button></header><div className="glossary-body" role="region" aria-label="Glossary terms" tabIndex={0}><dl>{GLOSSARY_TERMS.map((item) => <div key={item.term}><dt>{item.term}</dt><dd>{item.definition}</dd></div>)}</dl></div></section></div>;
 }
 
 function WorkshopEntryState({ initializing, busy, error, entryHandoff, onRetry, onJoinLocal }: { initializing: boolean; busy: boolean; error: string; entryHandoff: JoinInput | null; onRetry: () => void; onJoinLocal: () => void }) {
@@ -454,15 +599,15 @@ function WorkshopEntryState({ initializing, busy, error, entryHandoff, onRetry, 
   return <main className="entry-page participant-reference"><div className="entry-brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><span><strong>Sovereign</strong><small>Futures Lab</small></span></div><section className="entry-copy"><span className="eyebrow">Case · Kuvera Financing Assurances</span><h1>{WORKSHOP_TITLE}</h1><p>Take the role of Kuvera’s Debt Management Office (DMO). Inspect the record, request evidence, and prepare an internal negotiation-preparation brief that states what is known, unknown, and conditional.</p><p>A financing assurance is a creditor signal that can support the package before final legal agreements exist; your recommendation informs that process but does not create an assurance or sovereign commitment.</p><div className="method-line"><span>Evidence</span><i /> <span>Decision</span><i /> <span>Consequence</span><i /> <span>Transfer</span></div></section><section className="join-card" aria-labelledby="entry-state-title" aria-live="polite"><h2 id="entry-state-title">{inProgress ? "Joining the workshop" : "Enter through the main page"}</h2>{inProgress ? <p>Your participant details are being verified. Keep this page open.</p> : <p>The participant sign-in is on the Sovereign landing page so your details are entered only once.</p>}{error && <div className="error-panel" role="alert">{error}</div>}{!inProgress && entryHandoff && <><button className="primary-button full" type="button" onClick={onRetry}>Try again</button><button className="secondary-button full" type="button" onClick={onJoinLocal}>Continue in local emergency mode</button></>}{!inProgress && <p><a href="/">Return to participant sign-in</a></p>}</section></main>;
 }
 
-function PreparationState({ onOrientation, onBridge }: { onOrientation: () => void; onBridge: () => void }) {
-  return <section className="preparation-state" aria-labelledby="preparation-state-title"><span className="eyebrow">Preparation · incomplete</span><h1 id="preparation-state-title">Finish preparation before casework</h1><p>Orientation and the Learning Bridge are outside the timed case. The 20-minute casework clock starts only when the facilitator begins the exercise.</p><p>Skipping or closing preparation keeps you here. You can reopen either resource without changing any casework decisions, evidence requests, or messages.</p><div className="preparation-deadlines" aria-label="Institutional case deadlines"><div><strong>Six weeks</strong><span>USD 750m maturity</span></div><div><strong>Eleven weeks</strong><span>IMF Board horizon</span></div></div><p className="preparation-deadline-note">These are institutional case facts, not a conversion from workshop minutes.</p><div className="actions"><button className="primary-button" type="button" aria-haspopup="dialog" onClick={onOrientation}>Continue orientation</button><button className="secondary-button" type="button" aria-haspopup="dialog" onClick={onBridge}>Open Learning Bridge</button></div></section>;
+function PreparationState({ onOrientation, onBridge }: { onOrientation: (target: EventTarget | null) => void; onBridge: (target: EventTarget | null) => void }) {
+  return <section className="preparation-state" aria-labelledby="preparation-state-title"><span className="eyebrow">Preparation · incomplete</span><h1 id="preparation-state-title">Finish preparation before casework</h1><p>Orientation and the Learning Bridge are outside the timed case. The 20-minute casework clock starts only when the facilitator begins the exercise.</p><p>Skipping or closing preparation keeps you here. You can reopen either resource without changing any casework decisions, evidence requests, or messages.</p><div className="preparation-deadlines" aria-label="Institutional case deadlines"><div><strong>Six weeks</strong><span>USD 750m maturity</span></div><div><strong>Eleven weeks</strong><span>IMF Board horizon</span></div></div><p className="preparation-deadline-note">These are institutional case facts, not a conversion from workshop minutes.</p><div className="actions"><button className="primary-button" type="button" aria-haspopup="dialog" onClick={(event) => onOrientation(event.currentTarget)}>Continue orientation</button><button className="secondary-button" type="button" aria-haspopup="dialog" onClick={(event) => onBridge(event.currentTarget)}>Open Learning Bridge</button></div></section>;
 }
 
 function RoleBrief({ onContinue }: { onContinue: () => void }) {
   return <section className="role-lens" aria-labelledby="role-lens-title"><div className="role-lens-head"><div className="role-lens-id"><div className="role-lens-avatar" aria-hidden="true">DMO</div><div><h1 id="role-lens-title">Debt Management Office</h1><span>Kuvera Finance Ministry · your role in the ministry team</span></div></div><div className="role-lens-kicker">Your role</div></div><p className="role-lens-lead">You hold the loan agreements and the claims record. You do not hold the cash position, the legal reading, or the authority to release anything externally. Use your role to inspect, request, compare, record, and recommend without crossing those boundaries.</p><div className="role-lens-grid"><div className="role-lens-cell"><b>Mandate</b><p>Maintain and reconcile the claims record, map Facility A/B dependencies, and prepare debt-treatment inputs for the Finance Ministry team.</p></div><div className="role-lens-cell"><b>Evidence available to you</b><p>Facility agreements, the debt-service calendar, claim terms, the partial copper-revenue account memo, and internal creditor-position notes.</p></div><div className="role-lens-cell"><b>Authority boundary</b><p>May request verification, reconcile claims, map dependencies, propose treatment inputs, and revise DMO records. Cannot authorize disclosure or create a creditor financing assurance.</p></div><div className="role-lens-cell"><b>Critical handoff</b><p>Needs Treasury for cash availability and protected balances; Legal for interpretation; and the Lead for external submission and disclosure decisions.</p></div></div><div className="role-lens-foot"><p>The facilitator controls when new steps open. Select Mandate in the process rail whenever you need to reopen this brief.</p><button className="primary-button" type="button" onClick={onContinue}>Continue to my first decision</button></div></section>;
 }
 
-function StageContent({ stage, decisions, setDecisions, bundle, setBundle, setError, now }: { stage: number; decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; now: number }) {
+function StageContent({ stage, decisions, setDecisions, bundle, setBundle, setError, setSaveState, now }: { stage: number; decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; setSaveState: (value: SaveState) => void; now: number }) {
   const update = <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => setDecisions({ ...decisions, [key]: value });
   const treasuryReconciliationAvailable = bundle.evidenceRequests.some((request) => (
     request.evidenceId === "treasury-reconciliation" && evidenceIsAvailable(request, new Date(now))
@@ -473,11 +618,11 @@ function StageContent({ stage, decisions, setDecisions, bundle, setBundle, setEr
   if (stage === 3) return <section className="work-card task-card highlight"><h2>Record the supported liquidity basis</h2><p>Record what your current evidence supports. Access to a figure is not the same as verification.</p><ChoiceGroup value={decisions.liquidityBasis} onChange={(value) => update("liquidityBasis", value as DecisionState["liquidityBasis"])} options={[{ value: "VERIFIED_480", title: treasuryReconciliationAvailable ? "USD 480m verified usable" : "Record a reconciled usable-liquidity basis", detail: treasuryReconciliationAvailable ? "Use the amount established by the returned Treasury reconciliation." : "Select only if returned Treasury evidence establishes a usable amount." },{ value: "REPORTED_780", title: "USD 780m reported, not verified", detail: "Record the reported figure as provisional rather than usable cash." },{ value: "UNRESOLVED", title: "Keep the basis unresolved", detail: "Record that the available evidence does not establish a usable amount." }]} /><TextArea label="State the evidence and caveat behind this record entry." value={decisions.liquidityBasisRationale} onChange={(value) => update("liquidityBasisRationale", value)} /></section>;
   if (stage === 4) return <section className="work-card task-card highlight"><h2>Map account control and facility dependency</h2><h3>Account classification</h3><ChoiceGroup value={decisions.accountClassification} onChange={(value) => update("accountClassification", value as DecisionState["accountClassification"])} options={[{ value: "EFFECTIVE_CONTROL", title: "Quasi-collateral / effective control", detail: "Record an effective-control classification." },{ value: "ORDINARY_ACCOUNT", title: "Ordinary operating account", detail: "Record an ordinary-account classification." },{ value: "UNRESOLVED", title: "Unresolved", detail: "Record that the available evidence does not support a classification." }]} /><h3>Facility A/B linkage</h3><ChoiceGroup value={decisions.facilityLinkage} onChange={(value) => update("facilityLinkage", value as DecisionState["facilityLinkage"])} options={[{ value: "SHARED_POOL", title: "Shared revenue pool", detail: "Record Facilities A and B as sharing a revenue pool." },{ value: "INDEPENDENT", title: "Independent facilities", detail: "Record the facilities as independent for dependency analysis." },{ value: "UNRESOLVED", title: "Linkage unresolved", detail: "Record that Facility B's relationship to RA-01 remains unconfirmed." }]} /><TextArea label="Explain the evidence supporting both entries." value={decisions.linkageRationale} onChange={(value) => update("linkageRationale", value)} /></section>;
   if (stage === 5) return <section className="work-card task-card highlight"><h2>Recommend disclosure and treatment perimeter</h2><h3>Disclosure level</h3><ChoiceGroup value={decisions.disclosure} onChange={(value) => update("disclosure", value as DecisionState["disclosure"])} options={[{ value: "FULL", title: "Full contract disclosure", detail: "Recommend release of the complete contract information." },{ value: "REDACTED", title: "Redacted functional summary", detail: "Recommend release of a summary with selected details removed." },{ value: "WITHHOLD", title: "Withhold pending consent", detail: "Recommend no external release until permission is established." }]} /><h3>Treatment perimeter</h3><ChoiceGroup value={decisions.treatmentPerimeter} onChange={(value) => update("treatmentPerimeter", value as DecisionState["treatmentPerimeter"])} options={[{ value: "BOTH_FACILITIES", title: "Carry Facilities A and B", detail: "Record both facilities inside the proposed treatment perimeter." },{ value: "FACILITY_A_ONLY", title: "Carry Facility A only", detail: "Record only Facility A inside the proposed treatment perimeter." },{ value: "DEFER", title: "Defer perimeter recommendation", detail: "Record that the evidence is insufficient to define the perimeter." }]} /><TextArea label="Explain the trade-off and the boundary of your recommendation." value={decisions.disclosureRationale} onChange={(value) => update("disclosureRationale", value)} /></section>;
-  if (stage === 6) return <SubmissionStage decisions={decisions} update={update} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />;
-  return <DebriefStage decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} />;
+  if (stage === 6) return <SubmissionStage decisions={decisions} update={update} bundle={bundle} setBundle={setBundle} setError={setError} setSaveState={setSaveState} now={now} />;
+  return <DebriefStage decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} setSaveState={setSaveState} />;
 }
 
-function DebriefStage({ decisions, setDecisions, bundle, setBundle, setError }: { decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void }) {
+function DebriefStage({ decisions, setDecisions, bundle, setBundle, setError, setSaveState }: { decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; setSaveState: (value: SaveState) => void }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const latestSubmission = [...bundle.submissions]
@@ -495,6 +640,7 @@ function DebriefStage({ decisions, setDecisions, bundle, setBundle, setError }: 
 
   async function saveReflection() {
     setSaving(true);
+    setSaveState("SAVING");
     setSaved(false);
     setError("");
     try {
@@ -502,7 +648,9 @@ function DebriefStage({ decisions, setDecisions, bundle, setBundle, setError }: 
       setBundle(next);
       setDecisions(next.decisions);
       setSaved(true);
+      setSaveState("SAVED");
     } catch (caught) {
+      setSaveState("ERROR");
       setError(caught instanceof Error ? caught.message : "Transfer reflection could not be saved.");
     } finally {
       setSaving(false);
@@ -539,22 +687,11 @@ function InstitutionalRequestDesk({ bundle, setBundle, setError, idPrefix = "sta
 
 function CommunicationsPanel({ bundle, setBundle, setError, error, now, onClose }: { bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; error: string; now: number; onClose: () => void }) {
   const [activeChannel, setActiveChannel] = useState<"facilitator" | "evidence" | "institutions">("facilitator");
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, []);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useDialogLifecycle(rootRef, closeRef);
 
-  return <div className="drawer-scrim communications-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="communications-dialog" role="dialog" aria-modal="true" aria-labelledby="communications-title" onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
-    if (event.key !== "Tab") return;
-    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-  }}><header className="communications-head"><div><h2 id="communications-title">Communications</h2><p>Internal team and institutional counterparts</p></div><div className="communications-head-actions"><span className="pill"><span className="status-dot" />{bundle.messages.filter((message) => message.status === "PENDING").length} awaiting reply</span><button type="button" className="secondary-button" autoFocus onClick={onClose}>Close</button></div></header><div className="communications-layout">
+  return <div ref={rootRef} className="drawer-scrim communications-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="communications-dialog" role="dialog" aria-modal="true" aria-labelledby="communications-title" tabIndex={-1} onKeyDown={(event) => trapDialogFocus(event, onClose)}><header className="communications-head"><div><h2 id="communications-title">Communications</h2><p>Internal team and institutional counterparts</p></div><div className="communications-head-actions"><span className="pill"><span className="status-dot" />{bundle.messages.filter((message) => message.status === "PENDING").length} awaiting reply</span><button ref={closeRef} type="button" className="secondary-button" onClick={onClose}>Close</button></div></header><div className="communications-layout">
     <aside className="communications-sidebar" aria-label="Communication channels"><div className="communications-sidebar-head"><strong>Channels</strong><span>Internal team + external counterparts</span></div>{[
       { id: "facilitator" as const, initials: "FR", title: "Facilitator room", subtitle: "Room-wide broadcasts", count: bundle.injects.length },
       { id: "evidence" as const, initials: "ED", title: "Evidence desk", subtitle: "Requests and returns", count: bundle.evidenceRequests.length },
@@ -570,12 +707,34 @@ function CommunicationsPanel({ bundle, setBundle, setError, error, now, onClose 
   </div><footer className="communications-footnote"><span><strong>Process evidence:</strong> requests, responses, and facilitator interventions are preserved for replay.</span><span>Message volume and response speed are not competence measures.</span></footer></section></div>;
 }
 
-function SubmissionStage({ decisions, update, bundle, setBundle, setError, now }: { decisions: DecisionState; update: <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; now: number }) {
+function SubmissionStage({ decisions, update, bundle, setBundle, setError, setSaveState, now }: { decisions: DecisionState; update: <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; setSaveState: (value: SaveState) => void; now: number }) {
+  const [submitting, setSubmitting] = useState(false);
   const canSubmit = negotiationBriefIsSubmittable(decisions);
+  const missingSubmissionFields = [
+    !decisions.readiness && "a position",
+    !decisions.nextHandoff.trim() && "the next institutional handoff",
+    !decisions.finalRationale.trim() && "the recommendation to the Finance Ministry Lead",
+  ].filter(Boolean) as string[];
   const preparedAt = new Date(now);
   const review = reviewRecommendation({ decisions, evidenceRequests: bundle.evidenceRequests, reviewedAt: preparedAt });
   const brief = buildNegotiationPreparationBrief({ decisions, evidenceRequests: bundle.evidenceRequests, institutionalMessages: bundle.messages, preparedAt });
-  return <section className="work-card task-card highlight"><h2>Negotiation-preparation brief</h2><p>This is an internal DMO recommendation for Finance Ministry preparation. It is not a negotiated result, agreement, assurance, or sovereign commitment. A conditional or not-ready brief may preserve unresolved evidence.</p><h3>Position</h3><ChoiceGroup accessibleLabel="Position" value={decisions.readiness} onChange={(value) => update("readiness", value as DecisionState["readiness"])} options={[{ value: "READY", title: "Ready", detail: "The evidence state supports advancing the DMO package without a blocking dependency." },{ value: "READY_WITH_CONDITIONS", title: "Ready with conditions", detail: "Advance only with the conditions and unresolved dependencies stated." },{ value: "NOT_READY", title: "Not ready", detail: "The DMO record does not support advancing the package." }]} /><TextArea label="Conditions to advance" value={decisions.unresolvedRisks} onChange={(value) => update("unresolvedRisks", value)} /><TextArea label="Next institutional handoff" value={decisions.nextHandoff} onChange={(value) => update("nextHandoff", value)} rows={3} maxLength={400} /><TextArea label="Recommendation to the Finance Ministry Lead" value={decisions.finalRationale} onChange={(value) => update("finalRationale", value)} rows={6} /><section className="brief-review" aria-labelledby="brief-review-title"><div className="brief-review-heading"><div><span className="eyebrow">Internal DMO artifact</span><h3 id="brief-review-title">Negotiation-preparation brief</h3></div><span className="pill">Draft</span></div><dl><div><dt>Position</dt><dd>{brief.position}</dd></div><div><dt>Evidence basis</dt><dd>{brief.evidenceBasis.length ? <ul>{brief.evidenceBasis.map((item) => <li key={item.id}><strong>{item.title}</strong><span>{item.summary} <cite>{item.sourceLabel}</cite></span></li>)}</ul> : "No requested evidence is available yet."}</dd></div><div><dt>Known uncertainties</dt><dd>{brief.knownUncertainties.length ? <ul>{brief.knownUncertainties.map((item) => <li key={item}>{item}</li>)}</ul> : "No material uncertainty identified by the recommendation check."}</dd></div><div><dt>Disclosure boundary</dt><dd>{brief.disclosureBoundary}</dd></div><div><dt>Treatment perimeter</dt><dd>{brief.treatmentPerimeter}</dd></div><div><dt>Conditions to advance</dt><dd>{brief.conditionsToAdvance}</dd></div><div><dt>Next institutional handoff</dt><dd>{brief.nextInstitutionalHandoff}</dd></div><div><dt>Recommendation to the Finance Ministry Lead</dt><dd>{brief.financeMinistryRecommendation}</dd></div></dl></section><section aria-labelledby="recommendation-check-title"><h3 id="recommendation-check-title">Recommendation check</h3><p>This compares each selected claim with evidence available now. It does not score or choose a recommendation.</p><div className="evidence-list">{review.items.map((item) => <article key={item.claim} className={item.status === "SUPPORTED" ? "evidence ready" : "evidence"}><div><small>{item.label}</small><h3>{item.recordedClaim}</h3><p>{item.explanation}</p></div><span className="pill" aria-label={`${item.label}: ${item.status.toLowerCase()}`}>{item.status}</span></article>)}</div>{review.readyMismatch && <div className="error-panel" role="status"><span><strong>READY does not match the current evidence state.</strong> {review.mismatchExplanation}</span></div>}</section><div className="submission-bar"><div><strong>{bundle.submissions.length} version{bundle.submissions.length === 1 ? "" : "s"} submitted</strong><span role="status">{canSubmit ? "Each version retains its brief, evidence state, and next institutional handoff." : "Record a position, next institutional handoff, and Finance Ministry recommendation to submit."}</span></div><button type="button" className="record-button" disabled={!canSubmit || bundle.session.submissionsClosed} onClick={() => { void saveDecisions(bundle, decisions, 6).then((saved) => submitRecommendation(saved)).then(setBundle).catch((caught) => setError(caught instanceof Error ? caught.message : "Submission failed")); }}>{bundle.session.submissionsClosed ? "Submissions closed" : "Submit brief"}</button></div></section>;
+  async function submitBrief() {
+    setSubmitting(true);
+    setSaveState("SAVING");
+    setError("");
+    try {
+      const saved = await saveDecisions(bundle, decisions, 6);
+      const submitted = await submitRecommendation(saved);
+      setBundle(submitted);
+      setSaveState("SAVED");
+    } catch (caught) {
+      setSaveState("ERROR");
+      setError(caught instanceof Error ? caught.message : "Submission failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+  return <section className="work-card task-card highlight"><h2>Negotiation-preparation brief</h2><p>This is an internal DMO recommendation for Finance Ministry preparation. It is not a negotiated result, agreement, assurance, or sovereign commitment. A conditional or not-ready brief may preserve unresolved evidence.</p><h3>Position</h3><ChoiceGroup accessibleLabel="Position" value={decisions.readiness} onChange={(value) => update("readiness", value as DecisionState["readiness"])} options={[{ value: "READY", title: "Ready", detail: "The evidence state supports advancing the DMO package without a blocking dependency." },{ value: "READY_WITH_CONDITIONS", title: "Ready with conditions", detail: "Advance only with the conditions and unresolved dependencies stated." },{ value: "NOT_READY", title: "Not ready", detail: "The DMO record does not support advancing the package." }]} /><TextArea label="Conditions to advance" value={decisions.unresolvedRisks} onChange={(value) => update("unresolvedRisks", value)} /><TextArea label="Next institutional handoff" value={decisions.nextHandoff} onChange={(value) => update("nextHandoff", value)} rows={3} maxLength={400} /><TextArea label="Recommendation to the Finance Ministry Lead" value={decisions.finalRationale} onChange={(value) => update("finalRationale", value)} rows={6} /><section className="brief-review" aria-labelledby="brief-review-title"><div className="brief-review-heading"><div><span className="eyebrow">Internal DMO artifact</span><h3 id="brief-review-title">Negotiation-preparation brief</h3></div><span className="pill">Draft</span></div><dl><div><dt>Position</dt><dd>{brief.position}</dd></div><div><dt>Evidence basis</dt><dd>{brief.evidenceBasis.length ? <ul>{brief.evidenceBasis.map((item) => <li key={item.id}><strong>{item.title}</strong><span>{item.summary} <cite>{item.sourceLabel}</cite></span></li>)}</ul> : "No requested evidence is available yet."}</dd></div><div><dt>Known uncertainties</dt><dd>{brief.knownUncertainties.length ? <ul>{brief.knownUncertainties.map((item) => <li key={item}>{item}</li>)}</ul> : "No material uncertainty identified by the recommendation check."}</dd></div><div><dt>Disclosure boundary</dt><dd>{brief.disclosureBoundary}</dd></div><div><dt>Treatment perimeter</dt><dd>{brief.treatmentPerimeter}</dd></div><div><dt>Conditions to advance</dt><dd>{brief.conditionsToAdvance}</dd></div><div><dt>Next institutional handoff</dt><dd>{brief.nextInstitutionalHandoff}</dd></div><div><dt>Recommendation to the Finance Ministry Lead</dt><dd>{brief.financeMinistryRecommendation}</dd></div></dl></section><section aria-labelledby="recommendation-check-title"><h3 id="recommendation-check-title">Recommendation check</h3><p>This compares each selected claim with evidence available now. It does not score or choose a recommendation.</p><div className="evidence-list">{review.items.map((item) => <article key={item.claim} className={item.status === "SUPPORTED" ? "evidence ready" : "evidence"}><div><small>{item.label}</small><h3>{item.recordedClaim}</h3><p>{item.explanation}</p></div><span className="pill" aria-label={`${item.label}: ${item.status.toLowerCase()}`}>{item.status}</span></article>)}</div>{review.readyMismatch && <div className="error-panel" role="status"><span><strong>READY does not match the current evidence state.</strong> {review.mismatchExplanation}</span></div>}</section><div className="submission-bar"><div><strong>{bundle.submissions.length} version{bundle.submissions.length === 1 ? "" : "s"} submitted</strong><span id="submission-requirements" role="status">{bundle.session.submissionsClosed ? "Submissions are closed; the latest submitted version is preserved." : missingSubmissionFields.length ? `To submit, add ${missingSubmissionFields.join(", ")}.` : "Ready to submit. Each version retains its brief, evidence state, and next institutional handoff."}</span></div><button type="button" className="record-button" aria-describedby="submission-requirements" disabled={!canSubmit || submitting || bundle.session.submissionsClosed} onClick={() => void submitBrief()}>{bundle.session.submissionsClosed ? "Submissions closed" : submitting ? "Submitting…" : "Submit brief"}</button></div></section>;
 }
 
 function ChoiceGroup({ value, onChange, options, accessibleLabel }: { value?: string; onChange: (value: string) => void; options: Array<{ value: string; title: string; detail: string }>; accessibleLabel?: string }) {
@@ -613,18 +772,18 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const conversation = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const turns = useMemo(() => bundle.advisorTurns.filter((turn) => turn.advisorId === advisorId), [bundle.advisorTurns, advisorId]);
   const profile = ADVISOR_PROFILES[advisorId];
+  useDialogLifecycle(rootRef, closeRef);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const synthesis = "speechSynthesis" in window ? window.speechSynthesis : null;
     const refreshVoices = () => setAvailableVoices(synthesis?.getVoices() ?? []);
     refreshVoices();
     synthesis?.addEventListener("voiceschanged", refreshVoices);
     return () => {
-      document.body.style.overflow = previousOverflow;
       synthesis?.removeEventListener("voiceschanged", refreshVoices);
       synthesis?.cancel();
     };
@@ -642,7 +801,7 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
       setReplyAnnouncement(`${revealingReply.advisorName} replied: ${revealingReply.text}`);
       setRevealingReply(null);
     };
-    if (reducedMotion || responseChunks.length === 0) {
+    if (advisorResponseUsesInstantReveal(reducedMotion, responseChunks.length)) {
       complete();
       return;
     }
@@ -716,16 +875,7 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
     speakAdvisorText(welcome);
   }
 
-  return <div className="advisor-workspace-scrim" role="presentation"><section className="advisor-workspace" role="dialog" aria-modal="true" aria-labelledby="advisor-title" onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
-    if (event.key !== "Tab") return;
-    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-  }}><header className="advisor-workspace-head"><div><h2 id="advisor-title">AI advisors</h2><p>Two case-grounded advisors explain evidence and process boundaries. They will not make your decision.</p></div><button className="secondary-button" type="button" autoFocus onClick={onClose}>Close</button></header><div className="advisor-workspace-body">
+  return <div ref={rootRef} className="advisor-workspace-scrim" role="presentation"><section className="advisor-workspace" role="dialog" aria-modal="true" aria-labelledby="advisor-title" tabIndex={-1} onKeyDown={(event) => trapDialogFocus(event, onClose)}><header className="advisor-workspace-head"><div><h2 id="advisor-title">AI advisors</h2><p>Two case-grounded advisors explain evidence and process boundaries. They will not make your decision.</p></div><button ref={closeRef} className="secondary-button" type="button" onClick={onClose}>Close</button></header><div className="advisor-workspace-body">
     <aside className="advisor-briefs" aria-label="Advisor briefs"><div className="advisor-selector" aria-label="Choose an advisor">{(Object.entries(ADVISOR_PROFILES) as Array<[AdvisorId, typeof profile]>).map(([id, advisor]) => <button key={id} type="button" aria-pressed={advisorId === id} onClick={() => setAdvisorId(id)}><img src={advisor.image} alt="" /><span><strong>{advisor.name}</strong><small>{advisor.shortName === "Amara" ? "Country and process" : "Contracts and treatment"}</small></span></button>)}</div><article className="advisor-brief-card selected"><div className="advisor-brief-head"><img src={profile.image} alt={profile.name} /><div><strong>{profile.name}</strong><small>{profile.bio}</small><span>{profile.role}</span></div></div><p>{profile.brief}</p><details className="advisor-welcome-message"><summary>Read welcome transcript</summary><p>{profile.welcome}</p></details><div className="advisor-brief-actions"><button type="button" className="text-button" onClick={() => playWelcome(profile.welcome)}>Play welcome</button></div></article></aside>
     <section className="advisor-chat" aria-labelledby="active-advisor-name"><header className="advisor-chat-head"><div className="advisor-person"><img src={profile.image} alt="" /><div><span className="eyebrow">Active advisor</span><h3 id="active-advisor-name">{profile.name}</h3><p className="advisor-active-bio">{profile.bio}</p><small>{profile.role}</small></div></div></header><div ref={conversation} className="advisor-conversation" role="log" aria-live="off" aria-busy={busy || Boolean(revealingReply)} aria-label={`Conversation with ${profile.name}`} tabIndex={0}><article className="advisor-opening"><div className="answer"><strong>{profile.shortName}</strong><p>{profile.greeting}</p></div></article>{turns.map((turn) => { const isRevealing = revealingReply?.turnId === turn.id; return <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{profile.shortName}</strong><p aria-hidden={isRevealing || undefined}>{isRevealing ? revealedReply : turn.answer}{isRevealing && <span className="advisor-stream-cursor" aria-hidden="true" />}</p>{!isRevealing && <AdvisorSources sources={turn.sources} />}</div></article>; })}{busy && <article className="advisor-thinking" role="status"><div className="answer"><strong>{profile.shortName}</strong><p>Considering the visible record<span aria-hidden="true">…</span></p></div></article>}</div><div className="sr-only" aria-live="polite" aria-atomic="true">{replyAnnouncement}</div><div className="advisor-suggestions" aria-label={`Suggested questions for ${profile.name}`}>{profile.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>{error && <div className="error-panel advisor-error" role="alert">{error}</div>}<div className="advisor-compose"><label><span>Review or edit the transcript before sending</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle"><input type="checkbox" checked={voiceReply} onChange={(event) => setVoiceReply(event.target.checked)} />Speak replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div><footer>AI advisor · evidence available in your case record only · no hidden-state disclosure · no decision recommendation</footer></section>
   </div></section></div>;

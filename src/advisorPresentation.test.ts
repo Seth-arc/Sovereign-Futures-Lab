@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  advisorResponseUsesInstantReveal,
   applyAdvisorFallbackCadence,
   isAdvisorGreeting,
   normalizeAdvisorCitations,
@@ -9,6 +10,12 @@ import {
 } from "./advisorPresentation";
 
 describe("advisor response presentation", () => {
+  it("reveals the complete response immediately when reduced motion is requested", () => {
+    expect(advisorResponseUsesInstantReveal(true, 12)).toBe(true);
+    expect(advisorResponseUsesInstantReveal(false, 12)).toBe(false);
+    expect(advisorResponseUsesInstantReveal(false, 0)).toBe(true);
+  });
+
   it("reveals a response progressively without changing the stored wording", () => {
     const answer = "First, establish the record.\n\nThen assess the implication.";
     const chunks = splitAdvisorResponse(answer);

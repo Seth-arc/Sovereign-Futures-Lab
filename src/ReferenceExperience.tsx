@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 export type ReferenceSurface = "orientation" | "bridge" | "case-file";
 
@@ -9,6 +9,39 @@ const TITLES: Record<ReferenceSurface, string> = {
   bridge: "Debt Management Office learning bridge",
   "case-file": "Kuvera case file",
 };
+
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
+
+function backgroundSiblings(root: HTMLElement): HTMLElement[] {
+  const siblings = new Set<HTMLElement>();
+  let current: HTMLElement = root;
+  while (current.parentElement && current.parentElement !== document.documentElement) {
+    Array.from(current.parentElement.children).forEach((element) => {
+      if (element !== current && element instanceof HTMLElement) siblings.add(element);
+    });
+    current = current.parentElement;
+  }
+  return [...siblings];
+}
+
+function trapWrapperFocus(event: ReactKeyboardEvent<HTMLElement>, onClose: () => void) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    onClose();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE));
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last?.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first?.focus();
+  }
+}
 
 function alignOrientationCopy(referenceDocument: Document) {
   const title = referenceDocument.getElementById("onboardingTitle");
@@ -76,13 +109,23 @@ function alignOrientationCopy(referenceDocument: Document) {
 
 export function ReferenceExperience({ surface, onClose, onComplete }: { surface: ReferenceSurface; onClose: () => void; onComplete: () => void }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dismissRef = useRef<HTMLButtonElement>(null);
   const observerRef = useRef<MutationObserver | null>(null);
+  const frameCleanupRef = useRef<(() => void) | null>(null);
   const [referenceDocument, setReferenceDocument] = useState("");
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
+    const root = rootRef.current;
+    const siblings = root ? backgroundSiblings(root) : [];
     document.body.style.overflow = "hidden";
+    siblings.forEach((element) => {
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
+    });
+    window.requestAnimationFrame(() => dismissRef.current?.focus());
     const controller = new AbortController();
     void fetch(REFERENCE_PATH, { signal: controller.signal })
       .then((response) => {
@@ -96,7 +139,12 @@ export function ReferenceExperience({ surface, onClose, onComplete }: { surface:
     return () => {
       controller.abort();
       observerRef.current?.disconnect();
+      frameCleanupRef.current?.();
       document.body.style.overflow = previousOverflow;
+      siblings.forEach((element) => {
+        element.inert = false;
+        element.removeAttribute("aria-hidden");
+      });
     };
   }, []);
 
@@ -116,6 +164,21 @@ export function ReferenceExperience({ surface, onClose, onComplete }: { surface:
       setLoadError(true);
       return;
     }
+
+    const accessibilityStyle = referenceDocument.createElement("style");
+    accessibilityStyle.dataset.futureslabAccessibility = "true";
+    accessibilityStyle.textContent = `
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      }
+      button, [role="button"], a, input, select, textarea, summary { min-height: 40px; }
+      .primary-button, .record-button, .primary { min-height: 44px; }
+      @media (max-width: 800px) {
+        .workspace, .learning-panel, .ref-panel, .comm-panel, .advisor-panel { zoom: 1 !important; }
+        .onboarding-copy, .bridge-copy, .ref-panel { font-size: 12px !important; }
+      }
+    `;
+    referenceDocument.head.append(accessibilityStyle);
 
     let activeSurface: HTMLElement;
     if (surface === "orientation") {
@@ -171,6 +234,25 @@ export function ReferenceExperience({ surface, onClose, onComplete }: { surface:
       return;
     }
 
+    const handleFrameKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(activeSurface.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if ((event.shiftKey && referenceDocument.activeElement === first) || (!event.shiftKey && referenceDocument.activeElement === last)) {
+        event.preventDefault();
+        dismissRef.current?.focus();
+      }
+    };
+    referenceDocument.addEventListener("keydown", handleFrameKeyDown);
+    frameCleanupRef.current?.();
+    frameCleanupRef.current = () => referenceDocument.removeEventListener("keydown", handleFrameKeyDown);
+
     observerRef.current?.disconnect();
     let exitReported = false;
     observerRef.current = new MutationObserver(() => {
@@ -187,9 +269,9 @@ export function ReferenceExperience({ surface, onClose, onComplete }: { surface:
   }
 
   return (
-    <div className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]}>
-      <button type="button" className="reference-experience-dismiss" onClick={onClose}>
-        Close and return to preparation
+    <div ref={rootRef} className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]} tabIndex={-1} onKeyDown={(event) => trapWrapperFocus(event, onClose)}>
+      <button ref={dismissRef} type="button" className="reference-experience-dismiss" onClick={onClose}>
+        Close {TITLES[surface]}
       </button>
       {loadError ? (
         <div className="reference-experience-error" role="alert">
