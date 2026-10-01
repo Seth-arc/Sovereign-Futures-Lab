@@ -21,7 +21,7 @@ Participant copy describes four outcomes through direct actions:
 - **Decision support:** separate facts, assumptions, and unresolved risks.
 - **Negotiation preparation:** build a position grounded in evidence and authority. The product does not promise negotiation performance.
 - **Strategic intelligence:** connect financial, contractual, and institutional signals.
-- **Reflection:** reconstruct what changed the decision and why.
+- **Debrief and transfer:** reconstruct the submitted decision, inspect its bounded consequences and one fixed-assumption counterfactual, then record what to do differently in a real decision under uncertainty.
 
 The landing and About experiences present participant and institutional value before the secondary research-to-decision architecture. Participant surfaces use plain language before specialist terms or acronyms, including Debt Management Office (DMO), Official Creditor Committee (OCC), financing assurance, treatment perimeter, effective control, and Comparability of Treatment (CoT). They say `evidence available in your case record`, `this response takes time to obtain`, `exercise-only assumption`, `after-action review` or `debrief record`, and `what would have changed if you had acted differently`. They do not expose prototype instructions, internal claim identifiers ahead of human-readable provenance, or architecture jargon as task guidance.
 
@@ -51,9 +51,11 @@ The static Case File and choice copy may identify questions, possible claims, an
 9. Assess Facility A/B linkage and account control.
 10. Prepare disclosure and treatment-perimeter recommendations.
 11. Submit a versioned negotiation-preparation brief as an internal DMO recommendation.
-12. Complete a short reflection.
+12. Wait with the submitted recommendation preserved until the facilitator begins debrief, then inspect the participant-only reconstruction and save a transfer reflection.
 
 On first entry, completing Orientation opens the Learning Bridge automatically; completing the bridge returns the participant to the live room at Mandate. Skip for now and Close return to an explicitly incomplete preparation state and do not mark either resource complete. Orientation, the Learning Bridge, and the complete Case File remain available throughout the exercise without resetting participant work. Preparation completion is stored separately from decision data, so reopening preparation cannot clear work and a normal refresh after casework entry restores the room without forcing preparation to restart. Participants may revisit unlocked steps. Facilitator pacing determines which new step is available. A participant may submit `READY`, `READY_WITH_CONDITIONS`, or `NOT_READY`; unresolved evidence never blocks an honest non-ready recommendation.
+
+After a participant submits, **Debrief and transfer** is available as a waiting state that identifies the preserved position and version. Selecting **Begin debrief** closes submissions, pauses the casework clock at its current remaining time, advances the session to stage 8, and publishes the `DEBRIEF` session change through the existing subscription. Connected participants move directly to the debrief without a reload; a later refresh in `DEBRIEF` also restores stage 8. Earlier decision stages become read-only through navigation closure once submissions close.
 
 The participant clock reads `Casework · 20:00 · waiting` before the facilitator starts the exercise. Orientation and the Learning Bridge never start or consume that clock. Once started, it measures only the twenty-minute workshop casework. The USD 750 million maturity in six weeks and the IMF Board horizon in eleven weeks are institutional case facts, remain visible as such, and are never presented as a conversion from real-time seconds or workshop minutes.
 
@@ -92,6 +94,14 @@ The brief reuses the structured decision record. `unresolvedRisks` is presented 
 
 Evidence basis is generated only from requested evidence whose authored availability time has elapsed by the submission moment or which the facilitator released by that moment, plus institutional replies that were answered by that moment. Requested-but-pending evidence and later replies are excluded. Each submission snapshot retains the complete decision state, including `nextHandoff`; the deterministic brief is reconstructed at that version's submission time. Individual AARs, workshop HTML/PDF comparisons, CSV/JSON exports, and the local emergency handoff expose the named brief sections without requiring a facilitator to interpret raw decision JSON.
 
+## Participant debrief and transfer
+
+The participant debrief is a concise reconstruction of that participant's latest submitted version, never their later unsent working edits. It shows the submitted position and version, evidence available at that submission time, deterministic material consequences, unresolved risks, one deterministic counterfactual with its fixed assumptions, and facilitator injects delivered before submission. Those injects are shown as material scenario context in the record; the product does not infer that an inject caused a participant's decision. The debrief states that consequences and counterfactuals belong to a fictional exercise and are not real-world predictions, scores, or competence findings.
+
+The participant debrief builder takes the current participant ID and filters submissions, evidence requests, and institutional messages by that participant and session before reconstruction. It contains no roster, other participant decision, transcript, identity, comparison, or detailed AAR. The facilitator AAR remains a separate facilitator-only artifact with identified history, advisor records, correspondence, timeline, and workshop-level export capability.
+
+The transfer prompt is **What will you do differently when preparing a real decision under uncertainty?** Its response continues to use the existing `reflection` field. During `DEBRIEF`, saving that response updates the participant's current record only; it does not reopen submissions or mutate any versioned submission snapshot. Existing records that used `reflection` for the earlier pre-debrief prompt remain preserved as legacy reflection text and require no data migration. The facilitator AAR labels the field **Transfer reflection** for current sessions.
+
 ## Deterministic boundary
 
 The scenario engine owns outcomes and counterfactuals. AI advisors may explain role-visible facts and engine results, but may not select an answer, change state, release evidence, or generate canonical consequences.
@@ -108,8 +118,8 @@ The facilitator cannot silently edit a participant submission or replace determi
 - Purpose: workshop delivery and debrief only; no research use.
 - Audio: processed for transcription and not persisted.
 - Retention: automatic deletion 30 days after the session; facilitator may delete earlier.
-- Detailed AARs and identified exports: facilitator only.
-- Participant completion view: short reflection and acknowledgement only.
+- Detailed AARs, participant comparisons, transcripts, and identified exports: facilitator only.
+- Participant debrief view: only that participant's submitted version, submission-time evidence, bounded consequences and risks, one fixed-assumption counterfactual, relevant facilitator injects, and transfer reflection.
 
 ## Explicit non-goals
 

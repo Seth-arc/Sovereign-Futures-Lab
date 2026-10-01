@@ -42,9 +42,9 @@ export const STAGES = [
     objective: "Submit an internal negotiation-preparation brief that states what is known, unknown, and conditional, with unresolved risks preserved.",
   },
   {
-    title: "Reflect",
-    short: "Reflect",
-    objective: "Record what changed your reasoning before the facilitator-led after-action review.",
+    title: "Debrief and transfer",
+    short: "Debrief",
+    objective: "Reconstruct your submitted decision, then record how you will transfer the learning to a real decision under uncertainty.",
   },
 ] as const;
 

@@ -8,13 +8,14 @@ import {
   loadParticipantBundle,
   requestEvidence,
   saveDecisions,
+  saveTransferReflection,
   sendInstitutionalRequest,
   submitRecommendation,
   subscribeToWorkshop,
   transcribeAudio,
   type ParticipantBundle,
 } from "./data";
-import { buildNegotiationPreparationBrief, evidenceIsAvailable, negotiationBriefIsSubmittable, reviewRecommendation } from "./engine";
+import { buildNegotiationPreparationBrief, buildParticipantDebrief, evidenceIsAvailable, negotiationBriefIsSubmittable, participantAvailableStage, participantEntryStage, reviewRecommendation } from "./engine";
 import { EVIDENCE_CATALOG, STAGES, WORKSHOP_TITLE } from "./scenario";
 import { ReferenceExperience, type ReferenceSurface } from "./ReferenceExperience";
 import { ThemeButton } from "./ThemeButton";
@@ -194,11 +195,11 @@ export function ParticipantApp() {
     if (participantId) {
       void loadParticipantBundle(participantId)
         .then((loaded) => {
-          const complete = preparationIsComplete(loaded);
+          const complete = loaded.session.status === "DEBRIEF" || loaded.session.status === "CLOSED" || preparationIsComplete(loaded);
           if (complete) localStorage.setItem(preparationKey(loaded.participant.id), "complete");
           setBundle(loaded);
           setDecisions(loaded.decisions);
-          setStage(Math.min(loaded.participant.currentStage, loaded.session.currentStage));
+          setStage(participantEntryStage(loaded.session, loaded.participant));
           setPreparationComplete(complete);
         })
         .catch(() => localStorage.removeItem(PARTICIPANT_KEY))
@@ -224,6 +225,13 @@ export function ParticipantApp() {
         if (latest && latest.id !== previousInject) setNotice(`${latest.title}: ${latest.body}`);
         setBundle(fresh);
         setDecisions(fresh.decisions);
+        if (fresh.session.status === "DEBRIEF" || fresh.session.status === "CLOSED") {
+          setPreparationComplete(true);
+          setStage(participantEntryStage(fresh.session, fresh.participant));
+          setRoleBriefOpen(false);
+          setNotice("Debrief and transfer is now open. Your submitted recommendation has been preserved.");
+          window.requestAnimationFrame(() => mainContent.current?.focus());
+        }
       });
     });
   }, [bundle?.participant.id, bundle?.session.id]);
@@ -251,10 +259,10 @@ export function ParticipantApp() {
     try {
       const joined = await joinWorkshop(input);
       localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
-      const complete = preparationIsComplete(joined);
+      const complete = joined.session.status === "DEBRIEF" || joined.session.status === "CLOSED" || preparationIsComplete(joined);
       setBundle(joined);
       setDecisions(joined.decisions);
-      setStage(0);
+      setStage(participantEntryStage(joined.session, joined.participant));
       setPreparationComplete(complete);
       setReferenceSurface(complete ? null : "orientation");
     } catch (caught) {
@@ -287,12 +295,13 @@ export function ParticipantApp() {
 
   if (!bundle || !decisions) return <WorkshopEntryState initializing={initializing} busy={busy} error={error} entryHandoff={entryHandoff} onRetry={() => entryHandoff && void handleJoin(entryHandoff)} onJoinLocal={() => entryHandoff && handleLocalJoin(entryHandoff)} />;
 
-  const availableStage = Math.max(bundle.session.currentStage, bundle.participant.currentStage);
+  const availableStage = participantAvailableStage(bundle.session, bundle.participant, bundle.submissions.length > 0);
   const latestInject = bundle.injects.at(-1);
   const clock = remainingFor(bundle, now);
   const caseworkRunning = preparationComplete && bundle.session.status === "RUNNING";
   const displayedClock = preparationComplete ? clock : bundle.session.durationSeconds;
-  const caseworkClockLabel = `Casework · ${formatClock(displayedClock)}${caseworkRunning ? "" : " · waiting"}`;
+  const caseworkClockState = bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED" ? "paused for debrief" : caseworkRunning ? "" : "waiting";
+  const caseworkClockLabel = `Casework · ${formatClock(displayedClock)}${caseworkClockState ? ` · ${caseworkClockState}` : ""}`;
   const pendingRequests = bundle.evidenceRequests.filter((request) => !evidenceIsAvailable(request, new Date(now)));
   const pendingCommunications = pendingRequests.length + bundle.messages.filter((message) => message.status === "PENDING").length;
 
@@ -337,7 +346,11 @@ export function ParticipantApp() {
     if (!bundle || !decisions) return;
     setMenuOpen(false); setBusy(true); setError("");
     try {
-      const saved = await saveDecisions(bundle, decisions, stage);
+      const saved = bundle.session.status === "CLOSED"
+        ? bundle
+        : bundle.session.status === "DEBRIEF"
+          ? await saveTransferReflection(bundle, decisions.reflection)
+          : await saveDecisions(bundle, decisions, stage);
       setBundle(saved);
       localStorage.removeItem(PARTICIPANT_KEY);
       sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
@@ -383,10 +396,10 @@ export function ParticipantApp() {
 
       <div className="shell">
         <aside className="process" aria-label="Simulation process" tabIndex={0}>
-          <div className="rail-title"><div className="eyebrow">Process flow</div><h2>Complete the decision chain</h2><div className="rail-sub">The facilitator unlocks each new step. Earlier work remains open for revision.</div></div>
+          <div className="rail-title"><div className="eyebrow">Process flow</div><h2>Complete the decision chain</h2><div className="rail-sub">{bundle.session.submissionsClosed ? "The submitted recommendation is preserved. Debrief and transfer remains available." : "The facilitator unlocks each new step. Earlier work remains open for revision."}</div></div>
           <ol className="steps">
             {STAGES.map((item, index) => {
-              const unlocked = index <= availableStage;
+              const unlocked = index <= availableStage && (!bundle.session.submissionsClosed || index === 7);
               const complete = index < bundle.participant.currentStage;
               const stepClass = ["step", stage === index ? "current" : "", complete ? "complete" : "", unlocked ? "available" : "locked"].filter(Boolean).join(" ");
               return <li key={item.short}><button type="button" className={stepClass} disabled={!unlocked} aria-current={stage === index ? "step" : undefined} onClick={() => { setRoleBriefOpen(index === 0); setStage(index); }}><span className="step-num">{index + 1}</span><span className="step-copy"><strong>{item.short}</strong><span>{unlocked ? item.title : "Await facilitator"}</span></span></button></li>;
@@ -400,11 +413,11 @@ export function ParticipantApp() {
             <div className="stage-head"><div><div className="eyebrow">Step {stage + 1} · {STAGES[stage].short}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className="autosave-state">{busy ? "Saving…" : "Saved on action"}</span></div></div>
             {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
             <StageContent stage={stage} decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />
-            <div className="stage-actions actions">
+            {stage < 7 && <div className="stage-actions actions">
               <button type="button" className="secondary-button" disabled={stage === 0 || busy} onClick={() => { void persist(stage); setRoleBriefOpen(false); setStage((value) => value - 1); }}>Previous</button>
               <button type="button" className="primary-button" disabled={busy} onClick={() => void persist(stage)}>Save work</button>
               {stage < availableStage && <button type="button" className="primary-button" disabled={busy} onClick={() => { void persist(stage + 1); setRoleBriefOpen(false); setStage((value) => value + 1); }}>Continue</button>}
-            </div>
+            </div>}
           </>}
         </main>
 
@@ -438,7 +451,7 @@ function GlossaryDialog({ onClose }: { onClose: () => void }) {
 
 function WorkshopEntryState({ initializing, busy, error, entryHandoff, onRetry, onJoinLocal }: { initializing: boolean; busy: boolean; error: string; entryHandoff: JoinInput | null; onRetry: () => void; onJoinLocal: () => void }) {
   const inProgress = initializing || busy;
-  return <main className="entry-page participant-reference"><div className="entry-brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><span><strong>Sovereign</strong><small>Futures Lab</small></span></div><section className="entry-copy"><span className="eyebrow">Case · Kuvera Financing Assurances</span><h1>{WORKSHOP_TITLE}</h1><p>Take the role of Kuvera’s Debt Management Office (DMO). Inspect the record, request evidence, and prepare an internal negotiation-preparation brief that states what is known, unknown, and conditional.</p><p>A financing assurance is a creditor signal that can support the package before final legal agreements exist; your recommendation informs that process but does not create an assurance or sovereign commitment.</p><div className="method-line"><span>Evidence</span><i /> <span>Decision</span><i /> <span>Consequence</span><i /> <span>Reflection</span></div></section><section className="join-card" aria-labelledby="entry-state-title" aria-live="polite"><h2 id="entry-state-title">{inProgress ? "Joining the workshop" : "Enter through the main page"}</h2>{inProgress ? <p>Your participant details are being verified. Keep this page open.</p> : <p>The participant sign-in is on the Sovereign landing page so your details are entered only once.</p>}{error && <div className="error-panel" role="alert">{error}</div>}{!inProgress && entryHandoff && <><button className="primary-button full" type="button" onClick={onRetry}>Try again</button><button className="secondary-button full" type="button" onClick={onJoinLocal}>Continue in local emergency mode</button></>}{!inProgress && <p><a href="/">Return to participant sign-in</a></p>}</section></main>;
+  return <main className="entry-page participant-reference"><div className="entry-brand"><img className="aiddata-brandmark" src="/assets/AidData Brandmark.png" alt="AidData" /><span><strong>Sovereign</strong><small>Futures Lab</small></span></div><section className="entry-copy"><span className="eyebrow">Case · Kuvera Financing Assurances</span><h1>{WORKSHOP_TITLE}</h1><p>Take the role of Kuvera’s Debt Management Office (DMO). Inspect the record, request evidence, and prepare an internal negotiation-preparation brief that states what is known, unknown, and conditional.</p><p>A financing assurance is a creditor signal that can support the package before final legal agreements exist; your recommendation informs that process but does not create an assurance or sovereign commitment.</p><div className="method-line"><span>Evidence</span><i /> <span>Decision</span><i /> <span>Consequence</span><i /> <span>Transfer</span></div></section><section className="join-card" aria-labelledby="entry-state-title" aria-live="polite"><h2 id="entry-state-title">{inProgress ? "Joining the workshop" : "Enter through the main page"}</h2>{inProgress ? <p>Your participant details are being verified. Keep this page open.</p> : <p>The participant sign-in is on the Sovereign landing page so your details are entered only once.</p>}{error && <div className="error-panel" role="alert">{error}</div>}{!inProgress && entryHandoff && <><button className="primary-button full" type="button" onClick={onRetry}>Try again</button><button className="secondary-button full" type="button" onClick={onJoinLocal}>Continue in local emergency mode</button></>}{!inProgress && <p><a href="/">Return to participant sign-in</a></p>}</section></main>;
 }
 
 function PreparationState({ onOrientation, onBridge }: { onOrientation: () => void; onBridge: () => void }) {
@@ -461,7 +474,46 @@ function StageContent({ stage, decisions, setDecisions, bundle, setBundle, setEr
   if (stage === 4) return <section className="work-card task-card highlight"><h2>Map account control and facility dependency</h2><h3>Account classification</h3><ChoiceGroup value={decisions.accountClassification} onChange={(value) => update("accountClassification", value as DecisionState["accountClassification"])} options={[{ value: "EFFECTIVE_CONTROL", title: "Quasi-collateral / effective control", detail: "Record an effective-control classification." },{ value: "ORDINARY_ACCOUNT", title: "Ordinary operating account", detail: "Record an ordinary-account classification." },{ value: "UNRESOLVED", title: "Unresolved", detail: "Record that the available evidence does not support a classification." }]} /><h3>Facility A/B linkage</h3><ChoiceGroup value={decisions.facilityLinkage} onChange={(value) => update("facilityLinkage", value as DecisionState["facilityLinkage"])} options={[{ value: "SHARED_POOL", title: "Shared revenue pool", detail: "Record Facilities A and B as sharing a revenue pool." },{ value: "INDEPENDENT", title: "Independent facilities", detail: "Record the facilities as independent for dependency analysis." },{ value: "UNRESOLVED", title: "Linkage unresolved", detail: "Record that Facility B's relationship to RA-01 remains unconfirmed." }]} /><TextArea label="Explain the evidence supporting both entries." value={decisions.linkageRationale} onChange={(value) => update("linkageRationale", value)} /></section>;
   if (stage === 5) return <section className="work-card task-card highlight"><h2>Recommend disclosure and treatment perimeter</h2><h3>Disclosure level</h3><ChoiceGroup value={decisions.disclosure} onChange={(value) => update("disclosure", value as DecisionState["disclosure"])} options={[{ value: "FULL", title: "Full contract disclosure", detail: "Recommend release of the complete contract information." },{ value: "REDACTED", title: "Redacted functional summary", detail: "Recommend release of a summary with selected details removed." },{ value: "WITHHOLD", title: "Withhold pending consent", detail: "Recommend no external release until permission is established." }]} /><h3>Treatment perimeter</h3><ChoiceGroup value={decisions.treatmentPerimeter} onChange={(value) => update("treatmentPerimeter", value as DecisionState["treatmentPerimeter"])} options={[{ value: "BOTH_FACILITIES", title: "Carry Facilities A and B", detail: "Record both facilities inside the proposed treatment perimeter." },{ value: "FACILITY_A_ONLY", title: "Carry Facility A only", detail: "Record only Facility A inside the proposed treatment perimeter." },{ value: "DEFER", title: "Defer perimeter recommendation", detail: "Record that the evidence is insufficient to define the perimeter." }]} /><TextArea label="Explain the trade-off and the boundary of your recommendation." value={decisions.disclosureRationale} onChange={(value) => update("disclosureRationale", value)} /></section>;
   if (stage === 6) return <SubmissionStage decisions={decisions} update={update} bundle={bundle} setBundle={setBundle} setError={setError} now={now} />;
-  return <section className="work-card task-card highlight"><h2>Reflection before debrief</h2><p>The facilitator holds the detailed after-action review. Record the most important change in your reasoning so it can be compared with the decision-time record.</p><TextArea label="What evidence, dependency, or authority boundary most changed your recommendation?" value={decisions.reflection} onChange={(value) => update("reflection", value)} rows={7} /><div className="completion-note"><strong>Your detailed debrief record is not shown here.</strong><span>The facilitator will reconstruct the decision sequence, realistic consequences, and what would have changed if you had acted differently.</span></div>{isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => downloadEmergencyHandoff(bundle, decisions)}>Download emergency handoff file</button>}</section>;
+  return <DebriefStage decisions={decisions} setDecisions={setDecisions} bundle={bundle} setBundle={setBundle} setError={setError} />;
+}
+
+function DebriefStage({ decisions, setDecisions, bundle, setBundle, setError }: { decisions: DecisionState; setDecisions: (value: DecisionState) => void; bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const latestSubmission = [...bundle.submissions]
+    .filter((submission) => submission.participantId === bundle.participant.id)
+    .sort((a, b) => a.version - b.version)
+    .at(-1);
+  const debriefOpen = bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED";
+  const debrief = debriefOpen ? buildParticipantDebrief({
+    participantId: bundle.participant.id,
+    submissions: bundle.submissions,
+    evidenceRequests: bundle.evidenceRequests,
+    institutionalMessages: bundle.messages,
+    injects: bundle.injects,
+  }) : undefined;
+
+  async function saveReflection() {
+    setSaving(true);
+    setSaved(false);
+    setError("");
+    try {
+      const next = await saveTransferReflection(bundle, decisions.reflection);
+      setBundle(next);
+      setDecisions(next.decisions);
+      setSaved(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Transfer reflection could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!debriefOpen) {
+    return <section className="work-card task-card highlight" aria-labelledby="debrief-waiting-title"><span className="eyebrow">Submitted record</span><h2 id="debrief-waiting-title">Waiting for the facilitator to begin the review</h2>{latestSubmission ? <><p>Your submitted recommendation is preserved while submissions remain open. You may return to earlier steps and submit another version until the facilitator begins debrief.</p><div className="brief-review"><dl><div><dt>Submitted position</dt><dd>{latestSubmission.decisions.readiness?.replaceAll("_", " ").toLowerCase() ?? "Not recorded"}</dd></div><div><dt>Submitted version</dt><dd>Version {latestSubmission.version} · {new Date(latestSubmission.submittedAt).toLocaleString()}</dd></div></dl></div></> : <p>No recommendation version has been submitted. The facilitator will begin the review and close submissions for the room.</p>}<div className="completion-note" role="status"><strong>The facilitator will begin the debrief.</strong><span>Your own submitted record will appear here without exposing another participant’s decisions or detailed after-action report.</span></div>{isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => downloadEmergencyHandoff(bundle, decisions)}>Download emergency handoff file</button>}</section>;
+  }
+
+  return <section className="work-card task-card highlight" aria-labelledby="participant-debrief-title"><span className="eyebrow">Your submitted record</span><h2 id="participant-debrief-title">Debrief and transfer</h2><p>This view reconstructs only your submitted recommendation. The facilitator’s detailed after-action report remains separate.</p>{debrief ? <><div className="brief-review"><dl><div><dt>Submitted position</dt><dd>{debrief.position}</dd></div><div><dt>Submitted version</dt><dd>Version {debrief.version} · {new Date(debrief.submittedAt).toLocaleString()}</dd></div><div><dt>Evidence available at submission</dt><dd>{debrief.evidenceAvailable.length ? <ul>{debrief.evidenceAvailable.map((item) => <li key={item.id}><strong>{item.title}</strong><span>{item.summary} <cite>{item.sourceLabel}</cite></span></li>)}</ul> : "No requested evidence was available at submission."}</dd></div><div><dt>Material consequences</dt><dd><ul>{debrief.consequences.map((item) => <li key={item.id}><strong>{item.title}</strong><span>{item.outcome} Basis: {item.basis}</span></li>)}</ul></dd></div><div><dt>Unresolved risks</dt><dd>{debrief.unresolvedRisks.length ? <ul>{debrief.unresolvedRisks.map((risk) => <li key={risk}>{risk}</li>)}</ul> : "No blocking uncertainty was recorded in this bounded exercise."}</dd></div><div><dt>One counterfactual</dt><dd><strong>{debrief.counterfactual.alternative}</strong><p>{debrief.counterfactual.projectedDifference}</p><span>Fixed assumptions: {debrief.counterfactual.fixedAssumptions}</span></dd></div><div><dt>Facilitator updates in the record</dt><dd>{debrief.facilitatorInjects.length ? <ul>{debrief.facilitatorInjects.map((inject) => <li key={inject.id}><strong>{inject.title}</strong><span>{inject.body}</span></li>)}</ul> : "No facilitator inject was delivered before this submission."}</dd></div></dl></div><div className="completion-note"><strong>Exercise boundary</strong><span>{debrief.fictionalBoundary}</span></div></> : <div className="completion-note"><strong>No submitted recommendation was recorded before submissions closed.</strong><span>You can still record a transfer reflection without creating or changing a submission.</span></div>}<TextArea label="What will you do differently when preparing a real decision under uncertainty?" value={decisions.reflection} onChange={(value) => { setSaved(false); setDecisions({ ...decisions, reflection: value }); }} rows={7} /><div className="submission-bar"><div><strong>Transfer reflection</strong><span role="status" aria-live="polite">{saved ? "Saved. Your submitted recommendation version is unchanged." : "This response is saved separately from the submitted recommendation snapshot."}</span></div><button type="button" className="primary-button" disabled={saving || bundle.session.status === "CLOSED"} onClick={() => void saveReflection()}>{bundle.session.status === "CLOSED" ? "Session closed" : saving ? "Saving…" : "Save transfer reflection"}</button></div>{isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => downloadEmergencyHandoff(bundle, decisions)}>Download emergency handoff file</button>}</section>;
 }
 
 function InstitutionalRequestDesk({ bundle, setBundle, setError, idPrefix = "stage" }: { bundle: ParticipantBundle; setBundle: (value: ParticipantBundle) => void; setError: (value: string) => void; idPrefix?: string }) {

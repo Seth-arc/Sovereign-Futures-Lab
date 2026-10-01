@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { buildAfterActionReport, buildNegotiationPreparationBrief, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, reviewRecommendation, unresolvedRiskList } from "./engine";
+import { describe, expect, it, vi } from "vitest";
+import { saveTransferReflection, submitRecommendation, type ParticipantBundle } from "./data";
+import { beginDebriefSession, buildAfterActionReport, buildNegotiationPreparationBrief, buildParticipantDebrief, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, participantAvailableStage, participantEntryStage, reviewRecommendation, unresolvedRiskList } from "./engine";
 import { afterActionReportHtml, workshopComparisonHtml, workshopCsv } from "./report";
-import type { DecisionState, EvidenceRequest } from "./types";
+import type { DecisionState, EvidenceRequest, ParticipantProfile, WorkshopSession } from "./types";
 
 const resolved: DecisionState = {
   mandateConfirmed: true,
@@ -43,6 +44,141 @@ function recommendationReview(decisions: DecisionState, evidenceRequests: Eviden
 function supportFor(review: ReturnType<typeof recommendationReview>, claim: string) {
   return review.items.find((item) => item.claim === claim);
 }
+
+const participant: ParticipantProfile = {
+  id: "participant-1",
+  sessionId: "session-1",
+  name: "Amina",
+  organization: "Kuvera DMO",
+  email: "amina@example.org",
+  currentStage: 6,
+  lastActiveAt: reviewMoment,
+  consentedAt: "2026-10-14T10:00:00Z",
+};
+
+const runningSession: WorkshopSession = {
+  id: "session-1",
+  title: "Kuvera Financing Assurances",
+  kind: "LIVE",
+  status: "RUNNING",
+  currentStage: 6,
+  durationSeconds: 1200,
+  remainingSeconds: 1200,
+  clockStartedAt: "2026-10-14T10:00:00Z",
+  submissionsClosed: false,
+  createdAt: "2026-10-14T10:00:00Z",
+  expiresAt: "2026-11-13T10:00:00Z",
+};
+
+describe("participant debrief and transfer", () => {
+  it("closes submissions, pauses the clock, and unlocks debrief as one transition", () => {
+    const debrief = beginDebriefSession(runningSession, "2026-10-14T10:03:00Z");
+    expect(debrief.status).toBe("DEBRIEF");
+    expect(debrief.submissionsClosed).toBe(true);
+    expect(debrief.currentStage).toBe(7);
+    expect(debrief.remainingSeconds).toBe(1020);
+    expect(debrief.clockStartedAt).toBeUndefined();
+  });
+
+  it("routes a subscribed participant to the final stage without a page refresh", () => {
+    const debrief = beginDebriefSession(runningSession, "2026-10-14T10:03:00Z");
+    expect(participantAvailableStage(debrief, participant, false)).toBe(7);
+    expect(participantEntryStage(debrief, participant)).toBe(7);
+  });
+
+  it("reconstructs the submitted version instead of later unsent working edits", () => {
+    const submission = { id: "submission-1", participantId: participant.id, sessionId: runningSession.id, version: 1, decisions: resolved, submittedAt: reviewMoment };
+    const debrief = buildParticipantDebrief({
+      participantId: participant.id,
+      submissions: [submission],
+      evidenceRequests: [evidence("treasury-reconciliation", true)],
+      injects: [],
+    });
+    const unsentWorkingEdits = { ...resolved, readiness: "NOT_READY" as const, liquidityBasis: "UNRESOLVED" as const };
+    expect(unsentWorkingEdits.readiness).not.toBe(submission.decisions.readiness);
+    expect(debrief?.version).toBe(1);
+    expect(debrief?.position).toBe("Ready with conditions");
+    expect(debrief?.consequences.some((item) => item.id === "verified-basis")).toBe(true);
+  });
+
+  it("saves transfer reflection without mutating the submitted decision snapshot", async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    });
+    try {
+      const localParticipant = { ...participant, sessionId: "local-rehearsal" };
+      const bundle: ParticipantBundle = {
+        session: { ...runningSession, id: "local-rehearsal", kind: "REHEARSAL" },
+        participant: localParticipant,
+        decisions: resolved,
+        evidenceRequests: [], submissions: [], injects: [], messages: [], advisorTurns: [], timeline: [],
+      };
+      const submitted = await submitRecommendation(bundle);
+      const debriefBundle: ParticipantBundle = {
+        ...submitted,
+        session: { ...submitted.session, status: "DEBRIEF", currentStage: 7, submissionsClosed: true, clockStartedAt: undefined },
+        decisions: { ...submitted.decisions, readiness: "NOT_READY", reflection: "An unsent working reflection." },
+      };
+      const saved = await saveTransferReflection(debriefBundle, "I will name the evidence dependency before recommending action.");
+      expect(saved.decisions.reflection).toContain("name the evidence dependency");
+      expect(saved.submissions[0].decisions.readiness).toBe("READY_WITH_CONDITIONS");
+      expect(saved.submissions[0].decisions.reflection).toBe(resolved.reflection);
+      const report = buildAfterActionReport({
+        participant: saved.participant,
+        session: saved.session,
+        decisions: saved.decisions,
+        evidenceRequests: [],
+        submissions: saved.submissions,
+        advisorTurns: [], injects: [], institutionalMessages: [], timeline: [],
+      });
+      expect(report.decisions.reflection).toBe(saved.decisions.reflection);
+      expect(afterActionReportHtml(report)).toContain("Transfer reflection");
+      expect(afterActionReportHtml(report)).toContain(saved.decisions.reflection);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("filters every participant-scoped debrief record before reconstruction", () => {
+    const ownSubmission = { id: "submission-1", participantId: participant.id, sessionId: runningSession.id, version: 1, decisions: resolved, submittedAt: reviewMoment };
+    const otherSubmission = { id: "submission-other", participantId: "participant-other", sessionId: runningSession.id, version: 99, decisions: { ...resolved, finalRationale: "OTHER PARTICIPANT PRIVATE DECISION" }, submittedAt: reviewMoment };
+    const debrief = buildParticipantDebrief({
+      participantId: participant.id,
+      submissions: [ownSubmission, otherSubmission],
+      evidenceRequests: [{ ...evidence("confidentiality-opinion", true), participantId: "participant-other" }],
+      institutionalMessages: [{ id: "message-other", sessionId: runningSession.id, participantId: "participant-other", institution: "LEGAL", question: "Private question", reply: "OTHER PARTICIPANT PRIVATE REPLY", status: "ANSWERED", createdAt: "2026-10-14T10:05:00Z", answeredAt: "2026-10-14T10:06:00Z" }],
+      injects: [],
+    });
+    expect(debrief?.version).toBe(1);
+    expect(debrief?.evidenceAvailable).toEqual([]);
+    expect(debrief).not.toHaveProperty("participantId");
+    expect(JSON.stringify(debrief)).not.toContain("OTHER PARTICIPANT");
+  });
+
+  it("names fixed assumptions and the fictional, non-scoring boundary", () => {
+    const debrief = buildParticipantDebrief({
+      participantId: participant.id,
+      submissions: [{ id: "submission-1", participantId: participant.id, sessionId: runningSession.id, version: 1, decisions: resolved, submittedAt: reviewMoment }],
+      evidenceRequests: [],
+      injects: [
+        { id: "inject-1", sessionId: runningSession.id, title: "Time compression", body: "The maturity window is unchanged.", sentAt: "2026-10-14T10:10:00Z" },
+        { id: "inject-late", sessionId: runningSession.id, title: "After submission", body: "This arrived after the preserved version.", sentAt: "2026-10-14T10:21:00Z" },
+      ],
+    });
+    expect(debrief?.counterfactual.fixedAssumptions).toContain("same restricted and protected balances");
+    expect(debrief?.fictionalBoundary).toContain("fictional");
+    expect(debrief?.fictionalBoundary).toContain("not a real-world prediction, score, or competence finding");
+    expect(debrief?.facilitatorInjects).toHaveLength(1);
+  });
+
+  it("restores the participant debrief after refresh while the session remains in DEBRIEF", () => {
+    const refreshedSession = { ...runningSession, status: "DEBRIEF" as const, currentStage: 7, submissionsClosed: true, clockStartedAt: undefined };
+    expect(participantEntryStage(refreshedSession, { ...participant, currentStage: 2 })).toBe(7);
+  });
+});
 
 describe("deterministic consequence engine", () => {
   it("pins the verified liquidity and shared-pool outcomes", () => {

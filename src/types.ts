@@ -205,6 +205,19 @@ export interface SubmissionBrief {
   brief: NegotiationPreparationBrief;
 }
 
+export interface ParticipantDebrief {
+  submissionId: string;
+  version: number;
+  submittedAt: string;
+  position: string;
+  evidenceAvailable: BriefEvidenceItem[];
+  consequences: Consequence[];
+  unresolvedRisks: string[];
+  counterfactual: Counterfactual;
+  facilitatorInjects: GlobalInject[];
+  fictionalBoundary: string;
+}
+
 export interface AfterActionReport {
   participant: Pick<ParticipantProfile, "id" | "name" | "organization" | "email">;
   session: Pick<WorkshopSession, "id" | "title" | "kind" | "createdAt">;

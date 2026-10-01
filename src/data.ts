@@ -345,6 +345,11 @@ export async function saveDecisions(bundle: ParticipantBundle, decisions: Decisi
   return { ...bundle, decisions: persistedDecisions, participant: mapParticipant(result.data as Record<string, unknown>) };
 }
 
+export async function saveTransferReflection(bundle: ParticipantBundle, reflection: string): Promise<ParticipantBundle> {
+  const decisions = decisionSnapshot({ ...bundle.decisions, reflection });
+  return saveDecisions(bundle, decisions, 7);
+}
+
 export async function requestEvidence(bundle: ParticipantBundle, evidenceId: string): Promise<ParticipantBundle> {
   if (bundle.evidenceRequests.some((item) => item.evidenceId === evidenceId)) return bundle;
   const definition = EVIDENCE_CATALOG.find((item) => item.id === evidenceId);

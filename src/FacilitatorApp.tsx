@@ -14,7 +14,7 @@ import {
   sendGlobalInject,
   updateWorkshopSession,
 } from "./data";
-import { buildAfterActionReport } from "./engine";
+import { beginDebriefSession, buildAfterActionReport } from "./engine";
 import {
   afterActionReportHtml,
   downloadReportHtml,
@@ -99,17 +99,31 @@ export function FacilitatorApp() {
   }
 
   async function patchSession(patch: Record<string, unknown>) {
-    if (!selected) return;
+    if (!selected) return false;
     setBusy(true);
-    try { await updateWorkshopSession(selected.id, patch); await refreshSessions(selected.id); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Session update failed"); }
+    try { await updateWorkshopSession(selected.id, patch); await refreshSessions(selected.id); return true; }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Session update failed"); return false; }
     finally { setBusy(false); }
   }
 
   async function toggleClock() {
     if (!selected) return;
+    if (selected.status === "DEBRIEF" || selected.status === "CLOSED") return;
     if (selected.status === "RUNNING") await patchSession({ status: "PAUSED", remaining_seconds: sessionClock(selected), clock_started_at: null });
     else await patchSession({ status: "RUNNING", clock_started_at: new Date().toISOString() });
+  }
+
+  async function beginDebrief() {
+    if (!selected || selected.status === "DEBRIEF" || selected.status === "CLOSED") return;
+    const transition = beginDebriefSession(selected, new Date());
+    const updated = await patchSession({
+      status: transition.status,
+      current_stage: transition.currentStage,
+      submissions_closed: transition.submissionsClosed,
+      remaining_seconds: transition.remainingSeconds,
+      clock_started_at: null,
+    });
+    if (updated) setNotice("Debrief opened for participants. Submissions are closed and the casework clock is paused.");
   }
 
   return <div className="facilitator-shell facilitator-reference">
@@ -119,9 +133,9 @@ export function FacilitatorApp() {
       <aside className="facilitator-nav"><nav className="workspace-nav" aria-label="Facilitator workspace"><span className="eyebrow">Session control</span><button type="button" aria-current={view === "overview" ? "page" : undefined} onClick={() => setView("overview")}>Live overview</button><button type="button" aria-current={view === "participants" ? "page" : undefined} onClick={() => setView("participants")}>Participants <span>{data.participants.length}</span></button><button type="button" aria-current={view === "communications" ? "page" : undefined} onClick={() => setView("communications")}>Communications <span>{data.messages.filter((item) => item.status === "PENDING").length}</span></button><button type="button" aria-current={view === "injects" ? "page" : undefined} onClick={() => setView("injects")}>Injects &amp; updates</button><button type="button" aria-current={view === "analytics" ? "page" : undefined} onClick={() => setView("analytics")}>Platform analytics</button><button type="button" aria-current={view === "replay" ? "page" : undefined} onClick={() => setView("replay")}>Replay &amp; debrief</button></nav><div className="nav-head"><span className="eyebrow">Workshop sessions</span><div><button type="button" onClick={() => void create("REHEARSAL")} disabled={busy}>+ Rehearsal</button><button type="button" onClick={() => void create("LIVE")} disabled={busy}>+ Live</button></div></div>{sessions.length === 0 && <p className="empty-copy">Create a rehearsal session first.</p>}{sessions.map((session) => <button key={session.id} type="button" className={selected?.id === session.id ? "session-link active" : "session-link"} onClick={() => { setSelected(session); void loadFacilitatorSession(session).then(setData); }}><span><strong>{session.kind}</strong><small>{new Date(session.createdAt).toLocaleDateString()}</small></span><em>{session.status}</em></button>)}</aside>
       <main className="facilitator-main" id="facilitator-main">
         {!selected ? <section className="empty-state"><h1>No workshop session</h1><p>Create a rehearsal or live session to begin.</p></section> : <>
-          <div className="facilitator-heading"><div><span className="eyebrow">{selected.kind} session</span><h1>{selected.title}</h1><p>Join code <strong className="join-code">{selected.joinCode}</strong> · {data.participants.length} participants</p></div><div className="facilitator-clock"><span>{selected.status}</span><strong>{formatClock(sessionClock(selected))}</strong><button type="button" onClick={() => void toggleClock()}>{selected.status === "RUNNING" ? "Pause" : "Start / resume"}</button></div></div>
+          <div className="facilitator-heading"><div><span className="eyebrow">{selected.kind} session</span><h1>{selected.title}</h1><p>Join code <strong className="join-code">{selected.joinCode}</strong> · {data.participants.length} participants</p></div><div className="facilitator-clock"><span>{selected.status}</span><strong>{formatClock(sessionClock(selected))}</strong><button type="button" disabled={selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void toggleClock()}>{selected.status === "RUNNING" ? "Pause" : selected.status === "DEBRIEF" ? "Debrief in progress" : selected.status === "CLOSED" ? "Session closed" : "Start / resume"}</button></div></div>
           {error && <div className="error-panel" role="alert">{error}</div>}{notice && <div className="success-panel" role="status">{notice}</div>}
-          {view === "overview" && <><section className="control-strip"><div><small>Current phase · concrete experience</small><strong>{selected.currentStage + 1}. {STAGES[selected.currentStage].title}</strong></div><button type="button" disabled={selected.currentStage === 0} onClick={() => void patchSession({ current_stage: selected.currentStage - 1 })}>Previous</button><button type="button" disabled={selected.currentStage === 7} onClick={() => void patchSession({ current_stage: selected.currentStage + 1 })}>Unlock next stage</button><button type="button" onClick={() => void patchSession({ status: "DEBRIEF", submissions_closed: true, clock_started_at: null, remaining_seconds: sessionClock(selected) })}>Begin debrief</button></section><div className="metric-grid"><Metric label="Connected participants" value={data.participants.length} /><Metric label="Active in last 2 min" value={data.participants.filter(({ participant }) => Date.now() - new Date(participant.lastActiveAt).getTime() < 120000).length} /><Metric label="Submitted" value={data.participants.filter(({ participant }) => data.submissions.some((item) => item.participantId === participant.id)).length} /><Metric label="Pending requests" value={data.messages.filter((item) => item.status === "PENDING").length} /></div></>}
+          {view === "overview" && <><section className="control-strip"><div><small>Current phase · {selected.status === "DEBRIEF" ? "debrief and transfer" : "concrete experience"}</small><strong>{selected.currentStage + 1}. {STAGES[selected.currentStage].title}</strong></div><button type="button" disabled={selected.currentStage === 0 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession({ current_stage: selected.currentStage - 1 })}>Previous</button><button type="button" disabled={selected.currentStage === 7 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession({ current_stage: selected.currentStage + 1 })}>Unlock next stage</button><button type="button" disabled={busy || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void beginDebrief()}>{selected.status === "DEBRIEF" ? "Debrief begun" : "Begin debrief"}</button></section><div className="metric-grid"><Metric label="Connected participants" value={data.participants.length} /><Metric label="Active in last 2 min" value={data.participants.filter(({ participant }) => Date.now() - new Date(participant.lastActiveAt).getTime() < 120000).length} /><Metric label="Submitted" value={data.participants.filter(({ participant }) => data.submissions.some((item) => item.participantId === participant.id)).length} /><Metric label="Pending requests" value={data.messages.filter((item) => item.status === "PENDING").length} /></div></>}
           {view === "participants" && <ParticipantMonitor data={data} reports={reports} afterRemove={() => void refreshSessions(selected.id)} />}
           {view === "communications" && <RequestDesk data={data} afterReply={() => void refreshSessions(selected.id)} />}
           {view === "injects" && <div className="facilitator-grid"><InjectDesk session={selected} afterSend={() => void refreshSessions(selected.id)} /><EvidenceDesk data={data} afterRelease={() => void refreshSessions(selected.id)} /></div>}

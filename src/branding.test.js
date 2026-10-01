@@ -117,7 +117,8 @@ describe("reference interface fidelity", () => {
       "ai advisor prototype",
     ]) expect(participantCopy).not.toContain(phrase);
     expect(participantSource).not.toMatch(/\bAAR\b/);
-    expect(participantSource).toContain("what would have changed if you had acted differently");
+    expect(participantSource).toContain("What will you do differently when preparing a real decision under uncertainty?");
+    expect(participantSource).toContain("Fixed assumptions:");
     expect(participantSource).toContain("This response takes time to obtain");
     expect(participantSource).toContain("exercise-only assumptions");
   });
@@ -257,7 +258,7 @@ describe("reference interface fidelity", () => {
     expect(runtimeParticipantReference).not.toMatch(/3[–-]4 minutes/i);
     expect(runtimeParticipantReference).not.toMatch(/about six minutes/i);
     expect(participantSource).toContain("Casework · ${formatClock(displayedClock)}");
-    expect(participantSource).toContain('" · waiting"');
+    expect(participantSource).toContain('? "paused for debrief" : caseworkRunning ? "" : "waiting"');
     expect(referenceExperienceSource).toContain("until the facilitator begins the exercise");
     expect(referenceExperienceSource).toContain("USD 750m maturity in six weeks");
     expect(referenceExperienceSource).toContain("IMF Board horizon in eleven weeks");
@@ -265,6 +266,13 @@ describe("reference interface fidelity", () => {
     expect(runtimeParticipantReference).not.toContain('title: "The clock is running"');
     expect(runtimeParticipantReference).not.toContain("It starts the moment you confirm your mandate");
     expect(runtimeParticipantReference).not.toContain("secondsPerWeek");
+  });
+
+  it("wires the facilitator debrief transition into the participant subscription", () => {
+    expect(facilitatorSource).toContain("beginDebriefSession(selected, new Date())");
+    expect(facilitatorSource).toContain("current_stage: transition.currentStage");
+    expect(participantSource).toContain("subscribeToWorkshop");
+    expect(participantSource).toContain("setStage(participantEntryStage(fresh.session, fresh.participant))");
   });
 
   it("restores completed or already-started casework without forcing preparation on refresh", () => {

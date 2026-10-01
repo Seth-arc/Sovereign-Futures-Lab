@@ -10,11 +10,15 @@ import type {
   GlobalInject,
   InstitutionalMessage,
   NegotiationPreparationBrief,
+  ParticipantDebrief,
   ParticipantProfile,
   RecommendationReview,
   Submission,
   WorkshopSession,
 } from "./types";
+
+const FINAL_STAGE_INDEX = 7;
+const PARTICIPANT_DEBRIEF_BOUNDARY = "This deterministic exercise reconstruction is fictional. It is not a real-world prediction, score, or competence finding.";
 
 const readinessLabels: Record<NonNullable<DecisionState["readiness"]>, string> = {
   READY: "Ready",
@@ -38,6 +42,37 @@ export function evidenceIsAvailable(request: EvidenceRequest, now = new Date()):
   const reviewTime = now.getTime();
   const releasedByReview = request.releasedAt !== undefined && new Date(request.releasedAt).getTime() <= reviewTime;
   return releasedByReview || new Date(request.availableAt).getTime() <= reviewTime;
+}
+
+export function beginDebriefSession(session: WorkshopSession, at: Date | string): WorkshopSession {
+  const transitionTime = typeof at === "string" ? new Date(at) : at;
+  const elapsed = session.status === "RUNNING" && session.clockStartedAt
+    ? Math.floor((transitionTime.getTime() - new Date(session.clockStartedAt).getTime()) / 1000)
+    : 0;
+  const remainingSeconds = Math.max(0, session.remainingSeconds - Math.max(0, elapsed));
+  const { clockStartedAt: _clockStartedAt, ...pausedSession } = session;
+  return {
+    ...pausedSession,
+    status: "DEBRIEF",
+    currentStage: FINAL_STAGE_INDEX,
+    remainingSeconds,
+    submissionsClosed: true,
+  };
+}
+
+export function participantEntryStage(session: WorkshopSession, participant: ParticipantProfile): number {
+  return session.status === "DEBRIEF" || session.status === "CLOSED"
+    ? FINAL_STAGE_INDEX
+    : Math.min(participant.currentStage, session.currentStage);
+}
+
+export function participantAvailableStage(
+  session: WorkshopSession,
+  participant: ParticipantProfile,
+  hasSubmission: boolean,
+): number {
+  if (session.status === "DEBRIEF" || session.status === "CLOSED" || hasSubmission) return FINAL_STAGE_INDEX;
+  return Math.max(session.currentStage, participant.currentStage);
 }
 
 export function reviewRecommendation(input: {
@@ -422,6 +457,49 @@ export function negotiationBriefIsSubmittable(decisions: DecisionState): boolean
   return Boolean(decisions.readiness && decisions.finalRationale.trim() && decisions.nextHandoff.trim());
 }
 
+export function buildParticipantDebrief(input: {
+  participantId: string;
+  submissions: Submission[];
+  evidenceRequests: EvidenceRequest[];
+  institutionalMessages?: InstitutionalMessage[];
+  injects: GlobalInject[];
+}): ParticipantDebrief | undefined {
+  const submission = input.submissions
+    .filter((item) => item.participantId === input.participantId)
+    .sort((a, b) => a.version - b.version)
+    .at(-1);
+  if (!submission) return undefined;
+
+  const evidenceRequests = input.evidenceRequests.filter((item) => (
+    item.participantId === input.participantId && item.sessionId === submission.sessionId
+  ));
+  const institutionalMessages = (input.institutionalMessages ?? [])
+    .filter((item) => item.participantId === input.participantId && item.sessionId === submission.sessionId)
+    .sort((a, b) => (a.answeredAt ?? a.createdAt).localeCompare(b.answeredAt ?? b.createdAt) || a.id.localeCompare(b.id));
+  const brief = buildNegotiationPreparationBrief({
+    decisions: submission.decisions,
+    evidenceRequests,
+    institutionalMessages,
+    preparedAt: submission.submittedAt,
+  });
+
+  return {
+    submissionId: submission.id,
+    version: submission.version,
+    submittedAt: submission.submittedAt,
+    position: brief.position,
+    evidenceAvailable: brief.evidenceBasis,
+    consequences: deriveConsequences(submission.decisions),
+    unresolvedRisks: unresolvedRiskList(submission.decisions),
+    counterfactual: deriveCounterfactuals(submission.decisions)[0]!,
+    facilitatorInjects: input.injects.filter((inject) => (
+      inject.sessionId === submission.sessionId
+      && new Date(inject.sentAt).getTime() <= new Date(submission.submittedAt).getTime()
+    )).sort((a, b) => a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id)),
+    fictionalBoundary: PARTICIPANT_DEBRIEF_BOUNDARY,
+  };
+}
+
 export function deriveConsequences(decisions: DecisionState): Consequence[] {
   const consequences: Consequence[] = [];
 
@@ -615,9 +693,9 @@ export function buildAfterActionReport(input: {
   const ignoredIds = new Set(recommendationReview.items
     .filter((item) => item.status === "UNSUPPORTED")
     .flatMap((item) => item.evidenceIds));
-  const consequences = deriveConsequences(input.decisions);
-  const risks = unresolvedRiskList(input.decisions);
-  const readiness = input.decisions.readiness?.replaceAll("_", " ").toLowerCase() ?? "not submitted";
+  const consequences = deriveConsequences(briefDecisions);
+  const risks = unresolvedRiskList(briefDecisions);
+  const readiness = briefDecisions.readiness?.replaceAll("_", " ").toLowerCase() ?? "not submitted";
   return {
     participant: {
       id: input.participant.id,
@@ -645,7 +723,7 @@ export function buildAfterActionReport(input: {
     submissionBriefs,
     institutionalMessages: input.institutionalMessages,
     consequences,
-    counterfactuals: deriveCounterfactuals(input.decisions),
+    counterfactuals: deriveCounterfactuals(briefDecisions),
     unresolvedRisks: risks,
     advisorUsage: input.advisorTurns,
     facilitatorInjects: input.injects,

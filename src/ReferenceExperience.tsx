@@ -68,8 +68,8 @@ function alignOrientationCopy(referenceDocument: Document) {
   } else if (title.textContent === "The debrief is the point") {
     setContent(
       "The debrief is the point",
-      "The final participant stage records what changed your reasoning. The facilitator then uses the private after-action reviews to reconstruct decisions, evidence use, realistic consequences, unresolved risks, and what would have changed if you had acted differently.<br><br>Nothing is scored or ranked.",
-      "Step 8 · Reflection, then facilitator debrief",
+      "After submissions close, the final participant stage reconstructs your own submitted position, the evidence available at submission, bounded exercise consequences, unresolved risks, and one fixed-assumption counterfactual. You then record what you will do differently when preparing a real decision under uncertainty.<br><br>The facilitatorâ€™s detailed after-action report remains private. Nothing is scored or ranked.",
+      "Step 8 · Debrief and transfer",
     );
   }
 }

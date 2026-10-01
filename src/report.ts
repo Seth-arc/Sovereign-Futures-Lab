@@ -83,7 +83,7 @@ body{font:15px/1.55 Arial,sans-serif;color:#182522;max-width:940px;margin:48px a
 <section><h2>Submission history and information available</h2><ol>${report.submissions.map((item) => { const recordedReview = report.submissionRecommendationReviews.find((entry) => entry.submissionId === item.id)?.review; const recordedBrief = report.submissionBriefs.find((entry) => entry.submissionId === item.id)?.brief; return `<li><strong>Version ${item.version}</strong>, ${escapeHtml(new Date(item.submittedAt).toLocaleString())}${recordedBrief ? briefHtml(recordedBrief) : `<p>${escapeHtml(label(item.decisions.readiness))}</p>`}${recordedReview?.readyMismatch ? `<p><strong>READY mismatch retained:</strong> ${escapeHtml(recordedReview.mismatchExplanation)}</p>` : ""}</li>`; }).join("") || "<li>No brief submitted.</li>"}</ol></section>
 <section><h2>AI-advisor record</h2>${report.advisorUsage.map((turn) => `<article><p><strong>${escapeHtml(turn.advisorId)}:</strong> ${escapeHtml(turn.question)}</p><p>${escapeHtml(turn.answer)}</p><p class="meta">Sources: ${escapeHtml(advisorSourcesText(turn))} · ${escapeHtml(turn.mode)}</p></article>`).join("") || "<p>No advisor interaction recorded.</p>"}</section>
 <section><h2>Facilitator interventions</h2>${report.facilitatorInjects.map((inject) => `<article><p><strong>${escapeHtml(inject.title)}</strong></p><p>${escapeHtml(inject.body)}</p><p class="meta">${escapeHtml(new Date(inject.sentAt).toLocaleString())}</p></article>`).join("") || "<p>No global facilitator inject recorded.</p>"}</section>
-<section><h2>Participant reflection</h2><p>${escapeHtml(report.decisions.reflection || "Not recorded")}</p></section>
+<section><h2>Transfer reflection</h2><p><strong>What will you do differently when preparing a real decision under uncertainty?</strong></p><p>${escapeHtml(report.decisions.reflection || "Not recorded")}</p></section>
 <section><h2>Decision timeline</h2><table><thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead><tbody>${timelineRows}</tbody></table></section>
 <footer><p class="meta">This report describes the recorded decision process in a fictional training scenario. It is not a score, legal advice, financial advice, or evidence of individual competence.</p></footer></body></html>`;
 }
@@ -140,7 +140,8 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add(report.advisorUsage.length ? report.advisorUsage.map((turn) => `${turn.advisorId}: ${turn.question}\n${turn.answer}\nSources: ${advisorSourcesText(turn)} · ${turn.mode}`).join("\n\n") : "No advisor interaction recorded.", 10, 14);
   add("Facilitator interventions", 15, 6);
   add(report.facilitatorInjects.length ? report.facilitatorInjects.map((inject) => `${inject.title}: ${inject.body}`).join("\n") : "No global facilitator inject recorded.", 10, 14);
-  add("Participant reflection", 15, 6);
+  add("Transfer reflection", 15, 6);
+  add("What will you do differently when preparing a real decision under uncertainty?", 9, 5);
   add(report.decisions.reflection || "Not recorded", 10, 16);
   add("This report is a process reconstruction for a fictional training scenario, not a score or evidence of individual competence.", 8, 0);
   pdf.save(filename(report, "pdf"));
