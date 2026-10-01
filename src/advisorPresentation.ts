@@ -2,6 +2,10 @@ import type { AdvisorCitation, AdvisorId } from "./types";
 
 export const ADVISOR_RESPONSE_REVEAL_INTERVAL_MS = 36;
 
+export function advisorResponseUsesInstantReveal(reducedMotion: boolean, chunkCount: number): boolean {
+  return reducedMotion || chunkCount === 0;
+}
+
 export function splitAdvisorResponse(text: string): string[] {
   return text.match(/\S+\s*/g) ?? [];
 }
