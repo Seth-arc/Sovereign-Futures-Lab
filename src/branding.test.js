@@ -590,6 +590,21 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toContain("setReplyAnnouncement");
   });
 
+  it("keeps participant and Learning Bridge transitions stable and motion-optional", () => {
+    const bridgeLayoutRule = styles.match(/\.reference-bridge-layout, \.reference-case-layout\s*\{([^}]*)\}/)?.[1] ?? "";
+    const bridgeContentRule = styles.match(/\.reference-bridge-content\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(styles).toContain("--space-16: 64px");
+    expect(bridgeLayoutRule).toMatch(/height:\s*100%/);
+    expect(bridgeLayoutRule).toMatch(/min-height:\s*0/);
+    expect(bridgeContentRule).toMatch(/overflow:\s*auto/);
+    expect(bridgeContentRule).toMatch(/scrollbar-gutter:\s*stable/);
+    expect(participantSource).toContain('className="participant-view-transition"');
+    expect(participantSource).not.toContain("<ReferenceExperience key={referenceSurface}");
+    expect(referenceExperienceSource).toContain('className="reference-bridge-panel reference-content-transition"');
+    expect(referenceExperienceSource).toContain("window.cancelAnimationFrame(frame)");
+    expect(styles).toContain("@media (prefers-reduced-motion: no-preference)");
+  });
+
   it("preserves reduced-motion content across the native reference surfaces and landing page", () => {
     expect(styles).toContain("animation-iteration-count: 1 !important");
     expect(styles).toContain(".advisor-stream-cursor { display: none; }");

@@ -540,23 +540,25 @@ export function ParticipantApp() {
         </aside>
 
         <main ref={mainContent} className={`workspace ${stage === 0 && roleBriefOpen ? "role-brief-open" : ""}`} id="main-content" tabIndex={-1}>
-          {!preparationComplete ? <PreparationState onOrientation={(target) => openReference("orientation", target)} onBridge={(target) => openReference("bridge", target)} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
-            <div className="stage-head"><div><div className="eyebrow">Current stage · Step {stage + 1} · {STAGES[stage].short}{stage < FINAL_STAGE_INDEX ? " · Working state" : ""}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className={`autosave-state save-${saveState.toLowerCase()}`} role="status" aria-live="polite">{saveState === "DIRTY" ? "Unsaved changes" : saveState === "SAVING" ? "Saving…" : saveState === "ERROR" ? "Save failed · changes unsaved" : "Saved"}</span></div></div>
-            {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
-            <StageContent stage={stage} decisions={decisions} setDecisions={(value) => { setDecisions(value); setSaveState("DIRTY"); }} bundle={bundle} setBundle={setBundle} setError={setError} setSaveState={setSaveState} now={now} />
-            {stage < FINAL_STAGE_INDEX && <div className="stage-actions actions">
-              <button type="button" className="secondary-button" disabled={stage === 0 || busy} onClick={() => { void persist(stage); setRoleBriefOpen(false); setStage((value) => value - 1); }}>Previous</button>
-              <button type="button" className="primary-button" disabled={busy} onClick={() => void persist(stage)}>Save work</button>
-              {stage < availableStage && <button type="button" className="primary-button" disabled={busy} onClick={() => { void persist(stage + 1); setRoleBriefOpen(false); setStage((value) => value + 1); }}>Continue</button>}
-            </div>}
-          </>}
+          <div key={!preparationComplete ? "preparation" : stage === 0 && roleBriefOpen ? "role-brief" : `stage-${stage}`} className="participant-view-transition">
+            {!preparationComplete ? <PreparationState onOrientation={(target) => openReference("orientation", target)} onBridge={(target) => openReference("bridge", target)} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
+              <div className="stage-head"><div><div className="eyebrow">Current stage · Step {stage + 1} · {STAGES[stage].short}{stage < FINAL_STAGE_INDEX ? " · Working state" : ""}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className={`autosave-state save-${saveState.toLowerCase()}`} role="status" aria-live="polite">{saveState === "DIRTY" ? "Unsaved changes" : saveState === "SAVING" ? "Saving…" : saveState === "ERROR" ? "Save failed · changes unsaved" : "Saved"}</span></div></div>
+              {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
+              <StageContent stage={stage} decisions={decisions} setDecisions={(value) => { setDecisions(value); setSaveState("DIRTY"); }} bundle={bundle} setBundle={setBundle} setError={setError} setSaveState={setSaveState} now={now} />
+              {stage < FINAL_STAGE_INDEX && <div className="stage-actions actions">
+                <button type="button" className="secondary-button" disabled={stage === 0 || busy} onClick={() => { void persist(stage); setRoleBriefOpen(false); setStage((value) => value - 1); }}>Previous</button>
+                <button type="button" className="primary-button" disabled={busy} onClick={() => void persist(stage)}>Save work</button>
+                {stage < availableStage && <button type="button" className="primary-button" disabled={busy} onClick={() => { void persist(stage + 1); setRoleBriefOpen(false); setStage((value) => value + 1); }}>Continue</button>}
+              </div>}
+            </>}
+          </div>
         </main>
 
       </div>
       {communicationsOpen && <CommunicationsPanel bundle={bundle} setBundle={setBundle} setError={setError} error={error} now={now} onClose={closeCommunications} />}
       {glossaryOpen && <GlossaryDialog onClose={closeGlossary} />}
       {advisorOpen && <AdvisorPanel bundle={bundle} setBundle={setBundle} onClose={closeAdvisor} />}
-      {referenceSurface && <ReferenceExperience key={referenceSurface} surface={referenceSurface} onClose={closePreparationSurface} onComplete={completePreparationSurface} preparationComplete={preparationComplete} />}
+      {referenceSurface && <ReferenceExperience surface={referenceSurface} onClose={closePreparationSurface} onComplete={completePreparationSurface} preparationComplete={preparationComplete} />}
       <div className="sr-only" aria-live="polite" aria-atomic="true">{liveAnnouncement}</div>
     </div>
   );

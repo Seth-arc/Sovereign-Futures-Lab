@@ -42,8 +42,10 @@ describe("negotiation brief persistence", () => {
     const stored = JSON.parse([...values.values()][0]);
     expect(saved.decisions.nextHandoff).toBe(handoff);
     expect(submitted.submissions[0].decisions.nextHandoff).toBe(handoff);
+    expect(submitted.submissions[0].contextSnapshot.decisions.nextHandoff).toBe(handoff);
     expect(stored.decisions.nextHandoff).toBe(handoff);
     expect(stored.submissions[0].decisions.nextHandoff).toBe(handoff);
+    expect(stored.submissions[0].contextSnapshot.decisions.nextHandoff).toBe(handoff);
   });
 
   it("retains distinct handoffs in versioned local submissions", async () => {
@@ -57,7 +59,9 @@ describe("negotiation brief persistence", () => {
   });
 
   it("cloud submission snapshots the complete stored decision JSON", () => {
-    const migration = readFileSync(new URL("../supabase/migrations/202609280001_futureslab.sql", import.meta.url), "utf8");
-    expect(migration).toContain("v_participant.submission_version, v_participant.decisions");
+    const migration = readFileSync(new URL("../supabase/migrations/202610010001_freeze_submission_context.sql", import.meta.url), "utf8");
+    expect(migration).toContain("'decisions', v_participant.decisions");
+    expect(migration).toContain("v_participant.submission_version");
+    expect(migration).toContain("v_context_snapshot");
   });
 });

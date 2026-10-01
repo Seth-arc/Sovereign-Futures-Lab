@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=0.9">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sovereign · Futures Lab</title>
     <link rel="icon" type="image/png" href="/assets/AidData%20Brandmark.png">
     <link rel="apple-touch-icon" href="/assets/AidData%20Brandmark.png">
@@ -103,6 +103,11 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        button,
+        summary {
+            min-height: 40px;
         }
 
         ::selection {
@@ -947,6 +952,7 @@
         }
 
         .btn.primary {
+            min-height: 44px;
             border-color: #004E38;
             color: var(--text-primary);
         }
@@ -1046,8 +1052,8 @@
 
         .about-close {
             flex: none;
-            width: 34px;
-            height: 34px;
+            width: 40px;
+            height: 40px;
             display: grid;
             place-items: center;
             background: transparent;
@@ -1178,17 +1184,26 @@
         }
 
         .about-dot {
-            width: 22px;
-            height: 3px;
+            width: 40px;
+            height: 40px;
             border: 0;
             padding: 0;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .about-dot::before {
+            content: '';
+            display: block;
+            width: 22px;
+            height: 3px;
+            margin: auto;
             border-radius: 999px;
             background: var(--grid-line);
-            cursor: pointer;
             transition: background var(--motion-standard) ease;
         }
 
-        .about-dot.is-on {
+        .about-dot.is-on::before {
             background: var(--accent);
         }
 
@@ -1207,8 +1222,8 @@
         }
 
         .about-nav-btn {
-            width: 38px;
-            height: 38px;
+            width: 40px;
+            height: 40px;
             display: grid;
             place-items: center;
             background: transparent;
@@ -1560,6 +1575,28 @@
         // Shared transition flag
         var isTransitioning = false;
         var shield = document.querySelector('.page-transition-shield');
+        var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        var modalFocusable = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+        function motionDelay(milliseconds) {
+            return reducedMotion.matches ? 0 : milliseconds;
+        }
+
+        function setLandingBackgroundInert(inert) {
+            contentLayer.inert = inert;
+            if (inert) contentLayer.setAttribute('aria-hidden', 'true');
+            else contentLayer.removeAttribute('aria-hidden');
+        }
+
+        function trapModalFocus(event, container) {
+            if (event.key !== 'Tab') return;
+            var focusable = Array.prototype.slice.call(container.querySelectorAll(modalFocusable));
+            if (!focusable.length) { event.preventDefault(); container.focus(); return; }
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
 
         function openLoginModal() {
             if (isTransitioning) return;
@@ -1569,14 +1606,14 @@
             document.body.classList.add('login-active');
             overlay.classList.add('is-active');
             overlay.removeAttribute('aria-hidden');
-            contentLayer.setAttribute('aria-hidden', 'true');
+            setLandingBackgroundInert(true);
             targetSpeed = 0.007;
 
             setTimeout(function () {
                 targetSpeed = 0.003;
                 isTransitioning = false;
                 document.getElementById('participant-name').focus();
-            }, 800);
+            }, motionDelay(800));
         }
 
         function closeLoginModal() {
@@ -1586,7 +1623,7 @@
 
             overlay.classList.remove('is-active');
             overlay.setAttribute('aria-hidden', 'true');
-            contentLayer.removeAttribute('aria-hidden');
+            setLandingBackgroundInert(false);
             document.body.classList.remove('login-active');
             targetSpeed = 0.007;
 
@@ -1594,7 +1631,7 @@
                 targetSpeed = 0.003;
                 isTransitioning = false;
                 enterBtn.focus();
-            }, 800);
+            }, motionDelay(800));
         }
 
         // Open Login Modal — a direct depth transition keeps the canvas continuous.
@@ -1613,9 +1650,9 @@
 
         // Escape closes the modal, matching the cancel action.
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && overlay.classList.contains('is-active')) {
-                closeLoginModal();
-            }
+            if (!overlay.classList.contains('is-active')) return;
+            if (e.key === 'Escape') { closeLoginModal(); return; }
+            trapModalFocus(e, overlay);
         });
 
         // ST-30: Login validation with error states — submitting via Enter or the button both work.
@@ -1777,13 +1814,15 @@
             document.body.classList.add('about-active');
             aboutOverlay.classList.add('is-active');
             aboutOverlay.setAttribute('aria-hidden', 'false');
-            setTimeout(function () { document.getElementById('about-close').focus(); }, 60);
+            setLandingBackgroundInert(true);
+            setTimeout(function () { document.getElementById('about-close').focus(); }, motionDelay(60));
         }
 
         function closeAboutModal() {
             aboutOverlay.classList.remove('is-active');
             aboutOverlay.setAttribute('aria-hidden', 'true');
             document.body.classList.remove('about-active');
+            setLandingBackgroundInert(false);
             if (aboutReturn && aboutReturn.focus) aboutReturn.focus();
         }
 
@@ -1799,6 +1838,7 @@
         document.addEventListener('keydown', function (e) {
             if (!aboutOverlay.classList.contains('is-active')) return;
             if (e.key === 'Escape') { closeAboutModal(); return; }
+            trapModalFocus(e, aboutOverlay);
             if (e.key === 'ArrowRight') renderAbout(aboutIndex + 1);
             if (e.key === 'ArrowLeft') renderAbout(aboutIndex - 1);
         });
@@ -1856,7 +1896,7 @@
                 ctx.stroke();
             }
 
-            requestAnimationFrame(drawTopography);
+            if (!reducedMotion.matches) requestAnimationFrame(drawTopography);
         }
 
         drawTopography();

@@ -56,7 +56,6 @@ function useReferenceDialog(rootRef: RefObject<HTMLDivElement | null>, closeRef:
       element.inert = true;
       element.setAttribute("aria-hidden", "true");
     });
-    window.requestAnimationFrame(() => closeRef.current?.focus());
     return () => {
       document.body.style.overflow = previousOverflow;
       siblings.forEach((element) => {
@@ -75,7 +74,7 @@ function Orientation({ onClose, onComplete, replayOnly }: { onClose: () => void;
       <div className="reference-progress" role="progressbar" aria-label="Orientation progress" aria-valuemin={1} aria-valuemax={ORIENTATION_STEPS.length} aria-valuenow={index + 1}>
         {ORIENTATION_STEPS.map((item, itemIndex) => <span key={item.id} className={itemIndex <= index ? "complete" : ""} aria-hidden="true" />)}
       </div>
-      <section className="reference-learning-card" aria-labelledby="orientation-step-title" aria-live="polite">
+      <section key={step.id} className="reference-learning-card reference-content-transition" aria-labelledby="orientation-step-title" aria-live="polite">
         <span className="eyebrow">Orientation · Step {index + 1} of {ORIENTATION_STEPS.length}</span>
         <h2 id="orientation-step-title">{step.title}</h2>
         {step.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
@@ -131,7 +130,7 @@ function LearningBridge({ onClose, onComplete, replayOnly }: { onClose: () => vo
           </button>
         ))}
       </div>
-      <article id="bridge-panel" className="reference-bridge-panel" role="tabpanel" aria-labelledby={`bridge-tab-${chapter.id}`} tabIndex={0}>
+      <article key={chapter.id} id="bridge-panel" className="reference-bridge-panel reference-content-transition" role="tabpanel" aria-labelledby={`bridge-tab-${chapter.id}`} tabIndex={0}>
         <aside>
           <span className="eyebrow">Chapter {index + 1} of {LEARNING_BRIDGE_CHAPTERS.length}</span>
           <strong>{chapter.type}</strong>
@@ -197,7 +196,7 @@ function CaseFile() {
       <div className="reference-case-tabs" role="tablist" aria-label="Case File sections">
         {CASE_FILE_SECTIONS.map((item, index) => <button key={item.id} id={`case-tab-${item.id}`} type="button" role="tab" aria-selected={item.id === activeId} aria-controls="case-panel" tabIndex={item.id === activeId ? 0 : -1} onKeyDown={(event) => handleTabKey(event, index)} onClick={() => setActiveId(item.id)}>{item.title}</button>)}
       </div>
-      <article id="case-panel" className="reference-case-body" role="tabpanel" aria-labelledby={`case-tab-${section.id}`} tabIndex={0}>
+      <article key={section.id} id="case-panel" className="reference-case-body reference-content-transition" role="tabpanel" aria-labelledby={`case-tab-${section.id}`} tabIndex={0}>
         <span className="eyebrow">Section {activeIndex + 1} of {CASE_FILE_SECTIONS.length}</span>
         <h3>{section.title}</h3>
         <p className="reference-case-lead">{section.lead}</p>
@@ -212,6 +211,10 @@ export function ReferenceExperience({ surface, onClose, onComplete, preparationC
   const rootRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useReferenceDialog(rootRef, closeRef);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => closeRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [surface]);
   return (
     <div ref={rootRef} className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]} tabIndex={-1} onKeyDown={(event) => trapFocus(event, onClose)}>
       <button ref={closeRef} type="button" className="reference-experience-dismiss" onClick={onClose}>Close {TITLES[surface]}</button>
