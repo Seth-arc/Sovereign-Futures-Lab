@@ -59,6 +59,7 @@ export interface DecisionState {
   disclosureRationale: string;
   readiness?: Readiness;
   unresolvedRisks: string;
+  nextHandoff: string;
   finalRationale: string;
   reflection: string;
 }
@@ -179,6 +180,31 @@ export interface SubmissionRecommendationReview {
   review: RecommendationReview;
 }
 
+export interface BriefEvidenceItem {
+  id: string;
+  title: string;
+  summary: string;
+  sourceLabel: string;
+}
+
+export interface NegotiationPreparationBrief {
+  preparedAt: string;
+  position: string;
+  evidenceBasis: BriefEvidenceItem[];
+  knownUncertainties: string[];
+  disclosureBoundary: string;
+  treatmentPerimeter: string;
+  conditionsToAdvance: string;
+  nextInstitutionalHandoff: string;
+  financeMinistryRecommendation: string;
+}
+
+export interface SubmissionBrief {
+  submissionId: string;
+  version: number;
+  brief: NegotiationPreparationBrief;
+}
+
 export interface AfterActionReport {
   participant: Pick<ParticipantProfile, "id" | "name" | "organization" | "email">;
   session: Pick<WorkshopSession, "id" | "title" | "kind" | "createdAt">;
@@ -192,6 +218,8 @@ export interface AfterActionReport {
   evidenceRequestHistory: EvidenceRequest[];
   recommendationReview: RecommendationReview;
   submissionRecommendationReviews: SubmissionRecommendationReview[];
+  negotiationPreparationBrief: NegotiationPreparationBrief;
+  submissionBriefs: SubmissionBrief[];
   institutionalMessages: InstitutionalMessage[];
   consequences: Consequence[];
   counterfactuals: Counterfactual[];
@@ -209,6 +237,7 @@ export const EMPTY_DECISIONS: DecisionState = {
   linkageRationale: "",
   disclosureRationale: "",
   unresolvedRisks: "",
+  nextHandoff: "",
   finalRationale: "",
   reflection: "",
 };

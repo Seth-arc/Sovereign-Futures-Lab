@@ -37,9 +37,9 @@ export const STAGES = [
     objective: "Recommend what can be disclosed and which claims belong in the treatment perimeter—the facilities carried into restructuring analysis—without exceeding Debt Management Office authority.",
   },
   {
-    title: "Submit DMO recommendation",
+    title: "Prepare negotiation brief",
     short: "Submit",
-    objective: "Submit a recommendation that states what is known, unknown, and conditional, with unresolved risks preserved.",
+    objective: "Submit an internal negotiation-preparation brief that states what is known, unknown, and conditional, with unresolved risks preserved.",
   },
   {
     title: "Reflect",

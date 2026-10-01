@@ -41,6 +41,10 @@ export function isLocalBundle(bundle: ParticipantBundle): boolean {
   return bundle.session.id.startsWith("local-");
 }
 
+export function decisionSnapshot(decisions: Partial<DecisionState>): DecisionState {
+  return structuredClone({ ...EMPTY_DECISIONS, ...decisions });
+}
+
 function iso(value: unknown): string {
   return typeof value === "string" ? value : new Date().toISOString();
 }
@@ -93,7 +97,7 @@ function mapSubmission(row: Record<string, unknown>): Submission {
     participantId: String(row.participant_id),
     sessionId: String(row.session_id),
     version: Number(row.version),
-    decisions: { ...EMPTY_DECISIONS, ...(row.decisions as Partial<DecisionState>) },
+    decisions: decisionSnapshot(row.decisions as Partial<DecisionState>),
     submittedAt: iso(row.submitted_at),
   };
 }
@@ -162,6 +166,11 @@ function localBundle(profile?: { name: string; organization: string; email: stri
     const parsed = JSON.parse(stored) as ParticipantBundle;
     return {
       ...parsed,
+      decisions: decisionSnapshot(parsed.decisions),
+      submissions: (parsed.submissions ?? []).map((submission) => ({
+        ...submission,
+        decisions: decisionSnapshot(submission.decisions),
+      })),
       messages: parsed.messages ?? [],
       advisorTurns: (parsed.advisorTurns ?? []).map((turn) => ({ ...turn, sources: mapAdvisorSources(turn.sources) })),
     };
@@ -217,7 +226,12 @@ function storedLocalParticipant(participantId: string): ParticipantBundle | unde
   const stored = localStorage.getItem(LOCAL_KEY);
   if (!stored) return undefined;
   const parsed = JSON.parse(stored) as ParticipantBundle;
-  return parsed.participant.id === participantId && isLocalBundle(parsed) ? { ...parsed, messages: parsed.messages ?? [] } : undefined;
+  return parsed.participant.id === participantId && isLocalBundle(parsed) ? {
+    ...parsed,
+    decisions: decisionSnapshot(parsed.decisions),
+    submissions: (parsed.submissions ?? []).map((submission) => ({ ...submission, decisions: decisionSnapshot(submission.decisions) })),
+    messages: parsed.messages ?? [],
+  } : undefined;
 }
 
 export function activateEmergencyMode(bundle: ParticipantBundle): ParticipantBundle {
@@ -297,7 +311,7 @@ export async function loadParticipantBundle(
   return {
     session,
     participant: mapParticipant(participantRow),
-    decisions: { ...EMPTY_DECISIONS, ...(participantRow.decisions as Partial<DecisionState>) },
+    decisions: decisionSnapshot(participantRow.decisions as Partial<DecisionState>),
     evidenceRequests: (evidence.data ?? []).map((row) => mapEvidence(row as Record<string, unknown>)),
     submissions: (submissions.data ?? []).map((row) => mapSubmission(row as Record<string, unknown>)),
     injects: (injects.data ?? []).map((row) => mapInject(row as Record<string, unknown>)),
@@ -309,25 +323,26 @@ export async function loadParticipantBundle(
 
 export async function saveDecisions(bundle: ParticipantBundle, decisions: DecisionState, currentStage: number): Promise<ParticipantBundle> {
   const now = new Date().toISOString();
+  const persistedDecisions = decisionSnapshot(decisions);
   if (!supabase || isLocalBundle(bundle)) {
     return saveLocal({
       ...bundle,
-      decisions,
+      decisions: persistedDecisions,
       participant: { ...bundle.participant, currentStage: Math.max(bundle.participant.currentStage, currentStage), lastActiveAt: now },
       timeline: [...bundle.timeline, {
         id: crypto.randomUUID(), sessionId: bundle.session.id, participantId: bundle.participant.id,
-        type: "DECISION_STATE_SAVED", detail: { stage: currentStage, decisions }, createdAt: now,
+        type: "DECISION_STATE_SAVED", detail: { stage: currentStage, decisions: persistedDecisions }, createdAt: now,
       }],
     });
   }
   const result = await supabase.rpc("save_futureslab_decisions", {
     p_participant_id: bundle.participant.id,
-    p_decisions: decisions,
+    p_decisions: persistedDecisions,
     p_current_stage: currentStage,
   });
   if (result.error) throw result.error;
-  await recordEvent(bundle, "DECISION_STATE_SAVED", { stage: currentStage, decisions });
-  return { ...bundle, decisions, participant: mapParticipant(result.data as Record<string, unknown>) };
+  await recordEvent(bundle, "DECISION_STATE_SAVED", { stage: currentStage, decisions: persistedDecisions });
+  return { ...bundle, decisions: persistedDecisions, participant: mapParticipant(result.data as Record<string, unknown>) };
 }
 
 export async function requestEvidence(bundle: ParticipantBundle, evidenceId: string): Promise<ParticipantBundle> {
@@ -418,7 +433,7 @@ export async function submitRecommendation(bundle: ParticipantBundle): Promise<P
       participantId: bundle.participant.id,
       sessionId: bundle.session.id,
       version,
-      decisions: structuredClone(bundle.decisions),
+      decisions: decisionSnapshot(bundle.decisions),
       submittedAt: new Date().toISOString(),
     };
     return saveLocal({ ...bundle, submissions: [...bundle.submissions, submission] });
@@ -606,7 +621,7 @@ export async function loadFacilitatorSession(session: WorkshopSession) {
   ]);
   for (const result of [evidence, submissions, injects, messages, turns, events]) if (result.error) throw result.error;
   return {
-    participants: rows.map((row) => ({ participant: mapParticipant(row), decisions: { ...EMPTY_DECISIONS, ...(row.decisions as Partial<DecisionState>) } })),
+    participants: rows.map((row) => ({ participant: mapParticipant(row), decisions: decisionSnapshot(row.decisions as Partial<DecisionState>) })),
     evidence: (evidence.data ?? []).map((row) => mapEvidence(row as Record<string, unknown>)),
     submissions: (submissions.data ?? []).map((row) => mapSubmission(row as Record<string, unknown>)),
     injects: (injects.data ?? []).map((row) => mapInject(row as Record<string, unknown>)),

@@ -77,7 +77,7 @@ describe("reference interface fidelity", () => {
   });
 
   it("leads the landing and About experiences with participant value", () => {
-    const proposition = /Work through a high-stakes sovereign-finance case,\s+test what the evidence supports, prepare a\s+negotiation-ready recommendation, and see how your choices shape the outcome\./;
+    const proposition = /Work through a high-stakes sovereign-finance case,\s+test what the evidence supports, prepare an\s+internal negotiation-preparation brief, and see how your choices shape the outcome\./;
     expect(landingSource).toContain("Futures Lab · Practise decisions that can withstand uncertainty.");
     expect(landingSource).toMatch(proposition);
     expect(aboutSource).toContain("Practise decisions that can withstand uncertainty.");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildAfterActionReport, deriveConsequences, deriveCounterfactuals, reviewRecommendation, unresolvedRiskList } from "./engine";
-import { afterActionReportHtml } from "./report";
+import { buildAfterActionReport, buildNegotiationPreparationBrief, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, reviewRecommendation, unresolvedRiskList } from "./engine";
+import { afterActionReportHtml, workshopComparisonHtml, workshopCsv } from "./report";
 import type { DecisionState, EvidenceRequest } from "./types";
 
 const resolved: DecisionState = {
@@ -18,6 +18,7 @@ const resolved: DecisionState = {
   disclosureRationale: "Share functional facts without restricted text.",
   readiness: "READY_WITH_CONDITIONS",
   unresolvedRisks: "Creditor headquarters authorization remains outstanding.",
+  nextHandoff: "Finance Ministry Lead to confirm the OCC instruction.",
   finalRationale: "The package is analytically ready, subject to authorization.",
   reflection: "Verification changed the liquidity basis.",
 };
@@ -86,6 +87,58 @@ describe("deterministic consequence engine", () => {
     });
     expect(report.institutionalMessages).toHaveLength(1);
     expect(report.institutionalMessages[0].reply).toContain("redacted functional summary");
+  });
+});
+
+describe("negotiation-preparation brief", () => {
+  it("uses returned evidence and excludes requested evidence that is still pending", () => {
+    const brief = buildNegotiationPreparationBrief({
+      decisions: resolved,
+      evidenceRequests: [evidence("treasury-reconciliation", true), evidence("confidentiality-opinion", false)],
+      preparedAt: reviewMoment,
+    });
+    expect(brief.evidenceBasis.map((item) => item.id)).toEqual(["treasury-reconciliation"]);
+    expect(brief.evidenceBasis[0].summary).toContain("USD 480m");
+    expect(brief.evidenceBasis.some((item) => item.summary.includes("redacted functional summary"))).toBe(false);
+    expect(brief.knownUncertainties.some((item) => item.includes("legal confidentiality opinion has not returned"))).toBe(true);
+  });
+
+  it("allows an honest NOT_READY brief with a recorded handoff", () => {
+    expect(negotiationBriefIsSubmittable({ ...resolved, readiness: "NOT_READY" })).toBe(true);
+  });
+
+  it("retains the handoff in the AAR, version history, and reconstructable exports", () => {
+    const first = { ...resolved, nextHandoff: "Treasury to reconcile the protected balance." };
+    const second = { ...resolved, nextHandoff: "Finance Ministry Lead to issue the OCC instruction." };
+    const report = buildAfterActionReport({
+      participant: { id: "participant-1", sessionId: "session-1", name: "Amina", organization: "Kuvera DMO", email: "amina@example.org", currentStage: 7, lastActiveAt: reviewMoment, consentedAt: "2026-10-14T10:00:00Z" },
+      session: { id: "session-1", title: "Kuvera Financing Assurances", kind: "LIVE", status: "DEBRIEF", currentStage: 7, durationSeconds: 1200, remainingSeconds: 0, submissionsClosed: true, createdAt: "2026-10-14T10:00:00Z", expiresAt: "2026-11-13T10:00:00Z" },
+      decisions: second,
+      evidenceRequests: [evidence("treasury-reconciliation", true)],
+      submissions: [
+        { id: "submission-1", participantId: "participant-1", sessionId: "session-1", version: 1, decisions: first, submittedAt: "2026-10-14T10:15:00Z" },
+        { id: "submission-2", participantId: "participant-1", sessionId: "session-1", version: 2, decisions: second, submittedAt: reviewMoment },
+      ],
+      advisorTurns: [], injects: [], institutionalMessages: [], timeline: [],
+    });
+    expect(report.negotiationPreparationBrief.nextInstitutionalHandoff).toBe(second.nextHandoff);
+    expect(report.negotiationPreparationBrief).toEqual(buildNegotiationPreparationBrief({ decisions: second, evidenceRequests: [evidence("treasury-reconciliation", true)], preparedAt: reviewMoment }));
+    expect(report.submissionBriefs.map((item) => item.brief.nextInstitutionalHandoff)).toEqual([first.nextHandoff, second.nextHandoff]);
+    expect(afterActionReportHtml(report)).toContain(second.nextHandoff);
+    expect(workshopComparisonHtml([report], false)).toContain(second.nextHandoff);
+    expect(workshopCsv([report])).toContain(second.nextHandoff);
+  });
+
+  it("labels the artifact as preparation rather than a negotiated result or creditor assurance", () => {
+    const report = buildAfterActionReport({
+      participant: { id: "participant-1", sessionId: "session-1", name: "Amina", organization: "Kuvera DMO", email: "amina@example.org", currentStage: 7, lastActiveAt: reviewMoment, consentedAt: "2026-10-14T10:00:00Z" },
+      session: { id: "session-1", title: "Kuvera Financing Assurances", kind: "LIVE", status: "DEBRIEF", currentStage: 7, durationSeconds: 1200, remainingSeconds: 0, submissionsClosed: true, createdAt: "2026-10-14T10:00:00Z", expiresAt: "2026-11-13T10:00:00Z" },
+      decisions: resolved, evidenceRequests: [], submissions: [], advisorTurns: [], injects: [], institutionalMessages: [], timeline: [],
+    });
+    const html = afterActionReportHtml(report);
+    expect(html).toContain("Negotiation-preparation brief");
+    expect(html).not.toContain("<h2>Negotiated outcome</h2>");
+    expect(html).not.toContain("<h2>Creditor assurance</h2>");
   });
 });
 

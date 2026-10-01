@@ -14,7 +14,7 @@
 
 ## Participant copy contract
 
-The landing experience leads with participant value: **Practise decisions that can withstand uncertainty.** Participants work through a high-stakes sovereign-finance case, test what the evidence supports, prepare a negotiation-ready recommendation, and see how their choices shape the outcome.
+The landing experience leads with participant value: **Practise decisions that can withstand uncertainty.** Participants work through a high-stakes sovereign-finance case, test what the evidence supports, prepare an internal negotiation-preparation brief, and see how their choices shape the outcome.
 
 Participant copy describes four outcomes through direct actions:
 
@@ -50,7 +50,7 @@ The static Case File and choice copy may identify questions, possible claims, an
 8. Update the debt record.
 9. Assess Facility A/B linkage and account control.
 10. Prepare disclosure and treatment-perimeter recommendations.
-11. Submit a versioned DMO recommendation.
+11. Submit a versioned negotiation-preparation brief as an internal DMO recommendation.
 12. Complete a short reflection.
 
 On first entry, completing Orientation opens the Learning Bridge automatically; completing the bridge returns the participant to the live room at Mandate. Skip for now and Close return to an explicitly incomplete preparation state and do not mark either resource complete. Orientation, the Learning Bridge, and the complete Case File remain available throughout the exercise without resetting participant work. Preparation completion is stored separately from decision data, so reopening preparation cannot clear work and a normal refresh after casework entry restores the room without forcing preparation to restart. Participants may revisit unlocked steps. Facilitator pacing determines which new step is available. A participant may submit `READY`, `READY_WITH_CONDITIONS`, or `NOT_READY`; unresolved evidence never blocks an honest non-ready recommendation.
@@ -82,7 +82,15 @@ The four support statuses mean:
 
 The authored comparison rules remain claim-specific. USD 480 million requires the returned Treasury reconciliation; USD 780 million is supported only as a provisional reported basis before that reconciliation returns. Effective-control classification requires the returned account-control terms; a Facility A waterfall alone is conditional. Shared-pool linkage and a two-facility perimeter require returned Facility B or dependency evidence; Facility A evidence alone makes those claims conditional, and no facility evidence makes a firm shared-pool claim unsupported. A redacted disclosure is conditional until the legal confidentiality opinion returns, while full disclosure remains unsupported without consent. Deferring the perimeter or recording unresolved linkage remains `UNRESOLVED`.
 
-Readiness is reviewed against the five underlying material claims. `NOT_READY` remains a valid, submittable posture when evidence is unresolved. `READY_WITH_CONDITIONS` may preserve conditional or unresolved dependencies, but it does not convert an unsupported firm claim into support. `READY` is supported only when all five claims are supported; otherwise the interface shows an explicit readiness mismatch. The product deliberately permits submission of that mismatch so it can be examined in debrief rather than silently changing or blocking the participant's conclusion. Every posture still requires the existing rationale fields, but support status never becomes a score, percentage, pass/fail mark, ranking, or competence judgment.
+Readiness is reviewed against the five underlying material claims. `NOT_READY` remains a valid, submittable posture when evidence is unresolved. `READY_WITH_CONDITIONS` may preserve conditional or unresolved dependencies, but it does not convert an unsupported firm claim into support. `READY` is supported only when all five claims are supported; otherwise the interface shows an explicit readiness mismatch. The product deliberately permits submission of that mismatch so it can be examined in debrief rather than silently changing or blocking the participant's conclusion. Every posture requires a Finance Ministry recommendation and next institutional handoff; conditions remain available for honest uncertainty. Support status never becomes a score, percentage, pass/fail mark, ranking, or competence judgment.
+
+## Negotiation-preparation brief
+
+The submission surface produces one compact **Negotiation-preparation brief** for internal DMO handoff. It is not a negotiation result, agreement, assurance, or sovereign commitment. The brief contains the participant's position; the evidence actually available at submission; known uncertainties from the deterministic recommendation review; the selected disclosure boundary and treatment perimeter; conditions to advance; the next institutional handoff; and the recommendation to the Finance Ministry Lead.
+
+The brief reuses the structured decision record. `unresolvedRisks` is presented as **Conditions to advance**, and `finalRationale` is presented as **Recommendation to the Finance Ministry Lead**. The only new participant-authored field is `nextHandoff`, presented as **Next institutional handoff**. A brief is submittable when position, next handoff, and Finance Ministry recommendation are recorded; `NOT_READY` and `READY_WITH_CONDITIONS` remain valid positions. Participants may revise every field and submit additional versions until the facilitator closes submissions.
+
+Evidence basis is generated only from requested evidence whose authored availability time has elapsed by the submission moment or which the facilitator released by that moment, plus institutional replies that were answered by that moment. Requested-but-pending evidence and later replies are excluded. Each submission snapshot retains the complete decision state, including `nextHandoff`; the deterministic brief is reconstructed at that version's submission time. Individual AARs, workshop HTML/PDF comparisons, CSV/JSON exports, and the local emergency handoff expose the named brief sections without requiring a facilitator to interpret raw decision JSON.
 
 ## Deterministic boundary
 
@@ -96,7 +104,7 @@ The facilitator cannot silently edit a participant submission or replace determi
 
 ## Data and privacy
 
-- Collected: name, organization, email, decisions, rationales, evidence requests, timestamps, facilitator interventions, messages, advisor transcripts, and reflection. Downloadable reports are regenerated from these records; exported files are not uploaded back to the platform.
+- Collected: name, organization, email, decisions, rationales, the next institutional handoff, evidence requests, timestamps, facilitator interventions, messages, advisor transcripts, and reflection. The next handoff is retained inside the decision record and each versioned submission snapshot. Downloadable reports are regenerated from these records; exported files are not uploaded back to the platform.
 - Purpose: workshop delivery and debrief only; no research use.
 - Audio: processed for transcription and not persisted.
 - Retention: automatic deletion 30 days after the session; facilitator may delete earlier.

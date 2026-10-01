@@ -9,11 +9,30 @@ import type {
   EvidenceRequest,
   GlobalInject,
   InstitutionalMessage,
+  NegotiationPreparationBrief,
   ParticipantProfile,
   RecommendationReview,
   Submission,
   WorkshopSession,
 } from "./types";
+
+const readinessLabels: Record<NonNullable<DecisionState["readiness"]>, string> = {
+  READY: "Ready",
+  READY_WITH_CONDITIONS: "Ready with conditions",
+  NOT_READY: "Not ready",
+};
+
+const disclosureLabels: Record<NonNullable<DecisionState["disclosure"]>, string> = {
+  FULL: "Full contract disclosure",
+  REDACTED: "Redacted functional summary",
+  WITHHOLD: "Withhold pending consent",
+};
+
+const perimeterLabels: Record<NonNullable<DecisionState["treatmentPerimeter"]>, string> = {
+  BOTH_FACILITIES: "Facilities A and B included",
+  FACILITY_A_ONLY: "Facility A included; Facility B deferred",
+  DEFER: "Treatment perimeter deferred",
+};
 
 export function evidenceIsAvailable(request: EvidenceRequest, now = new Date()): boolean {
   const reviewTime = now.getTime();
@@ -354,6 +373,55 @@ export function reviewRecommendation(input: {
   };
 }
 
+export function buildNegotiationPreparationBrief(input: {
+  decisions: DecisionState;
+  evidenceRequests: EvidenceRequest[];
+  institutionalMessages?: InstitutionalMessage[];
+  preparedAt: Date | string;
+}): NegotiationPreparationBrief {
+  const preparedAt = typeof input.preparedAt === "string" ? new Date(input.preparedAt) : input.preparedAt;
+  const availableIds = new Set(input.evidenceRequests
+    .filter((request) => evidenceIsAvailable(request, preparedAt))
+    .map((request) => request.evidenceId));
+  const review = reviewRecommendation({
+    decisions: input.decisions,
+    evidenceRequests: input.evidenceRequests,
+    reviewedAt: preparedAt,
+  });
+  const disclosure = input.decisions.disclosure ? disclosureLabels[input.decisions.disclosure] : "Not recorded";
+  const perimeter = input.decisions.treatmentPerimeter ? perimeterLabels[input.decisions.treatmentPerimeter] : "Not recorded";
+  const institutionalEvidence = (input.institutionalMessages ?? [])
+    .filter((message) => message.status === "ANSWERED" && message.reply && message.answeredAt && new Date(message.answeredAt).getTime() <= preparedAt.getTime())
+    .map((message) => ({
+      id: `institutional-message-${message.id}`,
+      title: `${message.institution.replaceAll("_", " ").toLowerCase()} reply`,
+      summary: message.reply!,
+      sourceLabel: "Facilitator-authorized institutional reply · case record",
+    }));
+  return {
+    preparedAt: preparedAt.toISOString(),
+    position: input.decisions.readiness ? readinessLabels[input.decisions.readiness] : "Not recorded",
+    evidenceBasis: EVIDENCE_CATALOG
+      .filter((item) => availableIds.has(item.id))
+      .map(({ id, title, details, sourceLabel }) => ({ id, title, summary: details, sourceLabel }))
+      .concat(institutionalEvidence),
+    knownUncertainties: review.items
+      .filter((item) => item.status !== "SUPPORTED")
+      .map((item) => `${item.label}: ${item.explanation}`),
+    disclosureBoundary: input.decisions.disclosureRationale.trim()
+      ? `${disclosure}. ${input.decisions.disclosureRationale.trim()}`
+      : disclosure,
+    treatmentPerimeter: perimeter,
+    conditionsToAdvance: input.decisions.unresolvedRisks.trim() || "No additional conditions recorded.",
+    nextInstitutionalHandoff: input.decisions.nextHandoff.trim() || "Not recorded",
+    financeMinistryRecommendation: input.decisions.finalRationale.trim() || "Not recorded",
+  };
+}
+
+export function negotiationBriefIsSubmittable(decisions: DecisionState): boolean {
+  return Boolean(decisions.readiness && decisions.finalRationale.trim() && decisions.nextHandoff.trim());
+}
+
 export function deriveConsequences(decisions: DecisionState): Consequence[] {
   const consequences: Consequence[] = [];
 
@@ -526,6 +594,24 @@ export function buildAfterActionReport(input: {
       reviewedAt: submission.submittedAt,
     }),
   }));
+  const briefDecisions = latestSubmission?.decisions ?? input.decisions;
+  const briefPreparedAt = latestSubmission?.submittedAt ?? generatedAt;
+  const negotiationPreparationBrief = buildNegotiationPreparationBrief({
+    decisions: briefDecisions,
+    evidenceRequests: input.evidenceRequests,
+    institutionalMessages: input.institutionalMessages,
+    preparedAt: briefPreparedAt,
+  });
+  const submissionBriefs = submissions.map((submission) => ({
+    submissionId: submission.id,
+    version: submission.version,
+    brief: buildNegotiationPreparationBrief({
+      decisions: submission.decisions,
+      evidenceRequests: input.evidenceRequests,
+      institutionalMessages: input.institutionalMessages,
+      preparedAt: submission.submittedAt,
+    }),
+  }));
   const ignoredIds = new Set(recommendationReview.items
     .filter((item) => item.status === "UNSUPPORTED")
     .flatMap((item) => item.evidenceIds));
@@ -546,7 +632,7 @@ export function buildAfterActionReport(input: {
       createdAt: input.session.createdAt,
     },
     generatedAt,
-    executiveSummary: `${input.participant.name} submitted a ${readiness} Debt Management Office recommendation. The record contains ${input.submissions.length} submission version${input.submissions.length === 1 ? "" : "s"}, ${requestedIds.size} evidence request${requestedIds.size === 1 ? "" : "s"}, and ${risks.length} unresolved risk${risks.length === 1 ? "" : "s"}.`,
+    executiveSummary: `${input.participant.name} submitted a ${readiness} internal Debt Management Office negotiation-preparation brief. The record contains ${input.submissions.length} submission version${input.submissions.length === 1 ? "" : "s"}, ${requestedIds.size} evidence request${requestedIds.size === 1 ? "" : "s"}, and ${risks.length} unresolved risk${risks.length === 1 ? "" : "s"}.`,
     decisions: input.decisions,
     submissions,
     evidenceRequested: EVIDENCE_CATALOG.filter((item) => requestedIds.has(item.id)),
@@ -555,6 +641,8 @@ export function buildAfterActionReport(input: {
     evidenceRequestHistory: input.evidenceRequests,
     recommendationReview,
     submissionRecommendationReviews,
+    negotiationPreparationBrief,
+    submissionBriefs,
     institutionalMessages: input.institutionalMessages,
     consequences,
     counterfactuals: deriveCounterfactuals(input.decisions),
