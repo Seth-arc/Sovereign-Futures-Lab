@@ -1,12 +1,25 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { FACILITATOR_STAGE_GUIDES, STAGES } from "./scenario";
+import {
+  ADVISOR_PROFILES,
+  ADVISOR_BASELINE_CONTEXT,
+  CASE_FACTS,
+  CASE_FILE_SECTIONS,
+  EVIDENCE_CATALOG,
+  FACILITATOR_STAGE_GUIDES,
+  LEARNING_BRIDGE_CHAPTERS,
+  ORIENTATION_STEPS,
+  RECOMMENDATION_CLAIM_LABELS,
+  REPORT_LABELS,
+  STAGES,
+} from "./scenario";
 
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const participantSource = read("./ParticipantApp.tsx");
 const advisorFunctionSource = read("../supabase/functions/advisor-chat/index.ts");
 const dataSource = read("./data.ts");
+const engineSource = read("./engine.ts");
 const reportSource = read("./report.ts");
 const typesSource = read("./types.ts");
 const facilitatorSource = read("./FacilitatorApp.tsx");
@@ -19,10 +32,12 @@ const aboutSource = read("../about.html");
 const workshopEntry = read("../workshop/index.html");
 const facilitatorEntry = read("../facilitator/index.html");
 const productContract = read("../docs/PRODUCT_CONTRACT.md");
+const migrationSource = read("../supabase/migrations/202609280001_futureslab.sql");
 const privacyNotice = read("../docs/PRIVACY_NOTICE.md");
 const vercelConfig = read("../vercel.json");
 const participantReference = read("../docs/interface-references/kuvera_debt_management_office.html");
-const runtimeParticipantReference = read("../public/kuvera_debt_management_office.html");
+const runtimeParticipantReferenceUrl = new URL("../public/kuvera_debt_management_office.html", import.meta.url);
+const preservedReferenceHash = createHash("sha256").update(participantReference.replace(/\r\n/g, "\n"), "utf8").digest("hex");
 const aidDataFavicon = '/assets/AidData%20Brandmark.png';
 
 describe("reference interface fidelity", () => {
@@ -51,9 +66,9 @@ describe("reference interface fidelity", () => {
 
   it("uses the exact reference branding and role imagery", () => {
     expect(participantSource).toContain('/assets/AidData Brandmark.png');
-    expect(runtimeParticipantReference).toContain('src="assets/national flag.jpg"');
-    expect(participantSource).toContain('/img/Amara Okoye.jpg');
-    expect(participantSource).toContain('/img/Daniel Mensah.jpg');
+    expect(participantReference).toContain('src="assets/national flag.jpg"');
+    expect(ADVISOR_PROFILES.amara.image).toBe('/img/Amara Okoye.jpg');
+    expect(ADVISOR_PROFILES.daniel.image).toBe('/img/Daniel Mensah.jpg');
     expect(facilitatorSource).toContain("Sovereign · Facilitator");
     expect(facilitatorSource).toContain('className="brand-mark">FC</div>');
     expect(facilitatorSource).toContain("Live overview");
@@ -61,7 +76,7 @@ describe("reference interface fidelity", () => {
   });
 
   it("uses the AidData brandmark as the site icon on every deployable page", () => {
-    for (const page of [landingSource, aboutSource, workshopEntry, facilitatorEntry, runtimeParticipantReference]) {
+    for (const page of [landingSource, aboutSource, workshopEntry, facilitatorEntry]) {
       expect(page).toContain(`rel="icon"`);
       expect(page).toContain(`href="${aidDataFavicon}"`);
       expect(page).toContain(`rel="apple-touch-icon"`);
@@ -96,13 +111,12 @@ describe("reference interface fidelity", () => {
     expect(scenarioSource).toContain('WORKSHOP_TITLE = "A Data-Informed Simulation for African Foresight Practice"');
     expect(scenarioSource).toContain('EXERCISE_TITLE = "Kuvera Financing Assurances"');
     expect(scenarioSource).toContain('ROLE_TITLE = "Debt Management Office"');
-    expect(runtimeParticipantReference).toContain("Sovereign · Futures Lab · Kuvera Financing Assurances");
     expect(workshopEntry).toContain("Sovereign · Futures Lab · Participant Workshop");
     expect(facilitatorEntry).toContain("Sovereign · Futures Lab · Facilitator");
   });
 
   it("removes prototype and developer language from participant-facing copy", () => {
-    const participantCopy = [landingSource, aboutSource, participantSource, referenceExperienceSource, runtimeParticipantReference].join("\n").toLowerCase();
+    const participantCopy = [landingSource, aboutSource, participantSource, referenceExperienceSource, scenarioSource].join("\n").toLowerCase();
     for (const phrase of [
       "internal role partition",
       "authored delay",
@@ -121,16 +135,16 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toContain("What will you do differently when preparing a real decision under uncertainty?");
     expect(participantSource).toContain("Fixed assumptions:");
     expect(participantSource).toContain("This response takes time to obtain");
-    expect(participantSource).toContain("exercise-only assumptions");
+    expect(ADVISOR_PROFILES.amara.welcome).toContain("exercise-only assumptions");
   });
 
   it("introduces specialist terms in plain language before relying on acronyms", () => {
     expect(participantSource).toContain("Debt Management Office (DMO)");
     expect(participantSource).toContain("A financing assurance is a creditor signal");
-    expect(referenceExperienceSource).toContain("Official Creditor Committee (OCC)");
+    expect(JSON.stringify(ORIENTATION_STEPS)).toContain("Official Creditor Committee (OCC)");
     expect(scenarioSource).toContain("effective control—practical limits on Kuvera’s use of cash");
     expect(scenarioSource).toContain("treatment perimeter—the facilities carried into restructuring analysis");
-    expect(runtimeParticipantReference).toContain("Comparability of Treatment (CoT) is multi-dimensional");
+    expect(LEARNING_BRIDGE_CHAPTERS.find((chapter) => chapter.id === "treatment")?.title).toContain("Comparability of Treatment");
   });
 
   it("keeps human-readable provenance ahead of internal identifiers", () => {
@@ -141,8 +155,8 @@ describe("reference interface fidelity", () => {
     expect(advisorSources).toContain(
       '<strong>{advisorSourceText(source?.sourceTitle, "Source title unavailable")}</strong><span>{sourceClassLabel(source?.sourceClass)}</span><span>{advisorSourceText(source?.pageReference, "Page reference unavailable")}</span><span><code>{claimId}</code>',
     );
-    expect(runtimeParticipantReference.indexOf("How China Collateralizes")).toBeLessThan(
-      runtimeParticipantReference.indexOf("RTL-FA-002"),
+    expect(participantReference.indexOf("How China Collateralizes")).toBeLessThan(
+      participantReference.indexOf("RTL-FA-002"),
     );
   });
 
@@ -150,7 +164,7 @@ describe("reference interface fidelity", () => {
     expect(landingSource).toMatch(/retained for up\s+to 30 days/);
     expect(landingSource).toContain("Microphone audio is not stored");
     expect(aboutSource).toContain("fictional Republic of Kuvera");
-    expect(runtimeParticipantReference).toMatch(/Every example here is\s+invented for practice/);
+    expect(referenceExperienceSource).toContain("Practice on parallel cases, not Kuvera");
     expect(privacyNotice).toContain("training delivery, not research or individual performance scoring");
     expect(productContract).toContain("No probabilistic scoring, ranking, or inferred competence");
   });
@@ -181,27 +195,61 @@ describe("reference interface fidelity", () => {
     expect(vercelConfig).not.toContain("script-src 'self' 'unsafe-inline'");
   });
 
-  it("restores the exact orientation, learning bridge, and complete case file", () => {
-    expect(runtimeParticipantReference.replace(/\r\n/g, "\n")).toBe(participantReference.replace(/\r\n/g, "\n"));
-    expect(referenceExperienceSource).not.toContain('sandbox="allow-scripts allow-same-origin"');
-    expect(referenceExperienceSource).toContain("fixed, bundled reference document");
-    expect(runtimeParticipantReference).toContain('id="onboardingModal"');
-    expect(runtimeParticipantReference).toContain('id="learningBridge"');
-    expect(runtimeParticipantReference).toContain('id="referenceOverlay"');
-    expect(runtimeParticipantReference.match(/data-ref-section=/g)).toHaveLength(6);
-    expect(runtimeParticipantReference).toContain("Country Profile");
-    expect(runtimeParticipantReference).toContain("Macro Indicators");
-    expect(runtimeParticipantReference).toContain("Creditor Landscape");
-    expect(runtimeParticipantReference).toContain("Contracts & Escrow");
-    expect(runtimeParticipantReference).toContain("Common Framework");
-    expect(runtimeParticipantReference).toContain("Evidence Basis");
+  it("keeps the three extracted reference surfaces available without shipping the obsolete runtime", () => {
+    expect(ORIENTATION_STEPS.map((step) => step.id)).toEqual(["role", "clock", "grounding", "process", "record", "case-file", "requests", "advisors", "debrief"]);
+    expect(LEARNING_BRIDGE_CHAPTERS).toHaveLength(5);
+    expect(CASE_FILE_SECTIONS.map((section) => section.id)).toEqual(["country", "indicators", "creditors", "contracts", "process", "research"]);
+    expect(referenceExperienceSource).toContain('surface === "orientation"');
+    expect(referenceExperienceSource).toContain('surface === "bridge"');
+    expect(referenceExperienceSource).toContain('surface === "case-file"');
+    expect(referenceExperienceSource).not.toMatch(/iframe|srcDoc|fetch\(|REFERENCE_PATH|const S\s*=|scenarioWeek|data-stage/);
+    expect(existsSync(runtimeParticipantReferenceUrl)).toBe(false);
     expect(participantSource).toContain('openReference("orientation"');
     expect(participantSource).toContain('openReference("bridge"');
     expect(participantSource).toContain('openReference("case-file"');
-    for (const script of runtimeParticipantReference.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
-      const hash = createHash("sha256").update(script[1].replace(/\r\n/g, "\n"), "utf8").digest("base64");
-      expect(vercelConfig).toContain(`'sha256-${hash}'`);
+  });
+
+  it("pins the immutable design reference independently from the runtime", () => {
+    expect(preservedReferenceHash).toBe("71ff43b728ac0a70c35b1df4c388d66f6ad114aeceefdb1eb2f5eba4f510aa5c");
+    expect(participantReference).toContain('id="onboardingModal"');
+    expect(participantReference).toContain('id="learningBridge"');
+    expect(participantReference).toContain('id="referenceOverlay"');
+    for (const script of participantReference.replace(/\r\n/g, "\n").matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+      const hash = createHash("sha256").update(script[1], "utf8").digest("base64");
+      expect(vercelConfig).not.toContain(`'sha256-${hash}'`);
     }
+  });
+
+  it("keeps SQL evidence IDs and authored delays in parity with the canonical catalog", () => {
+    const sqlDelayEntries = Array.from(migrationSource.matchAll(/when '([^']+)' then (\d+)/g), ([, id, delay]) => [id, Number(delay)]);
+    expect(sqlDelayEntries).toHaveLength(EVIDENCE_CATALOG.length);
+    expect(Object.fromEntries(sqlDelayEntries)).toEqual(Object.fromEntries(EVIDENCE_CATALOG.map((item) => [item.id, item.delaySeconds])));
+    const sqlFinalStageIndexes = Array.from(migrationSource.matchAll(/(?:current_stage|p_current_stage)[^\n]*between 0 and (\d+)/g), (match) => Number(match[1]));
+    expect(sqlFinalStageIndexes.length).toBeGreaterThan(0);
+    expect(sqlFinalStageIndexes.every((index) => index === STAGES.length - 1)).toBe(true);
+  });
+
+  it("keeps advisor evidence IDs and baseline facts in parity with the canonical scenario", () => {
+    const evidenceBlock = advisorFunctionSource.match(/const EVIDENCE_SCENARIO_SOURCES[\s\S]*?\n\];/)?.[0] ?? "";
+    const advisorEvidenceIds = Array.from(evidenceBlock.matchAll(/evidenceId:\s*"([^"]+)"/g), (match) => match[1]).sort();
+    expect(advisorEvidenceIds).toEqual(EVIDENCE_CATALOG.map((item) => item.id).sort());
+    const advisorEvidenceFacts = Object.fromEntries(Array.from(evidenceBlock.matchAll(/evidenceId:\s*"([^"]+)"[\s\S]*?text:\s*"([^"]+)"/g), ([, id, fact]) => [id, fact]));
+    expect(advisorEvidenceFacts).toEqual(Object.fromEntries(EVIDENCE_CATALOG.map((item) => [item.id, item.advisorContext])));
+    const baselineText = advisorFunctionSource.match(/id:\s*"kuvera-shared-case-context"[\s\S]*?text:\s*"([^"]+)"/)?.[1];
+    expect(baselineText).toBe(ADVISOR_BASELINE_CONTEXT);
+  });
+
+  it("renders participant stages, facilitator guides, recommendation labels, and report labels from the canonical definition", () => {
+    expect(STAGES).toHaveLength(8);
+    expect(FACILITATOR_STAGE_GUIDES).toHaveLength(STAGES.length);
+    expect(participantSource).toContain("STAGES.map");
+    expect(facilitatorSource).toContain("STAGES[currentStageIndex]");
+    expect(participantSource).not.toMatch(/const\s+(?:PARTICIPANT_)?STAGES\s*=/);
+    expect(facilitatorSource).not.toMatch(/const\s+(?:FACILITATOR_)?STAGES\s*=/);
+    for (const key of Object.keys(RECOMMENDATION_CLAIM_LABELS)) {
+      expect(engineSource).toContain(`RECOMMENDATION_CLAIM_LABELS.${key}`);
+    }
+    for (const key of Object.keys(REPORT_LABELS)) expect(reportSource).toContain(`REPORT_LABELS.${key}`);
   });
 
   it("opens preparation only until the participant has completed it", () => {
@@ -225,14 +273,17 @@ describe("reference interface fidelity", () => {
       participantSource.indexOf("function completePreparationSurface"),
       participantSource.indexOf("async function exitWorkshop"),
     );
-    expect(runtimeParticipantReference).toContain('"Continue to Learning Bridge"');
-    expect(runtimeParticipantReference).toContain("else openBridge();");
-    expect(referenceExperienceSource).toContain('surface === "orientation" && bridge.classList.contains("open")');
-    expect(referenceExperienceSource).toContain('bridge.dataset.preparationExit === "complete"');
+    expect(referenceExperienceSource).toContain('"Continue to Learning Bridge"');
+    expect(referenceExperienceSource).toContain('surface === "orientation" && <Orientation');
+    expect(referenceExperienceSource).toContain('surface === "bridge" && <LearningBridge');
+    expect(referenceExperienceSource).toContain('replayOnly ? "Return to workshop"');
+    expect(participantSource).toContain("preparationComplete={preparationComplete}");
     expect(completionHandler).toContain('setReferenceSurface("bridge")');
     expect(completionHandler).toContain('localStorage.setItem(preparationKey(bundle.participant.id), "complete")');
     expect(completionHandler).toContain("setStage(0)");
     expect(completionHandler).toContain("setRoleBriefOpen(true)");
+    expect(completionHandler.match(/if \(preparationComplete\)/g)).toHaveLength(2);
+    expect(completionHandler).toContain("closePreparationSurface()");
     expect(completionHandler).not.toContain("setDecisions");
   });
 
@@ -241,32 +292,23 @@ describe("reference interface fidelity", () => {
       participantSource.indexOf('<div className="orientation-tools"'),
       participantSource.indexOf('<div className="shell">'),
     );
-    const referenceHandlers = runtimeParticipantReference.slice(
-      runtimeParticipantReference.indexOf('document.getElementById("onboardingNext")'),
-      runtimeParticipantReference.indexOf("/* First-run sequence"),
-    );
-    expect(runtimeParticipantReference).toContain('id="skipOnboarding" type="button">Skip for now</button>');
-    expect(runtimeParticipantReference).toContain('id="skipBridge" type="button">Skip for now</button>');
-    expect(referenceHandlers).toContain('closeBridge(false)');
-    expect(referenceHandlers).toContain('closeBridge(true)');
+    expect(referenceExperienceSource.match(/>Skip for now<\/button>/g)).toHaveLength(2);
+    expect(referenceExperienceSource).toContain("onClick={onClose}");
+    expect(referenceExperienceSource).toContain("onComplete()");
     expect(participantSource).toContain("Preparation incomplete · casework waiting");
     expect(preparationControls).not.toContain("setDecisions");
-    expect(referenceHandlers).not.toContain("setDecisions");
+    expect(referenceExperienceSource).not.toContain("setDecisions");
   });
 
   it("uses one honest bridge duration and separates preparation, casework, and institutional deadlines", () => {
-    expect(runtimeParticipantReference.match(/About 6 minutes/g)).toHaveLength(1);
-    expect(runtimeParticipantReference).not.toMatch(/3[–-]4 minutes/i);
-    expect(runtimeParticipantReference).not.toMatch(/about six minutes/i);
+    expect(referenceExperienceSource.match(/About 6 minutes/g)).toHaveLength(1);
+    expect(referenceExperienceSource).not.toMatch(/3[–-]4 minutes/i);
     expect(participantSource).toContain("Casework · ${formatClock(displayedClock)}");
     expect(participantSource).toContain('? "paused for debrief" : caseworkRunning ? "" : "waiting"');
-    expect(referenceExperienceSource).toContain("until the facilitator begins the exercise");
-    expect(referenceExperienceSource).toContain("USD 750m maturity in six weeks");
-    expect(referenceExperienceSource).toContain("IMF Board horizon in eleven weeks");
-    expect(runtimeParticipantReference).toContain("Casework · 20:00 · waiting");
-    expect(runtimeParticipantReference).not.toContain('title: "The clock is running"');
-    expect(runtimeParticipantReference).not.toContain("It starts the moment you confirm your mandate");
-    expect(runtimeParticipantReference).not.toContain("secondsPerWeek");
+    expect(CASE_FACTS.caseworkDurationSeconds).toBe(1200);
+    expect(CASE_FACTS.maturityWeeks).toBe(6);
+    expect(CASE_FACTS.imfBoardHorizonWeeks).toBe(11);
+    expect(scenarioSource).not.toContain("secondsPerWeek");
   });
 
   it("wires the facilitator debrief transition into the participant subscription", () => {
@@ -348,12 +390,14 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain("width: auto; max-width: none");
   });
 
-  it("keeps the embedded Case File to one accessible scroll region", () => {
-    expect(referenceExperienceSource).toContain('caseFile.style.setProperty("overflow", "hidden", "important")');
-    expect(referenceExperienceSource).toContain('caseBody.style.setProperty("overflow", "auto", "important")');
-    expect(referenceExperienceSource).toContain("const scaledViewport = 100 / panelZoom");
-    expect(referenceExperienceSource).toContain("caseBody.tabIndex = 0");
-    expect(referenceExperienceSource).toContain('caseBody.setAttribute("role", "region")');
+  it("keeps the native Case File to one accessible scroll region", () => {
+    const caseBodyRule = styles.match(/\.reference-case-body\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(referenceExperienceSource).toContain('id="case-panel"');
+    expect(referenceExperienceSource).toContain('role="tabpanel"');
+    expect(referenceExperienceSource).toContain("tabIndex={0}");
+    expect(caseBodyRule).toMatch(/min-height:\s*0/);
+    expect(caseBodyRule).toMatch(/overflow:\s*auto/);
+    expect(referenceExperienceSource).not.toContain("iframe");
   });
 
   it("uses one live process rail beneath the Orientation overlay", () => {
@@ -365,11 +409,10 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toContain('id="openCommunications"');
     expect(participantSource).toContain('id="openReference"');
     expect(participantSource).toContain('className="role-lens"');
-    expect(referenceExperienceSource).toContain("function alignOrientationCopy");
-    expect(referenceExperienceSource).toContain('body>.app{visibility:hidden!important;pointer-events:none!important}');
+    expect(referenceExperienceSource).toContain("ORIENTATION_STEPS.map");
+    expect(referenceExperienceSource).not.toMatch(/processSteps|renderRail|data-stage/);
     expect(styles).toContain("grid-template-columns: var(--process-rail-width) minmax(0, 1fr)");
-    expect(styles).toContain(".reference-experience-orientation iframe { background: transparent; }");
-    expect(styles).toContain("width: 80%; padding: 38px clamp(24px, 4vw, 54px) 56px; zoom: 1.25");
+    expect(styles).toContain(".reference-experience-orientation { background: var(--scrim);");
   });
 
   it("uses the participant navigation menu for glossary, theme, and exit", () => {
@@ -413,9 +456,10 @@ describe("reference interface fidelity", () => {
   });
 
   it("opens AI advisors as a full-page workspace with both supplied briefs and welcomes", () => {
-    expect(participantSource).toContain("const ADVISOR_PROFILES");
-    expect(participantSource).toContain("Welcome. I’m Amara, your Kuvera country and Common Framework advisor.");
-    expect(participantSource).toContain("Welcome. I’m Daniel Mensah, your contracts, escrow, financing assurances, and comparability advisor.");
+    expect(Object.keys(ADVISOR_PROFILES)).toEqual(["amara", "daniel"]);
+    expect(ADVISOR_PROFILES.amara.welcome).toContain("your Kuvera country and Common Framework advisor");
+    expect(ADVISOR_PROFILES.daniel.welcome).toContain("your contracts, escrow, financing assurances, and comparability advisor");
+    expect(participantSource).toContain('ADVISOR_PROFILES[advisorId]');
     expect(participantSource).toContain('className="advisor-briefs"');
     expect(participantSource).toContain('className="advisor-chat"');
     expect(participantSource).toContain('className="advisor-selector"');
@@ -507,9 +551,10 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toContain('openReference("orientation"');
     expect(participantSource).toContain('openReference("bridge"');
     expect(participantSource).toContain('openReference("case-file"');
-    expect(referenceExperienceSource).toContain("trapWrapperFocus");
-    expect(referenceExperienceSource).toContain("dismissRef.current?.focus()");
-    expect(referenceExperienceSource).toContain('referenceDocument.addEventListener("keydown", handleFrameKeyDown)');
+    expect(referenceExperienceSource).toContain("function trapFocus");
+    expect(referenceExperienceSource).toContain("closeRef.current?.focus()");
+    expect(referenceExperienceSource).toContain('event.key === "Escape"');
+    expect(referenceExperienceSource).toContain("element.inert = true");
     expect(facilitatorSource).toContain("returnTarget?.focus()");
     expect(landingSource).toContain("trapModalFocus(e, overlay)");
     expect(landingSource).toContain("trapModalFocus(e, aboutOverlay)");
@@ -545,8 +590,7 @@ describe("reference interface fidelity", () => {
     expect(participantSource).toContain("setReplyAnnouncement");
   });
 
-  it("preserves reduced-motion content across the embedded references and landing page", () => {
-    expect(referenceExperienceSource).toContain("@media (prefers-reduced-motion: reduce)");
+  it("preserves reduced-motion content across the native reference surfaces and landing page", () => {
     expect(styles).toContain("animation-iteration-count: 1 !important");
     expect(styles).toContain(".advisor-stream-cursor { display: none; }");
     expect(landingSource).toContain("if (!reducedMotion.matches) requestAnimationFrame(drawTopography)");

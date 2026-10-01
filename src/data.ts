@@ -1,7 +1,7 @@
 import { createClient, type RealtimeChannel, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { applyAdvisorFallbackCadence, isAdvisorGreeting, normalizeAdvisorCitations } from "./advisorPresentation";
 import { buildSubmissionContextSnapshot, CONSEQUENCE_RULE_VERSION, parseSubmissionContextSnapshot, SCENARIO_VERSION } from "./engine";
-import { EVIDENCE_CATALOG, EXERCISE_TITLE } from "./scenario";
+import { CASE_FACTS, EVIDENCE_CATALOG, EXERCISE_TITLE, FINAL_STAGE_INDEX } from "./scenario";
 import { EMPTY_DECISIONS } from "./types";
 import type {
   ActivityEvent,
@@ -23,6 +23,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const forcedLocal = String(import.meta.env.VITE_FORCE_LOCAL_MODE).toLowerCase() === "true";
 export const cloudEnabled = Boolean(url && anonKey && !forcedLocal);
 export const supabase: SupabaseClient | undefined = cloudEnabled ? createClient(url!, anonKey!) : undefined;
+const LIQUIDITY_QUERY_PATTERN = new RegExp(`${CASE_FACTS.reportedLiquidityUsdMillions}|${CASE_FACTS.usableLiquidityUsdMillions}|liquid|cash|restrict`);
 
 export interface ParticipantBundle {
   session: WorkshopSession;
@@ -58,8 +59,8 @@ function mapSession(row: Record<string, unknown>): WorkshopSession {
     status: row.status as WorkshopSession["status"],
     ...(row.join_code ? { joinCode: String(row.join_code) } : {}),
     currentStage: Number(row.current_stage ?? 0),
-    durationSeconds: Number(row.duration_seconds ?? 1200),
-    remainingSeconds: Number(row.remaining_seconds ?? 1200),
+    durationSeconds: Number(row.duration_seconds ?? CASE_FACTS.caseworkDurationSeconds),
+    remainingSeconds: Number(row.remaining_seconds ?? CASE_FACTS.caseworkDurationSeconds),
     ...(row.clock_started_at ? { clockStartedAt: String(row.clock_started_at) } : {}),
     submissionsClosed: Boolean(row.submissions_closed),
     createdAt: iso(row.created_at),
@@ -198,9 +199,9 @@ function localBundle(profile?: { name: string; organization: string; email: stri
       kind: "REHEARSAL",
       status: "RUNNING",
       joinCode: "FUTURESLAB",
-      currentStage: 7,
-      durationSeconds: 1200,
-      remainingSeconds: 1200,
+      currentStage: FINAL_STAGE_INDEX,
+      durationSeconds: CASE_FACTS.caseworkDurationSeconds,
+      remainingSeconds: CASE_FACTS.caseworkDurationSeconds,
       clockStartedAt: now.toISOString(),
       submissionsClosed: false,
       createdAt: now.toISOString(),
@@ -251,7 +252,7 @@ export function activateEmergencyMode(bundle: ParticipantBundle): ParticipantBun
   const sessionId = bundle.session.id.startsWith("local-") ? bundle.session.id : `local-${bundle.session.id}`;
   return saveLocal({
     ...bundle,
-    session: { ...bundle.session, id: sessionId, kind: "REHEARSAL", status: "RUNNING", currentStage: 7, submissionsClosed: false },
+    session: { ...bundle.session, id: sessionId, kind: "REHEARSAL", status: "RUNNING", currentStage: FINAL_STAGE_INDEX, submissionsClosed: false },
     participant: { ...bundle.participant, sessionId },
     evidenceRequests: bundle.evidenceRequests.map((item) => ({ ...item, sessionId })),
     submissions: bundle.submissions.map((item) => ({ ...item, sessionId })),
@@ -360,7 +361,7 @@ export async function saveDecisions(bundle: ParticipantBundle, decisions: Decisi
 
 export async function saveTransferReflection(bundle: ParticipantBundle, reflection: string): Promise<ParticipantBundle> {
   const decisions = decisionSnapshot({ ...bundle.decisions, reflection });
-  return saveDecisions(bundle, decisions, 7);
+  return saveDecisions(bundle, decisions, FINAL_STAGE_INDEX);
 }
 
 export async function requestEvidence(bundle: ParticipantBundle, evidenceId: string): Promise<ParticipantBundle> {
@@ -519,22 +520,22 @@ export function scriptedAdvisorTurn(bundle: ParticipantBundle, advisorId: Adviso
     answer = advisorId === "amara"
       ? "Hello—I'm Amara. I'm glad to work through this with you. We can begin with Kuvera's fiscal position, creditor landscape, or the Common Framework sequence."
       : "Hello—I'm Daniel. Let's examine the record carefully. We can start with the facilities, account control, disclosure, or comparability of treatment.";
-  } else if (/780|480|liquid|cash|restrict/.test(text)) {
+  } else if (LIQUIDITY_QUERY_PATTERN.test(text)) {
     answer = hasVisibleEvidence(bundle, "treasury-reconciliation")
-      ? "The USD 780m figure is reported liquidity, not yet usable liquidity. The returned reconciliation subtracts USD 240m restricted and USD 60m protected, producing USD 480m usable. Your decision is whether that visible evidence supports the basis you record or still requires a caveat."
-      : "The participant-visible record currently establishes reported liquidity of USD 780m, but not a reconciled usable-liquidity figure. Request or await the Treasury cash reconciliation before treating restrictions or a lower usable balance as established.";
+      ? `The USD ${CASE_FACTS.reportedLiquidityUsdMillions}m figure is reported liquidity, not yet usable liquidity. The returned reconciliation subtracts USD ${CASE_FACTS.restrictedLiquidityUsdMillions}m restricted and USD ${CASE_FACTS.protectedLiquidityUsdMillions}m protected, producing USD ${CASE_FACTS.usableLiquidityUsdMillions}m usable. Your decision is whether that visible evidence supports the basis you record or still requires a caveat.`
+      : `The participant-visible record currently establishes reported liquidity of USD ${CASE_FACTS.reportedLiquidityUsdMillions}m, but not a reconciled usable-liquidity figure. Request or await the Treasury cash reconciliation before treating restrictions or a lower usable balance as established.`;
   } else if (/facility b|cross|shared|link/.test(text)) {
     answer = hasVisibleEvidence(bundle, "cross-collateralization")
-      ? "The returned dependency review establishes that Facilities A and B rely on the same RA-01 revenue pool. That supports a shared operational dependency without claiming the facilities have identical legal security."
+      ? `The returned dependency review establishes that Facilities A and B rely on the same ${CASE_FACTS.facilityAAccount} revenue pool. That supports a shared operational dependency without claiming the facilities have identical legal security.`
       : hasVisibleEvidence(bundle, "facility-b")
-        ? "The returned Facility B extract incorporates the common revenue-account schedule by reference, connecting Facility B to the RA-01 arrangement. The legal character of that dependency remains a separate classification question."
-        : "The shared case context establishes that Facility A references RA-01. Facility B's relationship to the account remains unconfirmed, so do not infer either a shared pool or independence until relevant evidence returns.";
+        ? `The returned Facility B extract incorporates the common revenue-account schedule by reference, connecting Facility B to the ${CASE_FACTS.facilityAAccount} arrangement. The legal character of that dependency remains a separate classification question.`
+        : `The shared case context establishes that Facility A references ${CASE_FACTS.facilityAAccount}. Facility B's relationship to the account remains ${CASE_FACTS.facilityBEntryStatus}, so do not infer either a shared pool or independence until relevant evidence returns.`;
   } else if (/facility a|account|collateral|escrow|control/.test(text)) {
     answer = hasVisibleEvidence(bundle, "account-control")
-      ? "The returned account-control summary establishes how receipts enter RA-01, when debt service is swept, and when withdrawals require consent. Use those visible features to assess control without assuming a formal security grant."
+      ? `The returned account-control summary establishes how receipts enter ${CASE_FACTS.facilityAAccount}, when debt service is swept, and when withdrawals require consent. Use those visible features to assess control without assuming a formal security grant.`
       : hasVisibleEvidence(bundle, "facility-a")
-        ? "The returned Facility A extract establishes that specified export proceeds flow through RA-01 and that its waterfall applies to Facility A debt service. It does not by itself establish Facility B's relationship to that account."
-        : "The shared case context establishes only that Facility A references RA-01 and that a partial memo indicates possible restrictions. Exact control terms remain unresolved until the relevant evidence returns.";
+        ? `The returned Facility A extract establishes that specified export proceeds flow through ${CASE_FACTS.facilityAAccount} and that its waterfall applies to Facility A debt service. It does not by itself establish Facility B's relationship to that account.`
+        : `The shared case context establishes only that Facility A references ${CASE_FACTS.facilityAAccount} and that a partial memo indicates possible restrictions. Exact control terms remain unresolved until the relevant evidence returns.`;
   } else if (/disclos|confidential/.test(text)) {
     answer = hasVisibleEvidence(bundle, "confidentiality-opinion")
       ? "The returned scenario legal opinion permits a redacted functional summary of account control, balances, and facility linkage. Full contract text requires consent. I can explain those boundaries, but the disclosure recommendation remains yours."
@@ -547,8 +548,8 @@ export function scriptedAdvisorTurn(bundle: ParticipantBundle, advisorId: Adviso
       : "Kuvera's creditor commitment status is not established in the shared case context. Request or await an authorized creditor reply before assigning a commitment level.";
   } else if (/assurance|board|maturity|deadline|mou|implementation|relief/.test(text)) {
     answer = hasVisibleEvidence(bundle, "imf-clarification")
-      ? "Keep the deadlines and commitment states separate. The USD 750m maturity arrives in six weeks, before the eleven-week IMF Board horizon. The returned IMF clarification establishes that an assurance remains distinct from implementation and cash-effective relief."
-      : "The shared case context establishes a USD 750m maturity in six weeks and an eleven-week IMF Board horizon. General process research can explain commitment levels, but Kuvera's own assurance status remains unresolved until an authorized response is visible.";
+      ? `Keep the deadlines and commitment states separate. The USD ${CASE_FACTS.maturityUsdMillions}m maturity arrives in ${CASE_FACTS.maturityWeeks} weeks, before the ${CASE_FACTS.imfBoardHorizonWeeks}-week IMF Board horizon. The returned IMF clarification establishes that an assurance remains distinct from implementation and cash-effective relief.`
+      : `The shared case context establishes a USD ${CASE_FACTS.maturityUsdMillions}m maturity in ${CASE_FACTS.maturityWeeks} weeks and a ${CASE_FACTS.imfBoardHorizonWeeks}-week IMF Board horizon. General process research can explain commitment levels, but Kuvera's own assurance status remains unresolved until an authorized response is visible.`;
   } else {
     answer = advisorId === "amara"
       ? "I can explain Kuvera's macro-fiscal setting, the two deadlines, creditor architecture, and the Common Framework sequence. Ask about a visible case fact or process dependency; I will not select your recommendation."

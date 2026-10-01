@@ -28,7 +28,7 @@ const BASELINE_SCENARIO_SOURCES: readonly ScenarioSource[] = [
   {
     id: "kuvera-shared-case-context",
     title: "Kuvera Case File · participant-visible scenario record",
-    text: "At entry, Kuvera reports USD 780m in liquidity, and a partial memo indicates possible restrictions that have not been reconciled. Facility A references RA-01; Facility B's relationship to the account is unconfirmed. Permitted disclosure and the creditor's commitment status begin unresolved. A USD 750m maturity arrives in six weeks, five weeks before the eleven-week IMF Board horizon.",
+    text: "At entry, Kuvera reports USD 780m in liquidity, and a partial memo indicates possible restrictions that have not been reconciled. Facility A references RA-01; Facility B's relationship to the account is unconfirmed. Permitted disclosure and the creditor's commitment status begin unresolved. A USD 750m maturity arrives in 6 weeks, five weeks before the 11-week IMF Board horizon.",
   },
 ];
 

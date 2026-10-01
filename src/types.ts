@@ -72,6 +72,44 @@ export interface EvidenceDefinition {
   summary: string;
   sourceLabel: string;
   details: string;
+  advisorContext: string;
+}
+
+export interface OrientationStepDefinition {
+  id: string;
+  title: string;
+  body: readonly string[];
+  location: string;
+}
+
+export interface LearningBridgeOption {
+  label: string;
+  correct: boolean;
+  feedback: string;
+}
+
+export interface LearningBridgeChapter {
+  id: string;
+  tab: string;
+  title: string;
+  type: string;
+  objective: string;
+  introduction: string;
+  model: readonly { label: string; detail: string }[];
+  practice: {
+    scenario: string;
+    question: string;
+    options: readonly LearningBridgeOption[];
+  };
+  takeaway: string;
+}
+
+export interface CaseFileSection {
+  id: "country" | "indicators" | "creditors" | "contracts" | "process" | "research";
+  title: string;
+  lead: string;
+  records: readonly { label: string; value: string; detail: string }[];
+  boundaries: readonly string[];
 }
 
 export interface EvidenceRequest {

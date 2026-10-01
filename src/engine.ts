@@ -1,4 +1,4 @@
-import { EVIDENCE_CATALOG } from "./scenario";
+import { CASE_FACTS, EVIDENCE_CATALOG, FINAL_STAGE_INDEX, RECOMMENDATION_CLAIM_LABELS } from "./scenario";
 import type {
   ActivityEvent,
   AdvisorTurn,
@@ -21,7 +21,6 @@ import type {
   WorkshopSession,
 } from "./types";
 
-const FINAL_STAGE_INDEX = 7;
 const PARTICIPANT_DEBRIEF_BOUNDARY = "This deterministic exercise reconstruction is fictional. It is not a real-world prediction, score, or competence finding.";
 export const SCENARIO_VERSION = "kuvera-financing-assurances-2026-10-01";
 export const CONSEQUENCE_RULE_VERSION = "kuvera-consequence-rules-2026-10-01";
@@ -213,7 +212,7 @@ export function reviewRecommendation(input: {
   const liquidity = (() => {
     if (!input.decisions.liquidityBasis || input.decisions.liquidityBasis === "UNRESOLVED") return {
       claim: "LIQUIDITY_BASIS" as const,
-      label: "Liquidity basis",
+      label: RECOMMENDATION_CLAIM_LABELS.LIQUIDITY_BASIS,
       recordedClaim: input.decisions.liquidityBasis === "UNRESOLVED" ? "Unresolved" : "Not recorded",
       status: "UNRESOLVED" as const,
       explanation: "The recommendation preserves that usable liquidity has not been established.",
@@ -221,32 +220,32 @@ export function reviewRecommendation(input: {
     };
     if (input.decisions.liquidityBasis === "REPORTED_780") return has("treasury-reconciliation") ? {
       claim: "LIQUIDITY_BASIS" as const,
-      label: "Liquidity basis",
-      recordedClaim: "USD 780m reported, not verified",
+      label: RECOMMENDATION_CLAIM_LABELS.LIQUIDITY_BASIS,
+      recordedClaim: `USD ${CASE_FACTS.reportedLiquidityUsdMillions}m reported, not verified`,
       status: "UNSUPPORTED" as const,
-      explanation: "The returned Treasury reconciliation establishes USD 480m as usable liquidity; USD 780m remains only the gross reported balance.",
+      explanation: `The returned Treasury reconciliation establishes USD ${CASE_FACTS.usableLiquidityUsdMillions}m as usable liquidity; USD ${CASE_FACTS.reportedLiquidityUsdMillions}m remains only the gross reported balance.`,
       evidenceIds: ["treasury-reconciliation"],
     } : {
       claim: "LIQUIDITY_BASIS" as const,
-      label: "Liquidity basis",
-      recordedClaim: "USD 780m reported, not verified",
+      label: RECOMMENDATION_CLAIM_LABELS.LIQUIDITY_BASIS,
+      recordedClaim: `USD ${CASE_FACTS.reportedLiquidityUsdMillions}m reported, not verified`,
       status: "SUPPORTED" as const,
-      explanation: "The shared case record supports USD 780m only as a reported, provisional figure.",
+      explanation: `The shared case record supports USD ${CASE_FACTS.reportedLiquidityUsdMillions}m only as a reported, provisional figure.`,
       evidenceIds: [],
     };
     return has("treasury-reconciliation") ? {
       claim: "LIQUIDITY_BASIS" as const,
-      label: "Liquidity basis",
-      recordedClaim: "USD 480m verified usable",
+      label: RECOMMENDATION_CLAIM_LABELS.LIQUIDITY_BASIS,
+      recordedClaim: `USD ${CASE_FACTS.usableLiquidityUsdMillions}m verified usable`,
       status: "SUPPORTED" as const,
-      explanation: "The returned Treasury reconciliation establishes the USD 480m usable-liquidity basis.",
+      explanation: `The returned Treasury reconciliation establishes the USD ${CASE_FACTS.usableLiquidityUsdMillions}m usable-liquidity basis.`,
       evidenceIds: ["treasury-reconciliation"],
     } : {
       claim: "LIQUIDITY_BASIS" as const,
-      label: "Liquidity basis",
-      recordedClaim: "USD 480m verified usable",
+      label: RECOMMENDATION_CLAIM_LABELS.LIQUIDITY_BASIS,
+      recordedClaim: `USD ${CASE_FACTS.usableLiquidityUsdMillions}m verified usable`,
       status: "UNSUPPORTED" as const,
-      explanation: "The Treasury cash reconciliation has not returned, so USD 480m is not established in the available record.",
+      explanation: `The Treasury cash reconciliation has not returned, so USD ${CASE_FACTS.usableLiquidityUsdMillions}m is not established in the available record.`,
       evidenceIds: [],
     };
   })();
@@ -254,7 +253,7 @@ export function reviewRecommendation(input: {
   const account = (() => {
     if (!input.decisions.accountClassification || input.decisions.accountClassification === "UNRESOLVED") return {
       claim: "ACCOUNT_CLASSIFICATION" as const,
-      label: "Account classification",
+      label: RECOMMENDATION_CLAIM_LABELS.ACCOUNT_CLASSIFICATION,
       recordedClaim: input.decisions.accountClassification === "UNRESOLVED" ? "Unresolved" : "Not recorded",
       status: "UNRESOLVED" as const,
       explanation: "The recommendation preserves that the account-control classification is not established.",
@@ -263,7 +262,7 @@ export function reviewRecommendation(input: {
     if (input.decisions.accountClassification === "EFFECTIVE_CONTROL") {
       if (has("account-control")) return {
         claim: "ACCOUNT_CLASSIFICATION" as const,
-        label: "Account classification",
+        label: RECOMMENDATION_CLAIM_LABELS.ACCOUNT_CLASSIFICATION,
         recordedClaim: "Quasi-collateral / effective control",
         status: "SUPPORTED" as const,
         explanation: "The returned account-control terms establish consent and payment-sweep constraints.",
@@ -271,7 +270,7 @@ export function reviewRecommendation(input: {
       };
       if (has("facility-a")) return {
         claim: "ACCOUNT_CLASSIFICATION" as const,
-        label: "Account classification",
+        label: RECOMMENDATION_CLAIM_LABELS.ACCOUNT_CLASSIFICATION,
         recordedClaim: "Quasi-collateral / effective control",
         status: "CONDITIONAL" as const,
         explanation: "Facility A confirms an account waterfall, but the withdrawal and control terms remain open.",
@@ -279,7 +278,7 @@ export function reviewRecommendation(input: {
       };
       return {
         claim: "ACCOUNT_CLASSIFICATION" as const,
-        label: "Account classification",
+        label: RECOMMENDATION_CLAIM_LABELS.ACCOUNT_CLASSIFICATION,
         recordedClaim: "Quasi-collateral / effective control",
         status: "UNSUPPORTED" as const,
         explanation: "The restricted-account control terms have not returned, so effective control is not established.",
@@ -288,12 +287,12 @@ export function reviewRecommendation(input: {
     }
     return {
       claim: "ACCOUNT_CLASSIFICATION" as const,
-      label: "Account classification",
+      label: RECOMMENDATION_CLAIM_LABELS.ACCOUNT_CLASSIFICATION,
       recordedClaim: "Ordinary operating account",
       status: "UNSUPPORTED" as const,
       explanation: has("account-control")
         ? "The returned account-control terms conflict with an ordinary-account classification."
-        : "The available record does not establish that RA-01 is an ordinary operating account.",
+        : `The available record does not establish that ${CASE_FACTS.facilityAAccount} is an ordinary operating account.`,
       evidenceIds: has("account-control") ? ["account-control"] : [],
     };
   })();
@@ -301,32 +300,32 @@ export function reviewRecommendation(input: {
   const facilityLinkage = (() => {
     if (!input.decisions.facilityLinkage || input.decisions.facilityLinkage === "UNRESOLVED") return {
       claim: "FACILITY_LINKAGE" as const,
-      label: "Facility A/B linkage",
+      label: RECOMMENDATION_CLAIM_LABELS.FACILITY_LINKAGE,
       recordedClaim: input.decisions.facilityLinkage === "UNRESOLVED" ? "Unresolved" : "Not recorded",
       status: "UNRESOLVED" as const,
-      explanation: "The recommendation preserves that Facility B's relationship to RA-01 is unconfirmed.",
+      explanation: `The recommendation preserves that Facility B's relationship to ${CASE_FACTS.facilityAAccount} is ${CASE_FACTS.facilityBEntryStatus}.`,
       evidenceIds: [],
     };
-    if (input.decisions.facilityLinkage === "SHARED_POOL") {
+    if (input.decisions.facilityLinkage === CASE_FACTS.facilityLinkageFinding) {
       if (linkageEvidence.length) return {
         claim: "FACILITY_LINKAGE" as const,
-        label: "Facility A/B linkage",
+        label: RECOMMENDATION_CLAIM_LABELS.FACILITY_LINKAGE,
         recordedClaim: "Shared revenue pool",
         status: "SUPPORTED" as const,
-        explanation: "Returned Facility B or dependency evidence establishes the shared RA-01 revenue pool.",
+        explanation: `Returned Facility B or dependency evidence establishes the shared ${CASE_FACTS.facilityAAccount} revenue pool.`,
         evidenceIds: linkageEvidence,
       };
       if (has("facility-a")) return {
         claim: "FACILITY_LINKAGE" as const,
-        label: "Facility A/B linkage",
+        label: RECOMMENDATION_CLAIM_LABELS.FACILITY_LINKAGE,
         recordedClaim: "Shared revenue pool",
         status: "CONDITIONAL" as const,
-        explanation: "Facility A's RA-01 link is available, but Facility B or dependency evidence has not returned.",
+        explanation: `Facility A's ${CASE_FACTS.facilityAAccount} link is available, but Facility B or dependency evidence has not returned.`,
         evidenceIds: ["facility-a"],
       };
       return {
         claim: "FACILITY_LINKAGE" as const,
-        label: "Facility A/B linkage",
+        label: RECOMMENDATION_CLAIM_LABELS.FACILITY_LINKAGE,
         recordedClaim: "Shared revenue pool",
         status: "UNSUPPORTED" as const,
         explanation: "Facility B or dependency evidence has not returned, so a shared pool is not established.",
@@ -335,12 +334,12 @@ export function reviewRecommendation(input: {
     }
     return {
       claim: "FACILITY_LINKAGE" as const,
-      label: "Facility A/B linkage",
+      label: RECOMMENDATION_CLAIM_LABELS.FACILITY_LINKAGE,
       recordedClaim: "Independent facilities",
       status: "UNSUPPORTED" as const,
       explanation: linkageEvidence.length
         ? "Returned Facility B or dependency evidence conflicts with treating the facilities as independent."
-        : "The available record does not establish that Facility B is independent of RA-01.",
+        : `The available record does not establish that Facility B is independent of ${CASE_FACTS.facilityAAccount}.`,
       evidenceIds: linkageEvidence,
     };
   })();
@@ -348,7 +347,7 @@ export function reviewRecommendation(input: {
   const disclosure = (() => {
     if (!input.decisions.disclosure) return {
       claim: "DISCLOSURE_RECOMMENDATION" as const,
-      label: "Disclosure recommendation",
+      label: RECOMMENDATION_CLAIM_LABELS.DISCLOSURE_RECOMMENDATION,
       recordedClaim: "Not recorded",
       status: "UNRESOLVED" as const,
       explanation: "No disclosure recommendation has been recorded.",
@@ -356,14 +355,14 @@ export function reviewRecommendation(input: {
     };
     if (input.decisions.disclosure === "REDACTED") return has("confidentiality-opinion") ? {
       claim: "DISCLOSURE_RECOMMENDATION" as const,
-      label: "Disclosure recommendation",
+      label: RECOMMENDATION_CLAIM_LABELS.DISCLOSURE_RECOMMENDATION,
       recordedClaim: "Redacted functional summary",
       status: "SUPPORTED" as const,
       explanation: "The returned legal opinion permits a redacted functional summary.",
       evidenceIds: ["confidentiality-opinion"],
     } : {
       claim: "DISCLOSURE_RECOMMENDATION" as const,
-      label: "Disclosure recommendation",
+      label: RECOMMENDATION_CLAIM_LABELS.DISCLOSURE_RECOMMENDATION,
       recordedClaim: "Redacted functional summary",
       status: "CONDITIONAL" as const,
       explanation: "A functional summary may meet the information need, but the legal confidentiality opinion has not returned.",
@@ -371,7 +370,7 @@ export function reviewRecommendation(input: {
     };
     if (input.decisions.disclosure === "FULL") return {
       claim: "DISCLOSURE_RECOMMENDATION" as const,
-      label: "Disclosure recommendation",
+      label: RECOMMENDATION_CLAIM_LABELS.DISCLOSURE_RECOMMENDATION,
       recordedClaim: "Full contract disclosure",
       status: "UNSUPPORTED" as const,
       explanation: has("confidentiality-opinion")
@@ -381,7 +380,7 @@ export function reviewRecommendation(input: {
     };
     return {
       claim: "DISCLOSURE_RECOMMENDATION" as const,
-      label: "Disclosure recommendation",
+      label: RECOMMENDATION_CLAIM_LABELS.DISCLOSURE_RECOMMENDATION,
       recordedClaim: "Withhold pending consent",
       status: "SUPPORTED" as const,
       explanation: "The available record does not establish permission for unrestricted disclosure, and the recommendation preserves that dependency.",
@@ -392,7 +391,7 @@ export function reviewRecommendation(input: {
   const treatment = (() => {
     if (!input.decisions.treatmentPerimeter || input.decisions.treatmentPerimeter === "DEFER") return {
       claim: "TREATMENT_PERIMETER" as const,
-      label: "Treatment perimeter",
+      label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
       recordedClaim: input.decisions.treatmentPerimeter === "DEFER" ? "Deferred" : "Not recorded",
       status: "UNRESOLVED" as const,
       explanation: "The recommendation preserves that the evidence does not yet define the treatment perimeter.",
@@ -401,7 +400,7 @@ export function reviewRecommendation(input: {
     if (input.decisions.treatmentPerimeter === "BOTH_FACILITIES") {
       if (linkageEvidence.length) return {
         claim: "TREATMENT_PERIMETER" as const,
-        label: "Treatment perimeter",
+        label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
         recordedClaim: "Facilities A and B",
         status: "SUPPORTED" as const,
         explanation: "Returned Facility B or dependency evidence supports carrying both facilities in the dependency analysis.",
@@ -409,15 +408,15 @@ export function reviewRecommendation(input: {
       };
       if (has("facility-a")) return {
         claim: "TREATMENT_PERIMETER" as const,
-        label: "Treatment perimeter",
+        label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
         recordedClaim: "Facilities A and B",
         status: "CONDITIONAL" as const,
-        explanation: "Facility A's RA-01 link is available, but Facility B's dependency remains open.",
+        explanation: `Facility A's ${CASE_FACTS.facilityAAccount} link is available, but Facility B's dependency remains open.`,
         evidenceIds: ["facility-a"],
       };
       return {
         claim: "TREATMENT_PERIMETER" as const,
-        label: "Treatment perimeter",
+        label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
         recordedClaim: "Facilities A and B",
         status: "UNSUPPORTED" as const,
         explanation: "Facility B or dependency evidence has not returned to support carrying both facilities.",
@@ -426,7 +425,7 @@ export function reviewRecommendation(input: {
     }
     if (linkageEvidence.length) return {
       claim: "TREATMENT_PERIMETER" as const,
-      label: "Treatment perimeter",
+      label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
       recordedClaim: "Facility A only",
       status: "UNSUPPORTED" as const,
       explanation: "Returned Facility B or dependency evidence conflicts with excluding Facility B from the dependency analysis.",
@@ -434,14 +433,14 @@ export function reviewRecommendation(input: {
     };
     return has("facility-a") ? {
       claim: "TREATMENT_PERIMETER" as const,
-      label: "Treatment perimeter",
+      label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
       recordedClaim: "Facility A only",
       status: "CONDITIONAL" as const,
-      explanation: "Facility A is established, but Facility B's relationship to RA-01 remains open.",
+      explanation: `Facility A is established, but Facility B's relationship to ${CASE_FACTS.facilityAAccount} remains open.`,
       evidenceIds: ["facility-a"],
     } : {
       claim: "TREATMENT_PERIMETER" as const,
-      label: "Treatment perimeter",
+      label: RECOMMENDATION_CLAIM_LABELS.TREATMENT_PERIMETER,
       recordedClaim: "Facility A only",
       status: "UNSUPPORTED" as const,
       explanation: "Facility A evidence has not returned, and Facility B's relationship remains open.",
@@ -457,7 +456,7 @@ export function reviewRecommendation(input: {
   const readiness = (() => {
     if (!input.decisions.readiness) return {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Not recorded",
       status: "UNRESOLVED" as const,
       explanation: "No readiness position has been recorded.",
@@ -465,14 +464,14 @@ export function reviewRecommendation(input: {
     };
     if (input.decisions.readiness === "NOT_READY") return materialItems.some((item) => item.status !== "SUPPORTED") ? {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Not ready",
       status: "SUPPORTED" as const,
       explanation: "The not-ready posture is consistent with the open or unsupported material claims in this review.",
       evidenceIds: [],
     } : {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Not ready",
       status: "CONDITIONAL" as const,
       explanation: "All reviewed material claims are supported; name any separate dependency keeping the package not ready.",
@@ -480,14 +479,14 @@ export function reviewRecommendation(input: {
     };
     if (input.decisions.readiness === "READY_WITH_CONDITIONS") return unsupported.length ? {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Ready with conditions",
       status: "UNSUPPORTED" as const,
       explanation: `A condition does not support firm claims that exceed or conflict with the evidence: ${unsupportedLabels}.`,
       evidenceIds: [],
     } : {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Ready with conditions",
       status: "SUPPORTED" as const,
       explanation: open.length
@@ -497,7 +496,7 @@ export function reviewRecommendation(input: {
     };
     if (unsupported.length) return {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Ready",
       status: "UNSUPPORTED" as const,
       explanation: `The ready posture exceeds material claims that are unsupported by the available evidence: ${unsupportedLabels}.`,
@@ -505,7 +504,7 @@ export function reviewRecommendation(input: {
     };
     if (open.length) return {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Ready",
       status: "CONDITIONAL" as const,
       explanation: `Readiness is not yet unconditional because these material dependencies remain open: ${openLabels}.`,
@@ -513,7 +512,7 @@ export function reviewRecommendation(input: {
     };
     return {
       claim: "READINESS_POSITION" as const,
-      label: "Readiness position",
+      label: RECOMMENDATION_CLAIM_LABELS.READINESS_POSITION,
       recordedClaim: "Ready",
       status: "SUPPORTED" as const,
       explanation: "Each reviewed material claim is supported by the evidence available at this moment.",
@@ -727,7 +726,7 @@ export function deriveConsequences(decisions: DecisionState): Consequence[] {
     consequences.push({
       id: "provisional-liquidity",
       title: "The initial package retained liquidity uncertainty",
-      outcome: "Coordination began earlier, but the OCC could not treat USD 780m as usable cash and requested clarification.",
+      outcome: `Coordination began earlier, but the OCC could not treat USD ${CASE_FACTS.reportedLiquidityUsdMillions}m as usable cash and requested clarification.`,
       basis: "Authored consequence rule: a caveat preserves uncertainty; it does not verify the figure.",
       severity: "CAUTION",
     });
@@ -736,27 +735,27 @@ export function deriveConsequences(decisions: DecisionState): Consequence[] {
   if (decisions.liquidityBasis === "VERIFIED_480") {
     consequences.push({
       id: "verified-basis",
-      title: "Usable liquidity was corrected to USD 480m",
-      outcome: "The package uses USD 480m as the verified usable-liquidity basis after distinguishing USD 240m restricted and USD 60m protected from the USD 780m reported balance.",
-      basis: "Deterministic reconciliation: 780 - 240 - 60 = 480.",
+      title: `Usable liquidity was corrected to USD ${CASE_FACTS.usableLiquidityUsdMillions}m`,
+      outcome: `The package uses USD ${CASE_FACTS.usableLiquidityUsdMillions}m as the verified usable-liquidity basis after distinguishing USD ${CASE_FACTS.restrictedLiquidityUsdMillions}m restricted and USD ${CASE_FACTS.protectedLiquidityUsdMillions}m protected from the USD ${CASE_FACTS.reportedLiquidityUsdMillions}m reported balance.`,
+      basis: `Deterministic reconciliation: ${CASE_FACTS.reportedLiquidityUsdMillions} - ${CASE_FACTS.restrictedLiquidityUsdMillions} - ${CASE_FACTS.protectedLiquidityUsdMillions} = ${CASE_FACTS.usableLiquidityUsdMillions}.`,
       severity: "POSITIVE",
     });
   } else {
     consequences.push({
       id: "unreconciled-basis",
       title: "Liquidity remained provisional",
-      outcome: "The package cannot rely on the gross USD 780m figure as freely usable resources.",
+      outcome: `The package cannot rely on the gross USD ${CASE_FACTS.reportedLiquidityUsdMillions}m figure as freely usable resources.`,
       basis: "The restricted and protected balances were not incorporated into the submitted basis.",
       severity: "BLOCKING",
     });
   }
 
-  if (decisions.facilityLinkage === "SHARED_POOL") {
+  if (decisions.facilityLinkage === CASE_FACTS.facilityLinkageFinding) {
     consequences.push({
       id: "shared-pool",
       title: "The treatment perimeter reflects the shared revenue pool",
       outcome: "Facilities A and B are carried as linked for dependency analysis, without claiming that they are legally identical.",
-      basis: "Scenario fact: both facilities depend on RA-01.",
+      basis: `Scenario fact: both facilities depend on ${CASE_FACTS.facilityAAccount}.`,
       severity: "POSITIVE",
     });
   } else {
@@ -814,13 +813,13 @@ export function deriveCounterfactuals(decisions: DecisionState): Counterfactual[
     items.push({
       id: "verify-earlier",
       alternative: "Request Treasury and account-control verification before using the gross figure.",
-      projectedDifference: "The initial package would arrive later but would use USD 480m as the supported usable-liquidity basis.",
+      projectedDifference: `The initial package would arrive later but would use USD ${CASE_FACTS.usableLiquidityUsdMillions}m as the supported usable-liquidity basis.`,
       fixedAssumptions: "Account terms, balances, deadlines, and all later scenario rules remain unchanged.",
     });
   } else {
     items.push({
       id: "defer-verification",
-      alternative: "Proceed immediately with the USD 780m report under an explicit caveat.",
+      alternative: `Proceed immediately with the USD ${CASE_FACTS.reportedLiquidityUsdMillions}m report under an explicit caveat.`,
       projectedDifference: "Coordination would begin earlier, but the OCC would retain a material liquidity question and later revision cost.",
       fixedAssumptions: "The same restricted and protected balances are eventually revealed.",
     });
@@ -833,11 +832,11 @@ export function deriveCounterfactuals(decisions: DecisionState): Counterfactual[
       fixedAssumptions: "No additional creditor consent is granted.",
     });
   }
-  if (decisions.facilityLinkage !== "SHARED_POOL") {
+  if (decisions.facilityLinkage !== CASE_FACTS.facilityLinkageFinding) {
     items.push({
       id: "map-shared-pool",
       alternative: "Carry both facilities inside the dependency analysis.",
-      projectedDifference: "The treatment perimeter would align with the authored RA-01 dependency and avoid treating Facility B as operationally independent.",
+      projectedDifference: `The treatment perimeter would align with the authored ${CASE_FACTS.facilityAAccount} dependency and avoid treating Facility B as operationally independent.`,
       fixedAssumptions: "This changes dependency treatment, not the legal character of either facility.",
     });
   }
@@ -901,9 +900,9 @@ function unresolvedRiskListForVersion(ruleVersion: string | undefined, decisions
 
 export function unresolvedRiskList(decisions: DecisionState): string[] {
   const risks: string[] = [];
-  if (decisions.liquidityBasis !== "VERIFIED_480") risks.push("Usable liquidity is not verified at USD 480m.");
+  if (decisions.liquidityBasis !== "VERIFIED_480") risks.push(`Usable liquidity is not verified at USD ${CASE_FACTS.usableLiquidityUsdMillions}m.`);
   if (decisions.accountClassification === "UNRESOLVED" || !decisions.accountClassification) risks.push("Account-control classification remains unresolved.");
-  if (decisions.facilityLinkage !== "SHARED_POOL") risks.push("The shared Facility A/B revenue-pool dependency is not incorporated.");
+  if (decisions.facilityLinkage !== CASE_FACTS.facilityLinkageFinding) risks.push("The shared Facility A/B revenue-pool dependency is not incorporated.");
   if (decisions.disclosure === "WITHHOLD") risks.push("The OCC lacks material account-control information.");
   if (decisions.treatmentPerimeter === "FACILITY_A_ONLY") risks.push("Facility B is outside the proposed perimeter despite the shared-pool dependency.");
   if (decisions.unresolvedRisks.trim()) risks.push(decisions.unresolvedRisks.trim());

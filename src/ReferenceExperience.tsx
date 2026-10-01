@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
+import { CASE_FACTS, CASE_FILE_SECTIONS, LEARNING_BRIDGE_CHAPTERS, ORIENTATION_STEPS } from "./scenario";
 
 export type ReferenceSurface = "orientation" | "bridge" | "case-file";
-
-const REFERENCE_PATH = "/kuvera_debt_management_office.html";
 
 const TITLES: Record<ReferenceSurface, string> = {
   orientation: "Debt Management Office orientation",
@@ -10,11 +9,11 @@ const TITLES: Record<ReferenceSurface, string> = {
   "case-file": "Kuvera case file",
 };
 
-const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 function backgroundSiblings(root: HTMLElement): HTMLElement[] {
   const siblings = new Set<HTMLElement>();
-  let current: HTMLElement = root;
+  let current = root;
   while (current.parentElement && current.parentElement !== document.documentElement) {
     Array.from(current.parentElement.children).forEach((element) => {
       if (element !== current && element instanceof HTMLElement) siblings.add(element);
@@ -24,275 +23,203 @@ function backgroundSiblings(root: HTMLElement): HTMLElement[] {
   return [...siblings];
 }
 
-function trapWrapperFocus(event: ReactKeyboardEvent<HTMLElement>, onClose: () => void) {
+function trapFocus(event: ReactKeyboardEvent<HTMLElement>, onClose: () => void) {
   if (event.key === "Escape") {
     event.preventDefault();
     onClose();
     return;
   }
   if (event.key !== "Tab") return;
-  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE));
+  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((element) => !element.hidden);
   const first = focusable[0];
   const last = focusable.at(-1);
-  if (event.shiftKey && document.activeElement === first) {
+  if (!first || !last) {
     event.preventDefault();
-    last?.focus();
+    event.currentTarget.focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
   } else if (!event.shiftKey && document.activeElement === last) {
     event.preventDefault();
-    first?.focus();
+    first.focus();
   }
 }
 
-function alignOrientationCopy(referenceDocument: Document) {
-  const title = referenceDocument.getElementById("onboardingTitle");
-  const body = referenceDocument.getElementById("onboardingBody");
-  const where = referenceDocument.getElementById("onboardingWhere");
-  if (!title || !body || !where) return;
-
-  const setContent = (nextTitle: string, nextBody: string, nextWhere: string) => {
-    if (title.textContent !== nextTitle) title.textContent = nextTitle;
-    if (body.innerHTML !== nextBody) body.innerHTML = nextBody;
-    const whereMarkup = `<span class="mk"></span>${nextWhere}`;
-    if (where.innerHTML !== whereMarkup) where.innerHTML = whereMarkup;
-  };
-
-  if (title.textContent === "What you are here to do") {
-    setContent(
-      "What you are here to do",
-      "You are the <b>Debt Management Office (DMO)</b> inside Kuvera’s Finance Ministry. You maintain the claims record, request evidence, map dependencies, and prepare a recommendation. Treasury, Legal, creditors, the Official Creditor Committee (OCC), and IMF staff are represented by the exercise or facilitator.<br><br>The live room uses the eight-stage process shown behind this orientation. The facilitator unlocks each new stage; every earlier unlocked stage remains available for revision.",
-      "Role · Debt Management Office",
-    );
-  } else if (title.textContent === "Casework starts with the facilitator") {
-    setContent(
-      "Casework starts with the facilitator",
-      "Orientation and the Learning Bridge do <b>not</b> use casework time. The top-right counter remains <b>Casework · 20:00 · waiting</b> until the facilitator begins the exercise.<br><br>Inside the case, two separate institutional deadlines still matter: a USD 750m maturity in six weeks and the IMF Board horizon in eleven weeks. Workshop minutes do not convert into scenario days or weeks.",
-      "Look top right · Casework clock",
-    );
-  } else if (title.textContent === "Every step is open") {
-    setContent(
-      "Facilitator-paced, revisitable steps",
-      "The <b>Process flow</b> on the left is the workshop’s single navigation model. The facilitator unlocks each new stage through Socratic dialogue.<br><br>You may return to any unlocked stage. Locked stages remain visibly marked <b>Await facilitator</b>, so the rail always reflects the live workshop state.",
-      "Look left · Process flow",
-    );
-  } else if (title.textContent === "Every decision carries a reason") {
-    setContent(
-      "Every decision carries a reason",
-      "Each decision stage combines a structured choice with a short written rationale. Save your work before moving on.<br><br>The facilitator’s after-action report reconstructs what you chose, what evidence was available, what you requested, and what remained unresolved at that moment.",
-      "Look centre · Decision workspace",
-    );
-  } else if (title.textContent === "Cite what you actually read") {
-    setContent(
-      "Use the complete Case File",
-      "The <b>Case File</b> in the top right holds the country profile, indicators, contracts, creditor landscape, Common Framework process, and evidence basis.<br><br>It remains available throughout the exercise without resetting or replacing your live workshop work.",
-      "Look top right · Case file",
-    );
-  } else if (title.textContent === "Nothing here is yours alone") {
-    setContent(
-      "Requests create a record",
-      "Use <b>Communications</b> to open the Evidence stage once the facilitator has released it. Routine institutional requests return through authored scenario rules; unusual requests go to the facilitator acting in the named institutional role.<br><br>Every request and response is timestamped for the after-action review.",
-      "Look top right · Communications",
-    );
-  } else if (title.textContent === "Two advisors, on call") {
-    setContent(
-      "Two advisors, on call",
-      "<b>Amara Okoye</b> covers the country, creditor architecture, and Common Framework sequence. <b>Daniel Mensah</b> covers contracts, restricted accounts, effective control (practical limits on Kuvera’s use of cash), disclosure, and Comparability of Treatment.<br><br>Open AI advisors from the lower-left control. Their answers are grounded in evidence available in your case record and cannot choose your recommendation or reveal hidden state.",
-      "Look bottom left · AI advisors",
-    );
-  } else if (title.textContent === "The debrief is the point") {
-    setContent(
-      "The debrief is the point",
-      "After submissions close, the final participant stage reconstructs your own submitted position, the evidence available at submission, bounded exercise consequences, unresolved risks, and one fixed-assumption counterfactual. You then record what you will do differently when preparing a real decision under uncertainty.<br><br>The facilitatorâ€™s detailed after-action report remains private. Nothing is scored or ranked.",
-      "Step 8 · Debrief and transfer",
-    );
-  }
-}
-
-export function ReferenceExperience({ surface, onClose, onComplete }: { surface: ReferenceSurface; onClose: () => void; onComplete: () => void }) {
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const dismissRef = useRef<HTMLButtonElement>(null);
-  const observerRef = useRef<MutationObserver | null>(null);
-  const frameCleanupRef = useRef<(() => void) | null>(null);
-  const [referenceDocument, setReferenceDocument] = useState("");
-  const [loadError, setLoadError] = useState(false);
-
+function useReferenceDialog(rootRef: RefObject<HTMLDivElement | null>, closeRef: RefObject<HTMLButtonElement | null>) {
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
     const root = rootRef.current;
-    const siblings = root ? backgroundSiblings(root) : [];
+    if (!root) return;
+    const previousOverflow = document.body.style.overflow;
+    const siblings = backgroundSiblings(root);
     document.body.style.overflow = "hidden";
     siblings.forEach((element) => {
       element.inert = true;
       element.setAttribute("aria-hidden", "true");
     });
-    window.requestAnimationFrame(() => dismissRef.current?.focus());
-    const controller = new AbortController();
-    void fetch(REFERENCE_PATH, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error("REFERENCE_NOT_AVAILABLE");
-        return response.text();
-      })
-      .then((html) => setReferenceDocument(html.replace(/<head>/i, '<head><base href="/">')))
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) setLoadError(true);
-      });
+    window.requestAnimationFrame(() => closeRef.current?.focus());
     return () => {
-      controller.abort();
-      observerRef.current?.disconnect();
-      frameCleanupRef.current?.();
       document.body.style.overflow = previousOverflow;
       siblings.forEach((element) => {
         element.inert = false;
         element.removeAttribute("aria-hidden");
       });
     };
-  }, []);
+  }, [closeRef, rootRef]);
+}
 
-  function prepareReference() {
-    const frame = frameRef.current;
-    const referenceDocument = frame?.contentDocument;
-    if (!referenceDocument) {
-      setLoadError(true);
-      return;
-    }
+function Orientation({ onClose, onComplete, replayOnly }: { onClose: () => void; onComplete: () => void; replayOnly: boolean }) {
+  const [index, setIndex] = useState(0);
+  const step = ORIENTATION_STEPS[index];
+  return (
+    <div className="reference-learning-layout">
+      <div className="reference-progress" role="progressbar" aria-label="Orientation progress" aria-valuemin={1} aria-valuemax={ORIENTATION_STEPS.length} aria-valuenow={index + 1}>
+        {ORIENTATION_STEPS.map((item, itemIndex) => <span key={item.id} className={itemIndex <= index ? "complete" : ""} aria-hidden="true" />)}
+      </div>
+      <section className="reference-learning-card" aria-labelledby="orientation-step-title" aria-live="polite">
+        <span className="eyebrow">Orientation · Step {index + 1} of {ORIENTATION_STEPS.length}</span>
+        <h2 id="orientation-step-title">{step.title}</h2>
+        {step.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+        <div className="reference-location"><span aria-hidden="true" />{step.location}</div>
+      </section>
+      <footer className="reference-learning-footer">
+        <button type="button" className="secondary-button" onClick={onClose}>Skip for now</button>
+        <div>
+          <button type="button" className="secondary-button" disabled={index === 0} onClick={() => setIndex((value) => value - 1)}>Back</button>
+          <button type="button" className="primary-button" onClick={() => index === ORIENTATION_STEPS.length - 1 ? onComplete() : setIndex((value) => value + 1)}>
+            {index === ORIENTATION_STEPS.length - 1 ? (replayOnly ? "Return to workshop" : "Continue to Learning Bridge") : "Next"}
+          </button>
+        </div>
+      </footer>
+    </div>
+  );
+}
 
-    const onboarding = referenceDocument.getElementById("onboardingModal");
-    const bridge = referenceDocument.getElementById("learningBridge");
-    const caseFile = referenceDocument.getElementById("referenceOverlay");
+function LearningBridge({ onClose, onComplete, replayOnly }: { onClose: () => void; onComplete: () => void; replayOnly: boolean }) {
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const chapter = LEARNING_BRIDGE_CHAPTERS[index];
+  const selected = answers[chapter.id];
+  const answer = selected === undefined ? undefined : chapter.practice.options[selected];
 
-    if (!onboarding || !bridge || !caseFile) {
-      setLoadError(true);
-      return;
-    }
+  function moveTo(next: number) {
+    setIndex(Math.max(0, Math.min(LEARNING_BRIDGE_CHAPTERS.length - 1, next)));
+  }
 
-    const accessibilityStyle = referenceDocument.createElement("style");
-    accessibilityStyle.dataset.futureslabAccessibility = "true";
-    accessibilityStyle.textContent = `
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-      }
-      button, [role="button"], a, input, select, textarea, summary { min-height: 40px; }
-      .primary-button, .record-button, .primary { min-height: 44px; }
-      @media (max-width: 800px) {
-        .workspace, .learning-panel, .ref-panel, .comm-panel, .advisor-panel { zoom: 1 !important; }
-        .onboarding-copy, .bridge-copy, .ref-panel { font-size: 12px !important; }
-      }
-    `;
-    referenceDocument.head.append(accessibilityStyle);
-
-    let activeSurface: HTMLElement;
-    if (surface === "orientation") {
-      const orientationStyle = referenceDocument.createElement("style");
-      orientationStyle.dataset.futureslabOrientation = "true";
-      orientationStyle.textContent = "html,body{background:transparent!important}body::before{display:none!important}body>.app{visibility:hidden!important;pointer-events:none!important}";
-      referenceDocument.head.append(orientationStyle);
-      alignOrientationCopy(referenceDocument);
-      activeSurface = onboarding;
-    } else if (surface === "bridge") {
-      onboarding.classList.remove("open");
-      onboarding.setAttribute("aria-hidden", "true");
-      referenceDocument.getElementById("replayBridge")?.click();
-      activeSurface = bridge;
-    } else {
-      onboarding.classList.remove("open");
-      onboarding.setAttribute("aria-hidden", "true");
-      bridge.classList.remove("open");
-      bridge.setAttribute("aria-hidden", "true");
-      referenceDocument.getElementById("openReference")?.click();
-
-      const casePanel = caseFile.querySelector<HTMLElement>(".ref-panel");
-      const caseBody = caseFile.querySelector<HTMLElement>(".ref-body");
-      if (!casePanel || !caseBody) {
-        setLoadError(true);
-        return;
-      }
-
-      // The preserved reference scales its full-viewport panel to 150%. In an
-      // iframe that makes the overlay itself scroll as well as the dossier body.
-      // Keep the authored scale, but size its logical viewport to the scaled
-      // frame so the case-file body remains the single scroll region.
-      const panelZoom = Number.parseFloat(
-        referenceDocument.defaultView?.getComputedStyle(casePanel).getPropertyValue("zoom") || "1",
-      ) || 1;
-      const scaledViewport = 100 / panelZoom;
-      referenceDocument.documentElement.style.overflow = "hidden";
-      referenceDocument.body.style.overflow = "hidden";
-      caseFile.style.setProperty("overflow", "hidden", "important");
-      casePanel.style.setProperty("width", `${scaledViewport}vw`, "important");
-      casePanel.style.setProperty("height", `${scaledViewport}vh`, "important");
-      casePanel.style.setProperty("max-height", `${scaledViewport}vh`, "important");
-      caseBody.style.setProperty("min-height", "0", "important");
-      caseBody.style.setProperty("overflow", "auto", "important");
-      caseBody.tabIndex = 0;
-      caseBody.setAttribute("role", "region");
-      caseBody.setAttribute("aria-label", "Kuvera case file contents");
-      activeSurface = caseFile;
-    }
-
-    if (!activeSurface.classList.contains("open")) {
-      setLoadError(true);
-      return;
-    }
-
-    const handleFrameKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = Array.from(activeSurface.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
-      const first = focusable[0];
-      const last = focusable.at(-1);
-      if ((event.shiftKey && referenceDocument.activeElement === first) || (!event.shiftKey && referenceDocument.activeElement === last)) {
-        event.preventDefault();
-        dismissRef.current?.focus();
-      }
-    };
-    referenceDocument.addEventListener("keydown", handleFrameKeyDown);
-    frameCleanupRef.current?.();
-    frameCleanupRef.current = () => referenceDocument.removeEventListener("keydown", handleFrameKeyDown);
-
-    observerRef.current?.disconnect();
-    let exitReported = false;
-    observerRef.current = new MutationObserver(() => {
-      if (surface === "orientation") alignOrientationCopy(referenceDocument);
-      if (activeSurface.classList.contains("open") || exitReported) return;
-      exitReported = true;
-      if (surface === "orientation" && bridge.classList.contains("open")) onComplete();
-      else if (surface === "bridge" && bridge.dataset.preparationExit === "complete") onComplete();
-      else onClose();
-    });
-    observerRef.current.observe(activeSurface, surface === "orientation"
-      ? { attributes: true, attributeFilter: ["class"], childList: true, characterData: true, subtree: true }
-      : { attributes: true, attributeFilter: ["class"] });
+  function handleTabKey(event: ReactKeyboardEvent<HTMLButtonElement>, tabIndex: number) {
+    let next: number | undefined;
+    if (event.key === "ArrowRight") next = (tabIndex + 1) % LEARNING_BRIDGE_CHAPTERS.length;
+    if (event.key === "ArrowLeft") next = (tabIndex - 1 + LEARNING_BRIDGE_CHAPTERS.length) % LEARNING_BRIDGE_CHAPTERS.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = LEARNING_BRIDGE_CHAPTERS.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    moveTo(next);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
   }
 
   return (
-    <div ref={rootRef} className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]} tabIndex={-1} onKeyDown={(event) => trapWrapperFocus(event, onClose)}>
-      <button ref={dismissRef} type="button" className="reference-experience-dismiss" onClick={onClose}>
-        Close {TITLES[surface]}
-      </button>
-      {loadError ? (
-        <div className="reference-experience-error" role="alert">
-          <h2>{TITLES[surface]}</h2>
-          <p>The preserved reference surface could not be loaded.</p>
-          <button type="button" className="primary-button" onClick={onClose}>Return to workshop</button>
+    <div className="reference-bridge-layout">
+      <header className="reference-bridge-intro">
+        <span className="eyebrow">Learning Bridge · subject-matter grounding · About 6 minutes</span>
+        <h2>Enter the case with a shared operating frame</h2>
+        <p>Read each model, make one call on a parallel practice case, and read why. These examples do not reveal Kuvera's unresolved evidence.</p>
+      </header>
+      <div className="reference-tabs" role="tablist" aria-label="Learning Bridge chapters">
+        {LEARNING_BRIDGE_CHAPTERS.map((item, itemIndex) => (
+          <button key={item.id} id={`bridge-tab-${item.id}`} type="button" role="tab" aria-selected={itemIndex === index} aria-controls="bridge-panel" tabIndex={itemIndex === index ? 0 : -1} onKeyDown={(event) => handleTabKey(event, itemIndex)} onClick={() => moveTo(itemIndex)}>
+            {itemIndex + 1}. {item.tab}<span>{answers[item.id] === undefined ? "Open" : "Practised"}</span>
+          </button>
+        ))}
+      </div>
+      <article id="bridge-panel" className="reference-bridge-panel" role="tabpanel" aria-labelledby={`bridge-tab-${chapter.id}`} tabIndex={0}>
+        <aside>
+          <span className="eyebrow">Chapter {index + 1} of {LEARNING_BRIDGE_CHAPTERS.length}</span>
+          <strong>{chapter.type}</strong>
+          <p>{chapter.objective}</p>
+          <small>Practice on parallel cases, not Kuvera. Kuvera's account restrictions, facility linkage, disclosure permission, and assurance sufficiency remain for you to establish.</small>
+        </aside>
+        <div className="reference-bridge-content">
+          <h3>{chapter.title}</h3>
+          <p>{chapter.introduction}</p>
+          <h4>Read the model</h4>
+          <ol className="reference-model-list">{chapter.model.map((item) => <li key={item.label}><strong>{item.label}</strong><span>{item.detail}</span></li>)}</ol>
+          <div className="reference-practice">
+            <h4>Make the call</h4>
+            <p>{chapter.practice.scenario}</p>
+            <strong>{chapter.practice.question}</strong>
+            <div className="reference-options" role="group" aria-label={chapter.practice.question}>
+              {chapter.practice.options.map((option, optionIndex) => (
+                <button key={option.label} type="button" aria-pressed={selected === optionIndex} onClick={() => setAnswers((current) => ({ ...current, [chapter.id]: optionIndex }))}>
+                  <span>{String.fromCharCode(65 + optionIndex)}</span>{option.label}
+                </button>
+              ))}
+            </div>
+            {answer && <div className={answer.correct ? "reference-feedback correct" : "reference-feedback"} role="status"><strong>{answer.correct ? "That holds." : "Not quite."}</strong><p>{answer.feedback}</p><span>Carry this into the case: {chapter.takeaway}</span></div>}
+          </div>
         </div>
-      ) : referenceDocument ? (
-        // This frame renders only the fixed, bundled reference document above.
-        // It intentionally remains same-origin because the wrapper coordinates
-        // its focus, completion state, and accessible case-file scroll region.
-        <iframe
-          ref={frameRef}
-          srcDoc={referenceDocument}
-          title={TITLES[surface]}
-          onLoad={prepareReference}
-          onError={() => setLoadError(true)}
-        />
-      ) : (
-        <div className="reference-experience-loading" role="status">Loading {TITLES[surface]}…</div>
-      )}
+      </article>
+      <footer className="reference-learning-footer">
+        <button type="button" className="secondary-button" onClick={onClose}>Skip for now</button>
+        <div>
+          <button type="button" className="secondary-button" disabled={index === 0} onClick={() => moveTo(index - 1)}>Back</button>
+          <button type="button" className="primary-button" disabled={selected === undefined} onClick={() => index === LEARNING_BRIDGE_CHAPTERS.length - 1 ? onComplete() : moveTo(index + 1)}>
+            {index === LEARNING_BRIDGE_CHAPTERS.length - 1 ? (replayOnly ? "Return to workshop" : "Continue to Mandate") : selected === undefined ? "Pick an answer to continue" : "Next chapter"}
+          </button>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function CaseFile() {
+  const [activeId, setActiveId] = useState(CASE_FILE_SECTIONS[0].id);
+  const activeIndex = CASE_FILE_SECTIONS.findIndex((section) => section.id === activeId);
+  const section = CASE_FILE_SECTIONS[activeIndex];
+
+  function handleTabKey(event: ReactKeyboardEvent<HTMLButtonElement>, tabIndex: number) {
+    let next: number | undefined;
+    if (event.key === "ArrowRight") next = (tabIndex + 1) % CASE_FILE_SECTIONS.length;
+    if (event.key === "ArrowLeft") next = (tabIndex - 1 + CASE_FILE_SECTIONS.length) % CASE_FILE_SECTIONS.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = CASE_FILE_SECTIONS.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    setActiveId(CASE_FILE_SECTIONS[next].id);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+  }
+
+  return (
+    <div className="reference-case-layout">
+      <header className="reference-case-head">
+        <div><span className="eyebrow">Case File</span><h2>Republic of Kuvera</h2></div>
+        <div className="reference-case-meta"><span>Common Framework treatment request</span><span>Debt assessed unsustainable</span><span>IMF Board in {CASE_FACTS.imfBoardHorizonWeeks} weeks</span></div>
+      </header>
+      <div className="reference-case-tabs" role="tablist" aria-label="Case File sections">
+        {CASE_FILE_SECTIONS.map((item, index) => <button key={item.id} id={`case-tab-${item.id}`} type="button" role="tab" aria-selected={item.id === activeId} aria-controls="case-panel" tabIndex={item.id === activeId ? 0 : -1} onKeyDown={(event) => handleTabKey(event, index)} onClick={() => setActiveId(item.id)}>{item.title}</button>)}
+      </div>
+      <article id="case-panel" className="reference-case-body" role="tabpanel" aria-labelledby={`case-tab-${section.id}`} tabIndex={0}>
+        <span className="eyebrow">Section {activeIndex + 1} of {CASE_FILE_SECTIONS.length}</span>
+        <h3>{section.title}</h3>
+        <p className="reference-case-lead">{section.lead}</p>
+        <dl className="reference-case-records">{section.records.map((record) => <div key={record.label}><dt>{record.label}</dt><dd><strong>{record.value}</strong><span>{record.detail}</span></dd></div>)}</dl>
+        <section className="reference-boundaries" aria-labelledby={`case-boundaries-${section.id}`}><h4 id={`case-boundaries-${section.id}`}>Evidence boundary</h4><ul>{section.boundaries.map((boundary) => <li key={boundary}>{boundary}</li>)}</ul></section>
+      </article>
+    </div>
+  );
+}
+
+export function ReferenceExperience({ surface, onClose, onComplete, preparationComplete }: { surface: ReferenceSurface; onClose: () => void; onComplete: () => void; preparationComplete: boolean }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useReferenceDialog(rootRef, closeRef);
+  return (
+    <div ref={rootRef} className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]} tabIndex={-1} onKeyDown={(event) => trapFocus(event, onClose)}>
+      <button ref={closeRef} type="button" className="reference-experience-dismiss" onClick={onClose}>Close {TITLES[surface]}</button>
+      <div className="reference-experience-surface">
+        {surface === "orientation" && <Orientation onClose={onClose} onComplete={onComplete} replayOnly={preparationComplete} />}
+        {surface === "bridge" && <LearningBridge onClose={onClose} onComplete={onComplete} replayOnly={preparationComplete} />}
+        {surface === "case-file" && <CaseFile />}
+      </div>
     </div>
   );
 }

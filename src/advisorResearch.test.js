@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { scriptedAdvisorTurn } from "./data";
+import { CASE_FACTS, CASE_FILE_SECTIONS, FINAL_STAGE_INDEX } from "./scenario";
 import { EMPTY_DECISIONS } from "./types";
 import {
   RESEARCH_CARDS,
@@ -24,14 +25,7 @@ const advisorFunctionSource = readFileSync(
   "utf8",
 );
 const participantSource = readFileSync(new URL("./ParticipantApp.tsx", import.meta.url), "utf8");
-const participantReference = readFileSync(
-  new URL("../public/kuvera_debt_management_office.html", import.meta.url),
-  "utf8",
-);
-const caseFileSource = participantReference.slice(
-  participantReference.indexOf('id="referenceOverlay"'),
-  participantReference.indexOf('id="advisorsListOverlay"'),
-);
+const caseFileSource = JSON.stringify(CASE_FILE_SECTIONS);
 const approvedDocumentClaimIds = [...approvedCardsSection.matchAll(/^- claim_id: (\S+)/gm)]
   .map((match) => match[1])
   .sort();
@@ -39,7 +33,7 @@ const approvedDocumentClaimIds = [...approvedCardsSection.matchAll(/^- claim_id:
 function participantBundle(evidenceIds = []) {
   const now = new Date().toISOString();
   return {
-    session: { id: "local-test", title: "Test", kind: "REHEARSAL", status: "RUNNING", currentStage: 7, durationSeconds: 1200, remainingSeconds: 1200, submissionsClosed: false, createdAt: now, expiresAt: now },
+    session: { id: "local-test", title: "Test", kind: "REHEARSAL", status: "RUNNING", currentStage: FINAL_STAGE_INDEX, durationSeconds: CASE_FACTS.caseworkDurationSeconds, remainingSeconds: CASE_FACTS.caseworkDurationSeconds, submissionsClosed: false, createdAt: now, expiresAt: now },
     participant: { id: "participant-test", sessionId: "local-test", name: "Test", organization: "Test", email: "test@example.org", currentStage: 0, lastActiveAt: now, consentedAt: now },
     decisions: { ...EMPTY_DECISIONS },
     evidenceRequests: evidenceIds.map((evidenceId) => ({ id: `request-${evidenceId}`, sessionId: "local-test", participantId: "participant-test", evidenceId, requestedAt: now, availableAt: now, releasedAt: now })),
@@ -216,8 +210,8 @@ describe("advisor research retrieval", () => {
 
 describe("participant evidence-discovery boundary", () => {
   it("keeps the exact usable-liquidity result out of the static Case File", () => {
-    expect(caseFileSource).toContain("$780m");
-    expect(caseFileSource).toContain("Usable amount</small>");
+    expect(caseFileSource).toContain(`USD ${CASE_FACTS.reportedLiquidityUsdMillions}m`);
+    expect(caseFileSource).toContain("usable result are not established");
     expect(caseFileSource).not.toMatch(/(?:USD |\$)480m/i);
     expect(caseFileSource).not.toMatch(/(?:USD |\$)240m/i);
     expect(caseFileSource).not.toMatch(/(?:USD |\$)60m/i);
@@ -225,7 +219,7 @@ describe("participant evidence-discovery boundary", () => {
 
   it("keeps Facility B linkage and disclosure permission unresolved in the static Case File", () => {
     expect(caseFileSource).toContain("Facility B's relationship to RA-01 is unconfirmed");
-    expect(caseFileSource).toContain("Permitted disclosure unresolved");
+    expect(caseFileSource).toContain('"value":"Permission unresolved"');
     expect(caseFileSource).not.toContain("Creditor knows it draws from the same copper-revenue pool as Facility A");
     expect(caseFileSource).not.toContain("Same creditor / same pool");
     expect(caseFileSource).not.toContain("Present through shared pool");
@@ -236,7 +230,7 @@ describe("participant evidence-discovery boundary", () => {
       participantSource.indexOf("function StageContent"),
       participantSource.indexOf("function InstitutionalRequestDesk"),
     );
-    expect(stageSource).toContain('treasuryReconciliationAvailable ? "USD 480m verified usable"');
+    expect(stageSource).toContain("CASE_FACTS.usableLiquidityUsdMillions");
     expect(stageSource).toContain('detail: "Record Facilities A and B as sharing a revenue pool."');
     expect(stageSource).toContain('detail: "Recommend release of a summary with selected details removed."');
     expect(stageSource).not.toContain("Both facilities depend on RA-01 and must be carried in the dependency analysis.");
