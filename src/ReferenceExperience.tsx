@@ -217,7 +217,11 @@ export function ReferenceExperience({ surface, onClose, onComplete, preparationC
   }, [surface]);
   return (
     <div ref={rootRef} className={`reference-experience reference-experience-${surface}`} role="dialog" aria-modal="true" aria-label={TITLES[surface]} tabIndex={-1} onKeyDown={(event) => trapFocus(event, onClose)}>
-      <button ref={closeRef} type="button" className="reference-experience-dismiss" onClick={onClose}>Close {TITLES[surface]}</button>
+      <button ref={closeRef} type="button" className="reference-experience-close" aria-label={`Close ${TITLES[surface]}`} title="Close" onClick={onClose}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      </button>
       <div className="reference-experience-surface">
         {surface === "orientation" && <Orientation onClose={onClose} onComplete={onComplete} replayOnly={preparationComplete} />}
         {surface === "bridge" && <LearningBridge onClose={onClose} onComplete={onComplete} replayOnly={preparationComplete} />}

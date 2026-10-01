@@ -83,6 +83,16 @@ describe("reference interface fidelity", () => {
     }
   });
 
+  it("loads Inter through ordered stylesheet links instead of late CSS imports", () => {
+    for (const page of [landingSource, aboutSource, workshopEntry, facilitatorEntry]) {
+      expect(page).not.toContain("@import");
+      expect(page).toContain('rel="preconnect" href="https://fonts.googleapis.com"');
+      expect(page).toContain('rel="preconnect" href="https://fonts.gstatic.com" crossorigin');
+      expect(page).toContain('rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter');
+      expect(page.indexOf("fonts.googleapis.com/css2")).toBeLessThan(page.indexOf("<style") === -1 ? page.length : page.indexOf("<style"));
+    }
+  });
+
   it("preserves the reference landing motion and integrated About experience", () => {
     expect(landingSource).toContain('id="topography-canvas"');
     expect(landingSource).toContain('id="about-overlay"');
@@ -455,7 +465,7 @@ describe("reference interface fidelity", () => {
     expect(styles).toContain("grid-template-columns: 245px minmax(0, 1fr) 260px");
   });
 
-  it("opens AI advisors as a full-page workspace with both supplied briefs and welcomes", () => {
+  it("opens AI advisors as a focused workspace with both supplied briefs and welcomes", () => {
     expect(Object.keys(ADVISOR_PROFILES)).toEqual(["amara", "daniel"]);
     expect(ADVISOR_PROFILES.amara.welcome).toContain("your Kuvera country and Common Framework advisor");
     expect(ADVISOR_PROFILES.daniel.welcome).toContain("your contracts, escrow, financing assurances, and comparability advisor");
@@ -472,14 +482,18 @@ describe("reference interface fidelity", () => {
     expect(participantSource).not.toContain("{profile.name} is ready.");
     expect(participantSource).not.toContain("Ask for an explanation of visible evidence, decision criteria, or process. The advisor cannot select your recommendation or reveal hidden state.");
     expect(participantSource).not.toContain("Grounded in visible case evidence");
-    expect(styles).toContain(".advisor-workspace { width: 66.666667vw; height: 66.666667vh; height: 66.666667dvh");
-    expect(styles).toContain("background: var(--bg); zoom: 1.5");
-    expect(styles).toContain(".advisor-briefs { min-height: 0; overflow: hidden");
-    expect(styles).toContain("grid-template-columns: minmax(360px, 430px) minmax(0, 1fr)");
+    expect(styles).toContain(".advisor-workspace { width: min(1180px, 100%); height: min(820px, 100%)");
+    expect(styles).not.toContain("background: var(--bg); zoom: 1.5");
+    expect(styles).toContain(".advisor-briefs { min-height: 0; overflow-y: auto");
+    expect(styles).toContain("grid-template-columns: 300px minmax(0, 1fr)");
+    expect(styles).toContain(".advisor-selector { display: grid; grid-template-columns: 1fr");
   });
 
   it("gives each advisor a greeting, a distinct written cadence, and accessible progressive replies", () => {
     expect(participantSource).toContain("profile.greeting");
+    expect(participantSource).toContain('const [voiceReply, setVoiceReply] = useState(false)');
+    expect(participantSource).toContain('disabled={!voicePlaybackAvailable}');
+    expect(participantSource).toContain('Quality voice unavailable');
     expect(participantSource).toContain("ADVISOR_RESPONSE_REVEAL_INTERVAL_MS");
     expect(participantSource).toContain('aria-live="off"');
     expect(participantSource).toContain('className="sr-only" aria-live="polite"');
@@ -515,10 +529,13 @@ describe("reference interface fidelity", () => {
     expect(reportSource).toContain('source.pageReference');
     expect(styles).toContain('.advisor-sources summary');
     expect(styles).not.toContain('.advisor-conversation .citations { display: none; }');
-    expect(styles).toContain('.advisor-conversation .question { width: 64%; margin-left: auto;');
-    expect(styles).toContain('.advisor-conversation .answer { width: 74%; margin-right: auto;');
-    expect(styles).toContain('.advisor-conversation .question, .advisor-conversation .answer { padding: 8px 10px;');
-    expect(styles).toContain('.advisor-conversation p { margin: 4px 0 0; white-space: pre-wrap; font-size: .6rem; line-height: 1.45; }');
+    expect(styles).toContain('.advisor-conversation .question { width: min(78%, 68ch); margin-left: auto;');
+    expect(styles).toContain('.advisor-conversation .answer { width: min(84%, 74ch); margin-right: auto;');
+    expect(styles).toContain('.advisor-conversation .question, .advisor-conversation .answer { padding: var(--space-3) var(--space-4);');
+    expect(styles).toContain('.advisor-conversation p { margin: var(--space-1) 0 0; white-space: pre-wrap; font-size: var(--text-sm); line-height: 1.55; }');
+    expect(styles).toContain('.voice-toggle, .inline-check { min-height: 40px;');
+    expect(styles).toContain('.voice-toggle input, .inline-check input { width: 18px; height: 18px; margin: 0; }');
+    expect(styles).toContain('grid-template-rows: minmax(180px, 28dvh) minmax(0, 1fr)');
     expect(referenceExperienceSource).not.toContain('include sources');
   });
 
@@ -594,6 +611,8 @@ describe("reference interface fidelity", () => {
     const bridgeLayoutRule = styles.match(/\.reference-bridge-layout, \.reference-case-layout\s*\{([^}]*)\}/)?.[1] ?? "";
     const bridgeContentRule = styles.match(/\.reference-bridge-content\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(styles).toContain("--space-16: 64px");
+    expect(styles).toContain("isolation: isolate; display: grid; grid-template-rows: minmax(0, 1fr)");
+    expect(styles).toContain("width: 100%; max-width: 100vw; height: 100%; min-height: 0");
     expect(bridgeLayoutRule).toMatch(/height:\s*100%/);
     expect(bridgeLayoutRule).toMatch(/min-height:\s*0/);
     expect(bridgeContentRule).toMatch(/overflow:\s*auto/);
@@ -603,6 +622,17 @@ describe("reference interface fidelity", () => {
     expect(referenceExperienceSource).toContain('className="reference-bridge-panel reference-content-transition"');
     expect(referenceExperienceSource).toContain("window.cancelAnimationFrame(frame)");
     expect(styles).toContain("@media (prefers-reduced-motion: no-preference)");
+  });
+
+  it("uses the compact reference close control without sacrificing its accessible name", () => {
+    const closeRule = styles.match(/\.reference-experience-close\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(referenceExperienceSource).toContain('className="reference-experience-close"');
+    expect(referenceExperienceSource).toContain('aria-label={`Close ${TITLES[surface]}`}');
+    expect(referenceExperienceSource).toContain('aria-hidden="true" focusable="false"');
+    expect(referenceExperienceSource).not.toContain('className="reference-experience-dismiss"');
+    expect(closeRule).toMatch(/right:\s*var\(--space-4\)/);
+    expect(closeRule).toMatch(/width:\s*var\(--space-10\)/);
+    expect(closeRule).toMatch(/border-radius:\s*var\(--pill\)/);
   });
 
   it("preserves reduced-motion content across the native reference surfaces and landing page", () => {

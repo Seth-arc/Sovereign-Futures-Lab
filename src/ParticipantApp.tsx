@@ -744,7 +744,7 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
   const [advisorId, setAdvisorId] = useState<AdvisorId>("amara");
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
-  const [voiceReply, setVoiceReply] = useState(true);
+  const [voiceReply, setVoiceReply] = useState(false);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -758,6 +758,8 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
   const closeRef = useRef<HTMLButtonElement>(null);
   const turns = useMemo(() => bundle.advisorTurns.filter((turn) => turn.advisorId === advisorId), [bundle.advisorTurns, advisorId]);
   const profile = ADVISOR_PROFILES[advisorId];
+  const selectedAdvisorVoice = useMemo(() => selectAdvisorVoice(availableVoices, advisorId), [availableVoices, advisorId]);
+  const voicePlaybackAvailable = Boolean(selectedAdvisorVoice);
   useDialogLifecycle(rootRef, closeRef);
 
   useEffect(() => {
@@ -770,6 +772,11 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
       synthesis?.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    if (!selectedAdvisorVoice) setVoiceReply(false);
+  }, [advisorId, selectedAdvisorVoice]);
 
   useEffect(() => {
     if (!revealingReply) return;
@@ -810,12 +817,18 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
     }
     const voiceProfile = ADVISOR_VOICE_PROFILES[advisorId];
     const selectedVoice = selectAdvisorVoice(availableVoices, advisorId);
+    if (!selectedVoice) {
+      setVoiceReply(false);
+      setError("No suitable natural English voice is available in this browser. The complete transcript remains visible.");
+      return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = voiceProfile.rate;
     utterance.pitch = voiceProfile.pitch;
     utterance.lang = selectedVoice?.lang ?? "en-US";
-    if (selectedVoice) utterance.voice = selectedVoice;
+    utterance.voice = selectedVoice;
+    utterance.onerror = () => setError("Voice playback failed. The complete transcript remains visible.");
     window.speechSynthesis.speak(utterance);
   }
 
@@ -853,12 +866,40 @@ function AdvisorPanel({ bundle, setBundle, onClose }: { bundle: ParticipantBundl
 
   function stopRecording() { if (recorder.current?.state === "recording") recorder.current.stop(); setRecording(false); }
 
-  function playWelcome(welcome: string) {
-    speakAdvisorText(welcome);
+  function previewAdvisorVoice() {
+    setError("");
+    speakAdvisorText(profile.greeting);
   }
 
-  return <div ref={rootRef} className="advisor-workspace-scrim" role="presentation"><section className="advisor-workspace" role="dialog" aria-modal="true" aria-labelledby="advisor-title" tabIndex={-1} onKeyDown={(event) => trapDialogFocus(event, onClose)}><header className="advisor-workspace-head"><div><h2 id="advisor-title">AI advisors</h2><p>Two case-grounded advisors explain evidence and process boundaries. They will not make your decision.</p></div><button ref={closeRef} className="secondary-button" type="button" onClick={onClose}>Close</button></header><div className="advisor-workspace-body">
-    <aside className="advisor-briefs" aria-label="Advisor briefs"><div className="advisor-selector" aria-label="Choose an advisor">{(Object.entries(ADVISOR_PROFILES) as Array<[AdvisorId, typeof profile]>).map(([id, advisor]) => <button key={id} type="button" aria-pressed={advisorId === id} onClick={() => setAdvisorId(id)}><img src={advisor.image} alt="" /><span><strong>{advisor.name}</strong><small>{advisor.shortName === "Amara" ? "Country and process" : "Contracts and treatment"}</small></span></button>)}</div><article className="advisor-brief-card selected"><div className="advisor-brief-head"><img src={profile.image} alt={profile.name} /><div><strong>{profile.name}</strong><small>{profile.bio}</small><span>{profile.role}</span></div></div><p>{profile.brief}</p><details className="advisor-welcome-message"><summary>Read welcome transcript</summary><p>{profile.welcome}</p></details><div className="advisor-brief-actions"><button type="button" className="text-button" onClick={() => playWelcome(profile.welcome)}>Play welcome</button></div></article></aside>
-    <section className="advisor-chat" aria-labelledby="active-advisor-name"><header className="advisor-chat-head"><div className="advisor-person"><img src={profile.image} alt="" /><div><span className="eyebrow">Active advisor</span><h3 id="active-advisor-name">{profile.name}</h3><p className="advisor-active-bio">{profile.bio}</p><small>{profile.role}</small></div></div></header><div ref={conversation} className="advisor-conversation" role="log" aria-live="off" aria-busy={busy || Boolean(revealingReply)} aria-label={`Conversation with ${profile.name}`} tabIndex={0}><article className="advisor-opening"><div className="answer"><strong>{profile.shortName}</strong><p>{profile.greeting}</p></div></article>{turns.map((turn) => { const isRevealing = revealingReply?.turnId === turn.id; return <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{profile.shortName}</strong><p aria-hidden={isRevealing || undefined}>{isRevealing ? revealedReply : turn.answer}{isRevealing && <span className="advisor-stream-cursor" aria-hidden="true" />}</p>{!isRevealing && <AdvisorSources sources={turn.sources} />}</div></article>; })}{busy && <article className="advisor-thinking" role="status"><div className="answer"><strong>{profile.shortName}</strong><p>Considering the visible record<span aria-hidden="true">…</span></p></div></article>}</div><div className="sr-only" aria-live="polite" aria-atomic="true">{replyAnnouncement}</div><div className="advisor-suggestions" aria-label={`Suggested questions for ${profile.name}`}>{profile.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>{error && <div className="error-panel advisor-error" role="alert">{error}</div>}<div className="advisor-compose"><label><span>Review or edit the transcript before sending</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle"><input type="checkbox" checked={voiceReply} onChange={(event) => setVoiceReply(event.target.checked)} />Speak replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div><footer>AI advisor · evidence available in your case record only · no hidden-state disclosure · no decision recommendation</footer></section>
-  </div></section></div>;
+  return (
+    <div ref={rootRef} className="advisor-workspace-scrim" role="presentation">
+      <section className="advisor-workspace" role="dialog" aria-modal="true" aria-labelledby="advisor-title" tabIndex={-1} onKeyDown={(event) => trapDialogFocus(event, onClose)}>
+        <header className="advisor-workspace-head">
+          <div><span className="eyebrow">Case-grounded support</span><h2 id="advisor-title">AI advisors</h2><p>Explain the visible record and process boundaries without making your decision.</p></div>
+          <button ref={closeRef} className="secondary-button" type="button" onClick={onClose}>Close</button>
+        </header>
+        <div className="advisor-workspace-body">
+          <aside className="advisor-briefs" aria-label="Advisor briefs">
+            <div className="advisor-briefs-head"><strong>Choose an advisor</strong><span>Switching advisors preserves each conversation.</span></div>
+            <div className="advisor-selector" aria-label="Choose an advisor">{(Object.entries(ADVISOR_PROFILES) as Array<[AdvisorId, typeof profile]>).map(([id, advisor]) => <button key={id} type="button" aria-pressed={advisorId === id} onClick={() => setAdvisorId(id)}><img src={advisor.image} alt="" /><span><strong>{advisor.name}</strong><small>{advisor.shortName === "Amara" ? "Country and process" : "Contracts and treatment"}</small></span></button>)}</div>
+            <article className="advisor-brief-card selected">
+              <div className="advisor-brief-head"><img src={profile.image} alt={profile.name} /><div><strong>{profile.name}</strong><small>{profile.bio}</small><span>{profile.role}</span></div></div>
+              <p>{profile.brief}</p>
+              <details className="advisor-welcome-message"><summary>Read welcome transcript</summary><p>{profile.welcome}</p></details>
+              <div className="advisor-brief-actions"><button type="button" className="text-button" disabled={!voicePlaybackAvailable} onClick={previewAdvisorVoice}>Preview voice</button><span>{voicePlaybackAvailable ? "Quality voice ready" : "Quality voice unavailable"}</span></div>
+            </article>
+          </aside>
+          <section className="advisor-chat" aria-labelledby="active-advisor-name">
+            <header className="advisor-chat-head"><div><span className="eyebrow">Conversation with</span><h3 id="active-advisor-name">{profile.name}</h3><p>{profile.role}</p></div><span className="advisor-audio-state" title={selectedAdvisorVoice?.name}>{voicePlaybackAvailable ? (voiceReply ? "Audio replies on" : "Text replies") : "Audio unavailable"}</span></header>
+            <div ref={conversation} className="advisor-conversation" role="log" aria-live="off" aria-busy={busy || Boolean(revealingReply)} aria-label={`Conversation with ${profile.name}`} tabIndex={0}><article className="advisor-opening"><div className="answer"><strong>{profile.shortName}</strong><p>{profile.greeting}</p></div></article>{turns.map((turn) => { const isRevealing = revealingReply?.turnId === turn.id; return <article key={turn.id}><div className="question"><strong>You</strong><p>{turn.question}</p></div><div className="answer"><strong>{profile.shortName}</strong><p aria-hidden={isRevealing || undefined}>{isRevealing ? revealedReply : turn.answer}{isRevealing && <span className="advisor-stream-cursor" aria-hidden="true" />}</p>{!isRevealing && <AdvisorSources sources={turn.sources} />}</div></article>; })}{busy && <article className="advisor-thinking" role="status"><div className="answer"><strong>{profile.shortName}</strong><p>Considering the visible record<span aria-hidden="true">…</span></p></div></article>}</div>
+            <div className="sr-only" aria-live="polite" aria-atomic="true">{replyAnnouncement}</div>
+            <div className="advisor-suggestions" aria-label={`Suggested questions for ${profile.name}`}>{profile.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</button>)}</div>
+            {error && <div className="error-panel advisor-error" role="alert">{error}</div>}
+            <div className="advisor-compose"><label><span>Ask about the visible case record</span><textarea rows={3} maxLength={2000} value={question} onChange={(event) => setQuestion(event.target.value)} /></label><div><button type="button" className={recording ? "voice-button recording" : "voice-button"} aria-pressed={recording} disabled={busy} onPointerDown={() => void startRecording()} onPointerUp={stopRecording} onPointerLeave={stopRecording} onKeyDown={(event) => { if (!event.repeat && (event.key === " " || event.key === "Enter")) { event.preventDefault(); void startRecording(); } }} onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); stopRecording(); } }}>{recording ? "Release to transcribe" : "Hold to speak"}</button><label className="voice-toggle" title={voicePlaybackAvailable ? `Use ${selectedAdvisorVoice?.name} for replies` : "No suitable natural English voice is available"}><input type="checkbox" checked={voiceReply} disabled={!voicePlaybackAvailable} onChange={(event) => setVoiceReply(event.target.checked)} />Audio replies</label><button type="button" className="primary-button" disabled={busy || !question.trim()} onClick={() => void send()}>{busy ? "Working…" : "Ask advisor"}</button></div></div>
+            <footer>Visible case evidence only · no hidden state · no decision recommendation</footer>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
 }
