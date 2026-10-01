@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { saveTransferReflection, submitRecommendation, type ParticipantBundle } from "./data";
-import { beginDebriefSession, buildAfterActionReport, buildNegotiationPreparationBrief, buildParticipantDebrief, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, participantAvailableStage, participantEntryStage, reviewRecommendation, unresolvedRiskList } from "./engine";
+import { beginDebriefSession, buildAfterActionReport, buildNegotiationPreparationBrief, buildParticipantDebrief, buildSubmissionContextSnapshot, buildSubmissionReplay, CONSEQUENCE_RULE_VERSION, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, participantAvailableStage, participantEntryStage, reviewRecommendation, SCENARIO_VERSION, selectAfterActionReportSubmission, unresolvedRiskList } from "./engine";
 import { afterActionReportHtml, workshopComparisonHtml, workshopCsv } from "./report";
-import type { DecisionState, EvidenceRequest, ParticipantProfile, WorkshopSession } from "./types";
+import type { DecisionState, EvidenceRequest, ParticipantProfile, Submission, WorkshopSession } from "./types";
 
 const resolved: DecisionState = {
   mandateConfirmed: true,
@@ -134,7 +134,8 @@ describe("participant debrief and transfer", () => {
         submissions: saved.submissions,
         advisorTurns: [], injects: [], institutionalMessages: [], timeline: [],
       });
-      expect(report.decisions.reflection).toBe(saved.decisions.reflection);
+      expect(report.decisions.reflection).toBe(resolved.reflection);
+      expect(report.transferReflection).toBe(saved.decisions.reflection);
       expect(afterActionReportHtml(report)).toContain("Transfer reflection");
       expect(afterActionReportHtml(report)).toContain(saved.decisions.reflection);
     } finally {
@@ -357,5 +358,143 @@ describe("recommendation evidence-support review", () => {
     const liquidityReview = supportFor(expected, "LIQUIDITY_BASIS");
     expect(liquidityReview).toBeDefined();
     expect(afterActionReportHtml(report)).toContain(liquidityReview!.explanation);
+  });
+});
+
+describe("frozen submission replay", () => {
+  const inject = { id: "inject-1", sessionId: "session-1", title: "Deadline update", body: "Private bounded inject body", sentAt: "2026-10-14T10:12:00Z" };
+  const answeredMessage = { id: "message-1", sessionId: "session-1", participantId: "participant-1", institution: "LEGAL" as const, question: "May we share a summary?", reply: "Private authorized reply", status: "ANSWERED" as const, createdAt: "2026-10-14T10:05:00Z", answeredAt: "2026-10-14T10:14:00Z" };
+
+  function frozenSubmission(
+    decisions: DecisionState,
+    version: number,
+    submittedAt: string,
+    evidenceRequests: EvidenceRequest[],
+  ): Submission {
+    return {
+      id: `submission-${version}`,
+      participantId: participant.id,
+      sessionId: runningSession.id,
+      version,
+      decisions: structuredClone(decisions),
+      submittedAt,
+      contextSnapshot: buildSubmissionContextSnapshot({
+        participantId: participant.id,
+        sessionId: runningSession.id,
+        decisions,
+        version,
+        submittedAt,
+        evidenceRequests,
+        injects: [inject],
+        institutionalMessages: [answeredMessage],
+      }),
+    };
+  }
+
+  it("captures the complete bounded context and excludes requested-but-pending evidence", () => {
+    const returned = { ...evidence("treasury-reconciliation", false), releasedAt: "2026-10-14T10:15:00Z" };
+    const pending = evidence("confidentiality-opinion", false);
+    const submission = frozenSubmission(resolved, 1, reviewMoment, [returned, pending]);
+    const snapshot = submission.contextSnapshot!;
+
+    expect(snapshot).toMatchObject({
+      schemaVersion: 1,
+      scenarioVersion: SCENARIO_VERSION,
+      consequenceRuleVersion: CONSEQUENCE_RULE_VERSION,
+      submissionVersion: 1,
+      submittedAt: new Date(reviewMoment).toISOString(),
+      decisions: resolved,
+      facilitatorInjectIds: [inject.id],
+      answeredInstitutionalMessageIds: [answeredMessage.id],
+    });
+    expect(snapshot.availableEvidence.map((item) => item.evidenceId)).toEqual(["treasury-reconciliation"]);
+    expect(snapshot.availableEvidence[0]).toMatchObject({
+      requestId: returned.id,
+      requestedAt: returned.requestedAt,
+      availableAt: returned.availableAt,
+      releasedAt: returned.releasedAt,
+    });
+    expect(JSON.stringify(snapshot)).not.toContain(inject.body);
+    expect(JSON.stringify(snapshot)).not.toContain(answeredMessage.reply);
+  });
+
+  it("does not let later returned evidence alter an earlier evidence-support review", () => {
+    const pendingAtSubmission = evidence("treasury-reconciliation", false);
+    const submission = frozenSubmission(resolved, 1, reviewMoment, [pendingAtSubmission]);
+    const returnedLater = { ...pendingAtSubmission, releasedAt: "2026-10-14T10:25:00Z" };
+    const replay = buildSubmissionReplay({
+      submission,
+      evidenceRequests: [returnedLater],
+      institutionalMessages: [answeredMessage],
+      injects: [inject],
+    });
+    expect(submission.contextSnapshot?.availableEvidence).toEqual([]);
+    expect(replay.evidenceAvailable.map((item) => item.id)).toEqual([
+      `institutional-message-${answeredMessage.id}`,
+    ]);
+    expect(replay.evidenceAvailable.some((item) => item.id === "treasury-reconciliation")).toBe(false);
+    expect(supportFor(replay.recommendationReview, "LIQUIDITY_BASIS")?.status).toBe("UNSUPPORTED");
+    expect(replay.replayProvenance.mode).toBe("FROZEN");
+  });
+
+  it("keeps later working edits out of a selected frozen report", () => {
+    const submission = frozenSubmission(resolved, 1, reviewMoment, [evidence("treasury-reconciliation", true)]);
+    const working = { ...resolved, liquidityBasis: "UNRESOLVED" as const, readiness: "NOT_READY" as const, finalRationale: "UNSENT WORKING EDIT" };
+    const report = buildAfterActionReport({
+      participant,
+      session: { ...runningSession, status: "DEBRIEF", currentStage: 7, submissionsClosed: true },
+      decisions: working,
+      evidenceRequests: [evidence("treasury-reconciliation", true)],
+      submissions: [submission],
+      advisorTurns: [], injects: [inject], institutionalMessages: [answeredMessage], timeline: [],
+    });
+    expect(report.decisions).toEqual(resolved);
+    expect(report.negotiationPreparationBrief.financeMinistryRecommendation).toBe(resolved.finalRationale);
+    expect(report.consequences.some((item) => item.id === "verified-basis")).toBe(true);
+    expect(JSON.stringify(report.negotiationPreparationBrief)).not.toContain("UNSENT WORKING EDIT");
+  });
+
+  it("keeps separate versions selectable with their own decisions and consequences", () => {
+    const firstDecisions = { ...resolved, liquidityBasis: "UNRESOLVED" as const, readiness: "NOT_READY" as const };
+    const first = frozenSubmission(firstDecisions, 1, "2026-10-14T10:08:00Z", []);
+    const second = frozenSubmission(resolved, 2, reviewMoment, [evidence("treasury-reconciliation", true)]);
+    const latest = buildAfterActionReport({
+      participant,
+      session: { ...runningSession, status: "DEBRIEF", currentStage: 7, submissionsClosed: true },
+      decisions: resolved,
+      evidenceRequests: [evidence("treasury-reconciliation", true)],
+      submissions: [first, second],
+      advisorTurns: [], injects: [inject], institutionalMessages: [answeredMessage], timeline: [],
+    });
+    const versionOne = selectAfterActionReportSubmission(latest, 1);
+    expect(latest.selectedSubmissionVersion).toBe(2);
+    expect(latest.consequences.some((item) => item.id === "verified-basis")).toBe(true);
+    expect(versionOne.selectedSubmissionVersion).toBe(1);
+    expect(versionOne.decisions.readiness).toBe("NOT_READY");
+    expect(versionOne.consequences.some((item) => item.id === "unreconciled-basis")).toBe(true);
+  });
+
+  it("keeps legacy rows readable and labels current-rule reconstruction explicitly", () => {
+    const legacy: Submission = { id: "legacy-1", participantId: participant.id, sessionId: runningSession.id, version: 1, decisions: resolved, submittedAt: reviewMoment };
+    const replay = buildSubmissionReplay({ submission: legacy, evidenceRequests: [], institutionalMessages: [], injects: [] });
+    expect(replay.replayProvenance.mode).toBe("LEGACY_CURRENT_RULE_RECONSTRUCTION");
+    expect(replay.replayProvenance.label).toBe("legacy · current-rule reconstruction");
+    expect(replay.decisions).toEqual(resolved);
+  });
+
+  it("shows replay provenance in reconstructable HTML, CSV, and JSON data", () => {
+    const submission = frozenSubmission(resolved, 1, reviewMoment, [evidence("treasury-reconciliation", true)]);
+    const report = buildAfterActionReport({
+      participant,
+      session: { ...runningSession, status: "DEBRIEF", currentStage: 7, submissionsClosed: true },
+      decisions: resolved,
+      evidenceRequests: [evidence("treasury-reconciliation", true)],
+      submissions: [submission],
+      advisorTurns: [], injects: [inject], institutionalMessages: [answeredMessage], timeline: [],
+    });
+    expect(afterActionReportHtml(report)).toContain("Replay provenance");
+    expect(afterActionReportHtml(report)).toContain(SCENARIO_VERSION);
+    expect(workshopCsv([report])).toContain(CONSEQUENCE_RULE_VERSION);
+    expect(JSON.stringify(report)).toContain('"mode":"FROZEN"');
   });
 });

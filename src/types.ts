@@ -84,6 +84,37 @@ export interface EvidenceRequest {
   releasedAt?: string;
 }
 
+export interface FrozenEvidenceAvailability {
+  requestId: string;
+  evidenceId: string;
+  requestedAt: string;
+  availableAt: string;
+  releasedAt?: string;
+}
+
+export interface SubmissionContextSnapshot {
+  schemaVersion: 1;
+  scenarioVersion: string;
+  consequenceRuleVersion: string;
+  submissionVersion: number;
+  submittedAt: string;
+  decisions: DecisionState;
+  availableEvidence: FrozenEvidenceAvailability[];
+  facilitatorInjectIds: string[];
+  answeredInstitutionalMessageIds: string[];
+}
+
+export type ReplayProvenanceMode = "FROZEN" | "LEGACY_CURRENT_RULE_RECONSTRUCTION" | "WORKING_STATE";
+
+export interface ReplayProvenance {
+  mode: ReplayProvenanceMode;
+  label: string;
+  scenarioVersion: string;
+  consequenceRuleVersion: string;
+  submissionVersion?: number;
+  submittedAt?: string;
+}
+
 export interface Submission {
   id: string;
   participantId: string;
@@ -91,6 +122,7 @@ export interface Submission {
   version: number;
   decisions: DecisionState;
   submittedAt: string;
+  contextSnapshot?: SubmissionContextSnapshot;
 }
 
 export interface GlobalInject {
@@ -215,7 +247,24 @@ export interface ParticipantDebrief {
   unresolvedRisks: string[];
   counterfactual: Counterfactual;
   facilitatorInjects: GlobalInject[];
+  replayProvenance: ReplayProvenance;
   fictionalBoundary: string;
+}
+
+export interface SubmissionReplay {
+  submissionId: string;
+  version: number;
+  submittedAt: string;
+  decisions: DecisionState;
+  evidenceAvailable: BriefEvidenceItem[];
+  recommendationReview: RecommendationReview;
+  negotiationPreparationBrief: NegotiationPreparationBrief;
+  consequences: Consequence[];
+  counterfactuals: Counterfactual[];
+  unresolvedRisks: string[];
+  institutionalMessages: InstitutionalMessage[];
+  facilitatorInjects: GlobalInject[];
+  replayProvenance: ReplayProvenance;
 }
 
 export interface AfterActionReport {
@@ -224,7 +273,11 @@ export interface AfterActionReport {
   generatedAt: string;
   executiveSummary: string;
   decisions: DecisionState;
+  transferReflection: string;
+  selectedSubmissionVersion?: number;
+  replayProvenance: ReplayProvenance;
   submissions: Submission[];
+  submissionReplays: SubmissionReplay[];
   evidenceRequested: EvidenceDefinition[];
   evidenceNotRequested: EvidenceDefinition[];
   evidenceIgnored: EvidenceDefinition[];

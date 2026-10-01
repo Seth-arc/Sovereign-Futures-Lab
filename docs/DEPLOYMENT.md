@@ -85,7 +85,48 @@ npx supabase db push --dry-run
 npx supabase db push
 ```
 
-The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. Use either `db push` or the Supabase SQL editor for the initial migration, not both.
+The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. The forward migration `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract. Apply both in timestamp order with either `db push` or the Supabase SQL editor, not both. Do not edit or reapply the initial migration to upgrade an existing project.
+
+For an existing project, export any required workshop reports, test the forward migration against a disposable or rehearsal project, then run the dry run and apply it outside a live workshop window. The migration deliberately leaves pre-existing `context_snapshot` values null; those rows must remain labeled `legacy · current-rule reconstruction`.
+
+If the Supabase CLI is configured against a disposable local project, apply the full migration chain with `npx supabase db reset` before the linked-project dry run. Never use `db reset --linked`.
+
+Verify the applied schema without changing data:
+
+```sql
+select column_name, data_type, is_nullable
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'futureslab_submissions'
+  and column_name = 'context_snapshot';
+
+select p.proname, pg_get_function_identity_arguments(p.oid) as arguments
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname = 'submit_futureslab_recommendation';
+
+select
+  count(*) filter (where context_snapshot is null) as legacy_rows,
+  count(*) filter (where context_snapshot is not null) as frozen_rows
+from public.futureslab_submissions;
+
+select
+  version,
+  submitted_at,
+  context_snapshot ->> 'scenarioVersion' as scenario_version,
+  context_snapshot ->> 'consequenceRuleVersion' as consequence_rule_version,
+  context_snapshot -> 'availableEvidence' as available_evidence,
+  context_snapshot -> 'facilitatorInjectIds' as facilitator_inject_ids,
+  context_snapshot -> 'answeredInstitutionalMessageIds' as answered_message_ids,
+  context_snapshot -> 'decisions' = decisions as decisions_match
+from public.futureslab_submissions
+where context_snapshot is not null
+order by submitted_at desc
+limit 5;
+```
+
+Pass means the nullable `jsonb` column exists, the only submission RPC signature is `(uuid, text, text)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
 
 After migration:
 
@@ -307,9 +348,9 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 15. Run the research boundary checks: ask whether all Chinese loans are collateralized, whether signing an MoU creates cash relief, whether the World Bank statutory options are current law, and whether CoT is one haircut formula. Each answer must begin with "No" and show the expected structured Sources disclosure.
 16. Ask a question that explicitly relies on `Progress debt treatments_CF.docx`. Confirm the answer reports a source gap, shows no source citation, and the Edge Function log records `advisor_research_boundary_returned` without an outbound model answer.
 17. Inspect an AI-provider request in a controlled rehearsal environment and confirm it contains only selected bounded card fields and short excerpts, never a source file, repository path, PDF, DOCX, or full report body.
-18. Submit at least two recommendation versions and confirm both remain in the AAR.
+18. Submit version 1 before a delayed evidence item returns, allow it to return, change the working recommendation, and submit version 2. Confirm both remain selectable in the participant debrief and facilitator AAR; version 1 excludes the later evidence and retains its original decisions and consequences, while version 2 reflects its own frozen state.
 19. Begin debrief and confirm further submission is blocked.
-20. Export and open every individual and workshop-level format.
+20. Export and open every individual and workshop-level format. Confirm HTML, PDF, CSV, and JSON name the selected submission version, scenario version, consequence-rule version, and either frozen or legacy replay provenance.
 21. Preview the anonymized projected comparison while identified reports remain facilitator-only.
 22. Delete a disposable rehearsal session and confirm related application records disappear.
 23. Verify local emergency mode separately and download its handoff file.

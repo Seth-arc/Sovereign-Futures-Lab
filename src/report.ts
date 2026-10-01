@@ -24,6 +24,7 @@ function filename(report: AfterActionReport, extension: string): string {
 }
 
 const label = (value: string | undefined) => value?.replaceAll("_", " ").toLowerCase() ?? "Not recorded";
+const provenanceText = (report: AfterActionReport) => `${report.replayProvenance.label} · scenario ${report.replayProvenance.scenarioVersion} · consequence rules ${report.replayProvenance.consequenceRuleVersion}`;
 
 const advisorSourcesText = (turn: AfterActionReport["advisorUsage"][number]) => turn.sources.length
   ? turn.sources.map((source) => `${source.claimId} · ${source.sourceId} · ${source.sourceTitle} · ${source.pageReference} · ${source.sourceClass}`).join("; ")
@@ -71,7 +72,7 @@ export function afterActionReportHtml(report: AfterActionReport, identified = tr
 <html lang="en"><head><meta charset="utf-8"><title>Futures Lab After-Action Report</title>
 <style>
 body{font:15px/1.55 Arial,sans-serif;color:#182522;max-width:940px;margin:48px auto;padding:0 32px}header{border-bottom:3px solid #aa6f32;padding-bottom:22px;margin-bottom:30px}.kicker{color:#6b4d2e;text-transform:uppercase;letter-spacing:.12em;font-size:12px}h1{font:700 34px Georgia,serif;margin:.2em 0}h2{font:700 22px Georgia,serif;border-bottom:1px solid #d8d2c6;padding-bottom:8px;margin-top:32px}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:9px;border-bottom:1px solid #e4dfd6}th{background:#f4f1eb}.tag{display:inline-block;padding:3px 7px;background:#e8eee9;margin:2px}li{margin:.5em 0}.meta{color:#596560}code{white-space:pre-wrap;font-size:11px}@media print{body{margin:0;max-width:none}.no-print{display:none}}</style></head>
-<body><header><div class="kicker">Sovereign · Futures Lab · Kuvera Financing Assurances</div><h1>After-Action Report</h1>${identity}<p class="meta">${escapeHtml(report.session.kind)} session · Generated ${escapeHtml(new Date(report.generatedAt).toLocaleString())}</p></header>
+<body><header><div class="kicker">Sovereign · Futures Lab · Kuvera Financing Assurances</div><h1>After-Action Report</h1>${identity}<p class="meta">${escapeHtml(report.session.kind)} session · Generated ${escapeHtml(new Date(report.generatedAt).toLocaleString())}</p><p><strong>Replay provenance:</strong> ${escapeHtml(provenanceText(report))}${report.selectedSubmissionVersion ? ` · selected version ${report.selectedSubmissionVersion}` : ""}</p></header>
 <section><h2>Executive summary</h2><p>${escapeHtml(report.executiveSummary)}</p></section>
 <section><h2>Mandate and authority boundary</h2><p>${escapeHtml(report.decisions.mandateRationale || "Not recorded")}</p></section>
 <section><h2>Negotiation-preparation brief</h2><p class="meta">Internal DMO recommendation prepared for the Finance Ministry. It is not a negotiated result, agreement, assurance, or sovereign commitment.</p>${briefHtml(report.negotiationPreparationBrief)}</section>
@@ -80,10 +81,10 @@ body{font:15px/1.55 Arial,sans-serif;color:#182522;max-width:940px;margin:48px a
 <section><h2>Deterministic consequences</h2>${report.consequences.map((item) => `<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.outcome)}</p><p class="meta">Basis: ${escapeHtml(item.basis)}</p></article>`).join("")}</section>
 <section><h2>Unresolved risks</h2><ul>${report.unresolvedRisks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("") || "<li>No blocking uncertainty recorded in the bounded exercise.</li>"}</ul></section>
 <section><h2>Counterfactual pathways</h2>${report.counterfactuals.map((item) => `<article><h3>${escapeHtml(item.alternative)}</h3><p>${escapeHtml(item.projectedDifference)}</p><p class="meta">Held fixed: ${escapeHtml(item.fixedAssumptions)}</p></article>`).join("")}</section>
-<section><h2>Submission history and information available</h2><ol>${report.submissions.map((item) => { const recordedReview = report.submissionRecommendationReviews.find((entry) => entry.submissionId === item.id)?.review; const recordedBrief = report.submissionBriefs.find((entry) => entry.submissionId === item.id)?.brief; return `<li><strong>Version ${item.version}</strong>, ${escapeHtml(new Date(item.submittedAt).toLocaleString())}${recordedBrief ? briefHtml(recordedBrief) : `<p>${escapeHtml(label(item.decisions.readiness))}</p>`}${recordedReview?.readyMismatch ? `<p><strong>READY mismatch retained:</strong> ${escapeHtml(recordedReview.mismatchExplanation)}</p>` : ""}</li>`; }).join("") || "<li>No brief submitted.</li>"}</ol></section>
+<section><h2>Submission history and information available</h2><ol>${report.submissions.map((item) => { const recordedReview = report.submissionRecommendationReviews.find((entry) => entry.submissionId === item.id)?.review; const recordedBrief = report.submissionBriefs.find((entry) => entry.submissionId === item.id)?.brief; const replay = report.submissionReplays.find((entry) => entry.submissionId === item.id); return `<li><strong>Version ${item.version}</strong>, ${escapeHtml(new Date(item.submittedAt).toLocaleString())}<p class="meta">${escapeHtml(replay?.replayProvenance.label ?? "legacy · current-rule reconstruction")}${replay ? ` · scenario ${escapeHtml(replay.replayProvenance.scenarioVersion)} · consequence rules ${escapeHtml(replay.replayProvenance.consequenceRuleVersion)}` : ""}</p>${recordedBrief ? briefHtml(recordedBrief) : `<p>${escapeHtml(label(item.decisions.readiness))}</p>`}${recordedReview?.readyMismatch ? `<p><strong>READY mismatch retained:</strong> ${escapeHtml(recordedReview.mismatchExplanation)}</p>` : ""}</li>`; }).join("") || "<li>No brief submitted.</li>"}</ol></section>
 <section><h2>AI-advisor record</h2>${report.advisorUsage.map((turn) => `<article><p><strong>${escapeHtml(turn.advisorId)}:</strong> ${escapeHtml(turn.question)}</p><p>${escapeHtml(turn.answer)}</p><p class="meta">Sources: ${escapeHtml(advisorSourcesText(turn))} · ${escapeHtml(turn.mode)}</p></article>`).join("") || "<p>No advisor interaction recorded.</p>"}</section>
 <section><h2>Facilitator interventions</h2>${report.facilitatorInjects.map((inject) => `<article><p><strong>${escapeHtml(inject.title)}</strong></p><p>${escapeHtml(inject.body)}</p><p class="meta">${escapeHtml(new Date(inject.sentAt).toLocaleString())}</p></article>`).join("") || "<p>No global facilitator inject recorded.</p>"}</section>
-<section><h2>Transfer reflection</h2><p><strong>What will you do differently when preparing a real decision under uncertainty?</strong></p><p>${escapeHtml(report.decisions.reflection || "Not recorded")}</p></section>
+<section><h2>Transfer reflection</h2><p><strong>What will you do differently when preparing a real decision under uncertainty?</strong></p><p>${escapeHtml(report.transferReflection || "Not recorded")}</p></section>
 <section><h2>Decision timeline</h2><table><thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead><tbody>${timelineRows}</tbody></table></section>
 <footer><p class="meta">This report describes the recorded decision process in a fictional training scenario. It is not a score, legal advice, financial advice, or evidence of individual competence.</p></footer></body></html>`;
 }
@@ -113,6 +114,7 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add("SOVEREIGN · FUTURES LAB · KUVERA FINANCING ASSURANCES", 9, 10);
   add("After-Action Report", 22, 12);
   add(`${report.participant.name} · ${report.participant.organization} · ${report.participant.email}`, 10, 18);
+  add(`Replay provenance: ${provenanceText(report)}${report.selectedSubmissionVersion ? ` · selected version ${report.selectedSubmissionVersion}` : ""}`, 9, 14);
   add("Executive summary", 15, 6);
   add(report.executiveSummary, 10, 14);
   add("Mandate and authority boundary", 15, 6);
@@ -134,7 +136,8 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add(report.submissions.length ? report.submissions.map((item) => {
     const recordedReview = report.submissionRecommendationReviews.find((entry) => entry.submissionId === item.id)?.review;
     const recordedBrief = report.submissionBriefs.find((entry) => entry.submissionId === item.id)?.brief;
-    return `Version ${item.version} · ${new Date(item.submittedAt).toLocaleString()}\n${recordedBrief ? briefText(recordedBrief) : `Position: ${label(item.decisions.readiness)}\nNext institutional handoff: ${item.decisions.nextHandoff || "Not recorded"}`}${recordedReview?.readyMismatch ? `\nREADY mismatch retained: ${recordedReview.mismatchExplanation}` : ""}`;
+    const replay = report.submissionReplays.find((entry) => entry.submissionId === item.id);
+    return `Version ${item.version} · ${new Date(item.submittedAt).toLocaleString()}\nReplay provenance: ${replay?.replayProvenance.label ?? "legacy · current-rule reconstruction"}${replay ? ` · scenario ${replay.replayProvenance.scenarioVersion} · consequence rules ${replay.replayProvenance.consequenceRuleVersion}` : ""}\n${recordedBrief ? briefText(recordedBrief) : `Position: ${label(item.decisions.readiness)}\nNext institutional handoff: ${item.decisions.nextHandoff || "Not recorded"}`}${recordedReview?.readyMismatch ? `\nREADY mismatch retained: ${recordedReview.mismatchExplanation}` : ""}`;
   }).join("\n") : "No recommendation submitted.", 10, 14);
   add("AI-advisor usage and citations", 15, 6);
   add(report.advisorUsage.length ? report.advisorUsage.map((turn) => `${turn.advisorId}: ${turn.question}\n${turn.answer}\nSources: ${advisorSourcesText(turn)} · ${turn.mode}`).join("\n\n") : "No advisor interaction recorded.", 10, 14);
@@ -142,7 +145,7 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add(report.facilitatorInjects.length ? report.facilitatorInjects.map((inject) => `${inject.title}: ${inject.body}`).join("\n") : "No global facilitator inject recorded.", 10, 14);
   add("Transfer reflection", 15, 6);
   add("What will you do differently when preparing a real decision under uncertainty?", 9, 5);
-  add(report.decisions.reflection || "Not recorded", 10, 16);
+  add(report.transferReflection || "Not recorded", 10, 16);
   add("This report is a process reconstruction for a fictional training scenario, not a score or evidence of individual competence.", 8, 0);
   pdf.save(filename(report, "pdf"));
 }
@@ -152,12 +155,16 @@ function csvCell(value: unknown): string {
 }
 
 export function workshopCsv(reports: AfterActionReport[]): string {
-  const headings = ["participant_id", "name", "organization", "email", "position", "evidence_basis", "known_uncertainties", "disclosure_boundary", "treatment_perimeter", "conditions_to_advance", "next_institutional_handoff", "finance_ministry_recommendation", "submission_versions", "versioned_briefs"];
+  const headings = ["participant_id", "name", "organization", "email", "selected_submission_version", "replay_provenance", "scenario_version", "consequence_rule_version", "position", "evidence_basis", "known_uncertainties", "disclosure_boundary", "treatment_perimeter", "conditions_to_advance", "next_institutional_handoff", "finance_ministry_recommendation", "submission_versions", "versioned_briefs"];
   const rows = reports.map((report) => [
     report.participant.id,
     report.participant.name,
     report.participant.organization,
     report.participant.email,
+    report.selectedSubmissionVersion ?? "working state",
+    report.replayProvenance.label,
+    report.replayProvenance.scenarioVersion,
+    report.replayProvenance.consequenceRuleVersion,
     report.negotiationPreparationBrief.position,
     evidenceBasisText(report.negotiationPreparationBrief),
     knownUncertaintiesText(report.negotiationPreparationBrief),
@@ -167,7 +174,7 @@ export function workshopCsv(reports: AfterActionReport[]): string {
     report.negotiationPreparationBrief.nextInstitutionalHandoff,
     report.negotiationPreparationBrief.financeMinistryRecommendation,
     report.submissions.length,
-    report.submissionBriefs.map((entry) => `Version ${entry.version}\n${briefText(entry.brief)}`).join("\n\n"),
+    report.submissionBriefs.map((entry) => { const replay = report.submissionReplays.find((item) => item.submissionId === entry.submissionId); return `Version ${entry.version}\nReplay provenance: ${replay?.replayProvenance.label ?? "legacy · current-rule reconstruction"}\n${briefText(entry.brief)}`; }).join("\n\n"),
   ]);
   return [headings, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
 }
@@ -205,7 +212,7 @@ export async function downloadWorkshopPdf(reports: AfterActionReport[], anonymou
   reports.forEach((report, index) => {
     const name = anonymous ? `Participant ${index + 1}` : `${report.participant.name} · ${report.participant.organization}`;
     const versions = report.submissionBriefs.map((entry) => `Submitted version ${entry.version}\n${briefText(entry.brief)}`).join("\n\n");
-    add(`${name}\nCurrent brief\n${briefText(report.negotiationPreparationBrief)}${versions ? `\n\n${versions}` : ""}`, 10, 9);
+    add(`${name}\nSelected replay: ${provenanceText(report)}${report.selectedSubmissionVersion ? ` · version ${report.selectedSubmissionVersion}` : ""}\n${briefText(report.negotiationPreparationBrief)}${versions ? `\n\n${versions}` : ""}`, 10, 9);
   });
   add("This comparison describes recorded process in a fictional training scenario. It is not a ranking or evidence of individual competence.", 8, 0);
   pdf.save("futureslab-workshop-comparison.pdf");
@@ -218,7 +225,7 @@ export function decisionPathKey(decisions: DecisionState): string {
 export function workshopComparisonHtml(reports: AfterActionReport[], anonymous: boolean): string {
   const paths = new Map<string, number>();
   reports.forEach((report) => paths.set(decisionPathKey(report.decisions), (paths.get(decisionPathKey(report.decisions)) ?? 0) + 1));
-  const briefs = reports.map((report, index) => `<article><h3>${anonymous ? `Participant ${index + 1}` : escapeHtml(report.participant.name)}</h3><h4>Current brief</h4>${briefHtml(report.negotiationPreparationBrief)}${report.submissionBriefs.map((entry) => `<h4>Submitted version ${entry.version}</h4>${briefHtml(entry.brief)}`).join("")}</article>`).join("");
+  const briefs = reports.map((report, index) => `<article><h3>${anonymous ? `Participant ${index + 1}` : escapeHtml(report.participant.name)}</h3><p class="meta">Selected replay: ${escapeHtml(provenanceText(report))}${report.selectedSubmissionVersion ? ` · version ${report.selectedSubmissionVersion}` : ""}</p>${briefHtml(report.negotiationPreparationBrief)}${report.submissionBriefs.map((entry) => { const replay = report.submissionReplays.find((item) => item.submissionId === entry.submissionId); return `<h4>Submitted version ${entry.version}</h4><p class="meta">${escapeHtml(replay?.replayProvenance.label ?? "legacy · current-rule reconstruction")}</p>${briefHtml(entry.brief)}`; }).join("")}</article>`).join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Futures Lab Workshop Comparison</title><style>body{font:15px/1.5 Arial,sans-serif;color:#182522;max-width:1100px;margin:40px auto;padding:0 28px}h1,h2,h3{font-family:Georgia,serif}table{width:100%;border-collapse:collapse;margin-bottom:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}th{width:220px;background:#f1eee7}.path{padding:10px;border-left:3px solid #aa6f32;margin:8px 0}.meta{color:#60706a}</style></head><body><p class="meta">Sovereign · Futures Lab · Kuvera Financing Assurances</p><h1>Workshop comparison</h1><p>${reports.length} individual decision records. This comparison describes pathways and evidence use; it does not rank participants.</p><h2>Decision pathways</h2>${[...paths].map(([path,count]) => `<div class="path"><strong>${count} participant${count === 1 ? "" : "s"}</strong><br>${escapeHtml(path)}</div>`).join("")}<h2>Negotiation-preparation briefs</h2>${briefs}</body></html>`;
 }
 

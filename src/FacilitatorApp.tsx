@@ -14,7 +14,7 @@ import {
   sendGlobalInject,
   updateWorkshopSession,
 } from "./data";
-import { beginDebriefSession, buildAfterActionReport } from "./engine";
+import { beginDebriefSession, buildAfterActionReport, selectAfterActionReportSubmission } from "./engine";
 import {
   afterActionReportHtml,
   downloadReportHtml,
@@ -275,6 +275,8 @@ function ReportDesk({ reports }: { reports: AfterActionReport[] }) {
 function ReportModal({ report, onClose }: { report: AfterActionReport; onClose: () => void }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [selectedVersion, setSelectedVersion] = useState(report.selectedSubmissionVersion ?? report.submissions.at(-1)?.version);
+  const selectedReport = selectedVersion === undefined ? report : selectAfterActionReportSubmission(report, selectedVersion);
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -293,7 +295,7 @@ function ReportModal({ report, onClose }: { report: AfterActionReport; onClose: 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
     if (event.key !== "Tab") return;
-    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'));
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'));
     const first = focusable[0];
     const last = focusable.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
@@ -306,7 +308,7 @@ function ReportModal({ report, onClose }: { report: AfterActionReport; onClose: 
       onClose();
     });
   }
-  return <div ref={rootRef} className="modal-scrim" role="presentation"><section className="report-modal" role="dialog" aria-modal="true" aria-label={`After-action report for ${report.participant.name}`} tabIndex={-1} onKeyDown={handleKeyDown}><header><div><span className="eyebrow">Facilitator-only report</span><h2>{report.participant.name}</h2><p>{report.participant.organization} · {report.participant.email}</p></div><button ref={closeRef} type="button" className="icon-button" aria-label="Close after-action report" onClick={onClose}>×</button></header><iframe title="After-action report preview" srcDoc={afterActionReportHtml(report)} sandbox="allow-same-origin" onLoad={(event) => connectFrameKeyboard(event.currentTarget)} /><footer><button type="button" onClick={() => void downloadReportPdf(report)}>Download PDF</button><button type="button" onClick={() => downloadReportHtml(report)}>Download HTML</button><button type="button" onClick={() => downloadReportJson(report)}>Download JSON</button><button type="button" className="primary-button" onClick={onClose}>Close</button></footer></section></div>;
+  return <div ref={rootRef} className="modal-scrim" role="presentation"><section className="report-modal" role="dialog" aria-modal="true" aria-label={`After-action report for ${report.participant.name}`} tabIndex={-1} onKeyDown={handleKeyDown}><header><div><span className="eyebrow">Facilitator-only report</span><h2>{report.participant.name}</h2><p>{report.participant.organization} · {report.participant.email}</p>{report.submissions.length > 0 && <label className="compact-label">Replayed submission version<select value={selectedVersion} onChange={(event) => setSelectedVersion(Number(event.target.value))}>{report.submissions.map((submission) => <option key={submission.id} value={submission.version}>Version {submission.version} · {submission.contextSnapshot ? "frozen" : "legacy reconstruction"}</option>)}</select></label>}</div><button ref={closeRef} type="button" className="icon-button" aria-label="Close after-action report" onClick={onClose}>×</button></header><iframe title={`After-action report preview${selectedVersion ? ` for submission version ${selectedVersion}` : ""}`} srcDoc={afterActionReportHtml(selectedReport)} sandbox="allow-same-origin" onLoad={(event) => connectFrameKeyboard(event.currentTarget)} /><footer><button type="button" onClick={() => void downloadReportPdf(selectedReport)}>Download PDF</button><button type="button" onClick={() => downloadReportHtml(selectedReport)}>Download HTML</button><button type="button" onClick={() => downloadReportJson(selectedReport)}>Download JSON</button><button type="button" className="primary-button" onClick={onClose}>Close</button></footer></section></div>;
 }
 
 function reportFor(participant: ParticipantProfile, decisions: DecisionState, session: WorkshopSession, data: FacilitatorData): AfterActionReport {

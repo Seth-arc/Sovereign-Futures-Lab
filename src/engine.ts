@@ -7,18 +7,30 @@ import type {
   Counterfactual,
   DecisionState,
   EvidenceRequest,
+  FrozenEvidenceAvailability,
   GlobalInject,
   InstitutionalMessage,
   NegotiationPreparationBrief,
   ParticipantDebrief,
   ParticipantProfile,
   RecommendationReview,
+  ReplayProvenance,
   Submission,
+  SubmissionContextSnapshot,
+  SubmissionReplay,
   WorkshopSession,
 } from "./types";
 
 const FINAL_STAGE_INDEX = 7;
 const PARTICIPANT_DEBRIEF_BOUNDARY = "This deterministic exercise reconstruction is fictional. It is not a real-world prediction, score, or competence finding.";
+export const SCENARIO_VERSION = "kuvera-financing-assurances-2026-10-01";
+export const CONSEQUENCE_RULE_VERSION = "kuvera-consequence-rules-2026-10-01";
+export const SUBMISSION_CONTEXT_SCHEMA_VERSION = 1 as const;
+export const SUBMISSION_CONTEXT_LIMITS = {
+  availableEvidence: 32,
+  facilitatorInjects: 100,
+  answeredInstitutionalMessages: 100,
+} as const;
 
 const readinessLabels: Record<NonNullable<DecisionState["readiness"]>, string> = {
   READY: "Ready",
@@ -37,6 +49,117 @@ const perimeterLabels: Record<NonNullable<DecisionState["treatmentPerimeter"]>, 
   FACILITY_A_ONLY: "Facility A included; Facility B deferred",
   DEFER: "Treatment perimeter deferred",
 };
+
+function asStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : undefined;
+}
+
+function parseFrozenEvidence(value: unknown): FrozenEvidenceAvailability[] | undefined {
+  if (!Array.isArray(value) || value.length > SUBMISSION_CONTEXT_LIMITS.availableEvidence) return undefined;
+  const parsed = value.map((item) => {
+    if (!item || typeof item !== "object") return undefined;
+    const row = item as Record<string, unknown>;
+    if (![row.requestId, row.evidenceId, row.requestedAt, row.availableAt].every((field) => typeof field === "string")) return undefined;
+    if (row.releasedAt !== undefined && row.releasedAt !== null && typeof row.releasedAt !== "string") return undefined;
+    return {
+      requestId: row.requestId as string,
+      evidenceId: row.evidenceId as string,
+      requestedAt: row.requestedAt as string,
+      availableAt: row.availableAt as string,
+      ...(row.releasedAt ? { releasedAt: row.releasedAt as string } : {}),
+    };
+  });
+  return parsed.every(Boolean) ? parsed as FrozenEvidenceAvailability[] : undefined;
+}
+
+export function parseSubmissionContextSnapshot(value: unknown): SubmissionContextSnapshot | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as Record<string, unknown>;
+  const availableEvidence = parseFrozenEvidence(row.availableEvidence);
+  const facilitatorInjectIds = asStringArray(row.facilitatorInjectIds);
+  const answeredInstitutionalMessageIds = asStringArray(row.answeredInstitutionalMessageIds);
+  if (
+    row.schemaVersion !== SUBMISSION_CONTEXT_SCHEMA_VERSION
+    || typeof row.scenarioVersion !== "string"
+    || typeof row.consequenceRuleVersion !== "string"
+    || !Number.isInteger(row.submissionVersion)
+    || Number(row.submissionVersion) < 1
+    || typeof row.submittedAt !== "string"
+    || !row.decisions
+    || typeof row.decisions !== "object"
+    || !availableEvidence
+    || !facilitatorInjectIds
+    || facilitatorInjectIds.length > SUBMISSION_CONTEXT_LIMITS.facilitatorInjects
+    || !answeredInstitutionalMessageIds
+    || answeredInstitutionalMessageIds.length > SUBMISSION_CONTEXT_LIMITS.answeredInstitutionalMessages
+  ) return undefined;
+  return {
+    schemaVersion: SUBMISSION_CONTEXT_SCHEMA_VERSION,
+    scenarioVersion: String(row.scenarioVersion),
+    consequenceRuleVersion: String(row.consequenceRuleVersion),
+    submissionVersion: Number(row.submissionVersion),
+    submittedAt: String(row.submittedAt),
+    decisions: structuredClone(row.decisions as DecisionState),
+    availableEvidence,
+    facilitatorInjectIds,
+    answeredInstitutionalMessageIds,
+  };
+}
+
+export function buildSubmissionContextSnapshot(input: {
+  participantId: string;
+  sessionId: string;
+  decisions: DecisionState;
+  version: number;
+  submittedAt: Date | string;
+  evidenceRequests: EvidenceRequest[];
+  injects: GlobalInject[];
+  institutionalMessages: InstitutionalMessage[];
+}): SubmissionContextSnapshot {
+  const submittedAt = typeof input.submittedAt === "string" ? new Date(input.submittedAt) : input.submittedAt;
+  if (!Number.isInteger(input.version) || input.version < 1 || Number.isNaN(submittedAt.getTime())) throw new Error("SUBMISSION_CONTEXT_INVALID");
+  const availableEvidence = input.evidenceRequests
+    .filter((request) => request.participantId === input.participantId
+      && request.sessionId === input.sessionId
+      && new Date(request.requestedAt).getTime() <= submittedAt.getTime()
+      && evidenceIsAvailable(request, submittedAt))
+    .sort((a, b) => a.evidenceId.localeCompare(b.evidenceId) || a.id.localeCompare(b.id))
+    .map((request) => ({
+      requestId: request.id,
+      evidenceId: request.evidenceId,
+      requestedAt: request.requestedAt,
+      availableAt: request.availableAt,
+      ...(request.releasedAt ? { releasedAt: request.releasedAt } : {}),
+    }));
+  const facilitatorInjectIds = input.injects
+    .filter((inject) => inject.sessionId === input.sessionId && new Date(inject.sentAt).getTime() <= submittedAt.getTime())
+    .sort((a, b) => a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id))
+    .map((inject) => inject.id);
+  const answeredInstitutionalMessageIds = input.institutionalMessages
+    .filter((message) => message.participantId === input.participantId
+      && message.sessionId === input.sessionId
+      && message.status === "ANSWERED"
+      && Boolean(message.answeredAt)
+      && new Date(message.answeredAt!).getTime() <= submittedAt.getTime())
+    .sort((a, b) => a.answeredAt!.localeCompare(b.answeredAt!) || a.id.localeCompare(b.id))
+    .map((message) => message.id);
+  if (
+    availableEvidence.length > SUBMISSION_CONTEXT_LIMITS.availableEvidence
+    || facilitatorInjectIds.length > SUBMISSION_CONTEXT_LIMITS.facilitatorInjects
+    || answeredInstitutionalMessageIds.length > SUBMISSION_CONTEXT_LIMITS.answeredInstitutionalMessages
+  ) throw new Error("SUBMISSION_CONTEXT_LIMIT_EXCEEDED");
+  return {
+    schemaVersion: SUBMISSION_CONTEXT_SCHEMA_VERSION,
+    scenarioVersion: SCENARIO_VERSION,
+    consequenceRuleVersion: CONSEQUENCE_RULE_VERSION,
+    submissionVersion: input.version,
+    submittedAt: submittedAt.toISOString(),
+    decisions: structuredClone(input.decisions),
+    availableEvidence,
+    facilitatorInjectIds,
+    answeredInstitutionalMessageIds,
+  };
+}
 
 export function evidenceIsAvailable(request: EvidenceRequest, now = new Date()): boolean {
   const reviewTime = now.getTime();
@@ -413,12 +536,13 @@ export function buildNegotiationPreparationBrief(input: {
   evidenceRequests: EvidenceRequest[];
   institutionalMessages?: InstitutionalMessage[];
   preparedAt: Date | string;
+  recommendationReview?: RecommendationReview;
 }): NegotiationPreparationBrief {
   const preparedAt = typeof input.preparedAt === "string" ? new Date(input.preparedAt) : input.preparedAt;
   const availableIds = new Set(input.evidenceRequests
     .filter((request) => evidenceIsAvailable(request, preparedAt))
     .map((request) => request.evidenceId));
-  const review = reviewRecommendation({
+  const review = input.recommendationReview ?? reviewRecommendation({
     decisions: input.decisions,
     evidenceRequests: input.evidenceRequests,
     reviewedAt: preparedAt,
@@ -457,45 +581,133 @@ export function negotiationBriefIsSubmittable(decisions: DecisionState): boolean
   return Boolean(decisions.readiness && decisions.finalRationale.trim() && decisions.nextHandoff.trim());
 }
 
+function frozenSnapshotFor(submission: Submission): SubmissionContextSnapshot | undefined {
+  const snapshot = submission.contextSnapshot;
+  return snapshot
+    && snapshot.submissionVersion === submission.version
+    && new Date(snapshot.submittedAt).getTime() === new Date(submission.submittedAt).getTime()
+    ? snapshot
+    : undefined;
+}
+
+function frozenEvidenceRequests(submission: Submission, snapshot: SubmissionContextSnapshot): EvidenceRequest[] {
+  return snapshot.availableEvidence.map((item) => ({
+    id: item.requestId,
+    sessionId: submission.sessionId,
+    participantId: submission.participantId,
+    evidenceId: item.evidenceId,
+    requestedAt: item.requestedAt,
+    availableAt: item.availableAt,
+    ...(item.releasedAt ? { releasedAt: item.releasedAt } : {}),
+  }));
+}
+
+function replayProvenance(submission?: Submission): ReplayProvenance {
+  if (!submission) return {
+    mode: "WORKING_STATE",
+    label: "working state · not a submitted replay",
+    scenarioVersion: SCENARIO_VERSION,
+    consequenceRuleVersion: CONSEQUENCE_RULE_VERSION,
+  };
+  const snapshot = frozenSnapshotFor(submission);
+  if (!snapshot) return {
+    mode: "LEGACY_CURRENT_RULE_RECONSTRUCTION",
+    label: "legacy · current-rule reconstruction",
+    scenarioVersion: SCENARIO_VERSION,
+    consequenceRuleVersion: CONSEQUENCE_RULE_VERSION,
+    submissionVersion: submission.version,
+    submittedAt: submission.submittedAt,
+  };
+  return {
+    mode: "FROZEN",
+    label: `frozen submission context · scenario ${snapshot.scenarioVersion} · consequence rules ${snapshot.consequenceRuleVersion}`,
+    scenarioVersion: snapshot.scenarioVersion,
+    consequenceRuleVersion: snapshot.consequenceRuleVersion,
+    submissionVersion: submission.version,
+    submittedAt: submission.submittedAt,
+  };
+}
+
+export function buildSubmissionReplay(input: {
+  submission: Submission;
+  evidenceRequests: EvidenceRequest[];
+  institutionalMessages: InstitutionalMessage[];
+  injects: GlobalInject[];
+}): SubmissionReplay {
+  const snapshot = frozenSnapshotFor(input.submission);
+  const submittedAt = input.submission.submittedAt;
+  const decisions = structuredClone(snapshot?.decisions ?? input.submission.decisions);
+  const evidenceRequests = snapshot
+    ? frozenEvidenceRequests(input.submission, snapshot)
+    : input.evidenceRequests.filter((request) => request.participantId === input.submission.participantId
+      && request.sessionId === input.submission.sessionId
+      && new Date(request.requestedAt).getTime() <= new Date(submittedAt).getTime()
+      && evidenceIsAvailable(request, new Date(submittedAt)));
+  const messageIds = snapshot ? new Set(snapshot.answeredInstitutionalMessageIds) : undefined;
+  const institutionalMessages = input.institutionalMessages
+    .filter((message) => message.participantId === input.submission.participantId
+      && message.sessionId === input.submission.sessionId
+      && message.status === "ANSWERED"
+      && Boolean(message.answeredAt)
+      && (messageIds ? messageIds.has(message.id) : new Date(message.answeredAt!).getTime() <= new Date(submittedAt).getTime()))
+    .sort((a, b) => a.answeredAt!.localeCompare(b.answeredAt!) || a.id.localeCompare(b.id));
+  const injectIds = snapshot ? new Set(snapshot.facilitatorInjectIds) : undefined;
+  const facilitatorInjects = input.injects
+    .filter((inject) => inject.sessionId === input.submission.sessionId
+      && (injectIds ? injectIds.has(inject.id) : new Date(inject.sentAt).getTime() <= new Date(submittedAt).getTime()))
+    .sort((a, b) => a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id));
+  const review = reviewRecommendationForVersion(snapshot?.consequenceRuleVersion, { decisions, evidenceRequests, reviewedAt: submittedAt });
+  const brief = buildNegotiationPreparationBrief({ decisions, evidenceRequests, institutionalMessages, preparedAt: submittedAt, recommendationReview: review });
+  return {
+    submissionId: input.submission.id,
+    version: input.submission.version,
+    submittedAt,
+    decisions,
+    evidenceAvailable: brief.evidenceBasis,
+    recommendationReview: review,
+    negotiationPreparationBrief: brief,
+    consequences: deriveConsequencesForVersion(snapshot?.consequenceRuleVersion, decisions),
+    counterfactuals: deriveCounterfactualsForVersion(snapshot?.consequenceRuleVersion, decisions),
+    unresolvedRisks: unresolvedRiskListForVersion(snapshot?.consequenceRuleVersion, decisions),
+    institutionalMessages,
+    facilitatorInjects,
+    replayProvenance: replayProvenance(input.submission),
+  };
+}
+
 export function buildParticipantDebrief(input: {
   participantId: string;
   submissions: Submission[];
   evidenceRequests: EvidenceRequest[];
   institutionalMessages?: InstitutionalMessage[];
   injects: GlobalInject[];
+  submissionVersion?: number;
 }): ParticipantDebrief | undefined {
-  const submission = input.submissions
+  const participantSubmissions = input.submissions
     .filter((item) => item.participantId === input.participantId)
-    .sort((a, b) => a.version - b.version)
-    .at(-1);
+    .sort((a, b) => a.version - b.version);
+  const submission = input.submissionVersion === undefined
+    ? participantSubmissions.at(-1)
+    : participantSubmissions.find((item) => item.version === input.submissionVersion);
   if (!submission) return undefined;
-
-  const evidenceRequests = input.evidenceRequests.filter((item) => (
-    item.participantId === input.participantId && item.sessionId === submission.sessionId
-  ));
-  const institutionalMessages = (input.institutionalMessages ?? [])
-    .filter((item) => item.participantId === input.participantId && item.sessionId === submission.sessionId)
-    .sort((a, b) => (a.answeredAt ?? a.createdAt).localeCompare(b.answeredAt ?? b.createdAt) || a.id.localeCompare(b.id));
-  const brief = buildNegotiationPreparationBrief({
-    decisions: submission.decisions,
-    evidenceRequests,
-    institutionalMessages,
-    preparedAt: submission.submittedAt,
+  const replay = buildSubmissionReplay({
+    submission,
+    evidenceRequests: input.evidenceRequests,
+    institutionalMessages: input.institutionalMessages ?? [],
+    injects: input.injects,
   });
 
   return {
     submissionId: submission.id,
     version: submission.version,
     submittedAt: submission.submittedAt,
-    position: brief.position,
-    evidenceAvailable: brief.evidenceBasis,
-    consequences: deriveConsequences(submission.decisions),
-    unresolvedRisks: unresolvedRiskList(submission.decisions),
-    counterfactual: deriveCounterfactuals(submission.decisions)[0]!,
-    facilitatorInjects: input.injects.filter((inject) => (
-      inject.sessionId === submission.sessionId
-      && new Date(inject.sentAt).getTime() <= new Date(submission.submittedAt).getTime()
-    )).sort((a, b) => a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id)),
+    position: replay.negotiationPreparationBrief.position,
+    evidenceAvailable: replay.evidenceAvailable,
+    consequences: replay.consequences,
+    unresolvedRisks: replay.unresolvedRisks,
+    counterfactual: replay.counterfactuals[0]!,
+    facilitatorInjects: replay.facilitatorInjects,
+    replayProvenance: replay.replayProvenance,
     fictionalBoundary: PARTICIPANT_DEBRIEF_BOUNDARY,
   };
 }
@@ -632,6 +844,61 @@ export function deriveCounterfactuals(decisions: DecisionState): Counterfactual[
   return items;
 }
 
+function deriveConsequencesForVersion(ruleVersion: string | undefined, decisions: DecisionState): Consequence[] {
+  if (!ruleVersion || ruleVersion === CONSEQUENCE_RULE_VERSION) return deriveConsequences(decisions);
+  return [{
+    id: "archived-rule-version-unavailable",
+    title: "Archived consequence rules are unavailable in this client",
+    outcome: `This frozen submission names ${ruleVersion}; this client will not reinterpret it with ${CONSEQUENCE_RULE_VERSION}.`,
+    basis: "Replay fails closed when its recorded deterministic rule version is unavailable.",
+    severity: "NEUTRAL",
+  }];
+}
+
+function deriveCounterfactualsForVersion(ruleVersion: string | undefined, decisions: DecisionState): Counterfactual[] {
+  if (!ruleVersion || ruleVersion === CONSEQUENCE_RULE_VERSION) return deriveCounterfactuals(decisions);
+  return [{
+    id: "archived-rule-version-unavailable",
+    alternative: "Load a client that contains the archived consequence-rule version.",
+    projectedDifference: "No counterfactual is generated by a different rule version.",
+    fixedAssumptions: `The frozen decisions and ${ruleVersion} rule-version boundary remain unchanged.`,
+  }];
+}
+
+function reviewRecommendationForVersion(
+  ruleVersion: string | undefined,
+  input: Parameters<typeof reviewRecommendation>[0],
+): RecommendationReview {
+  if (!ruleVersion || ruleVersion === CONSEQUENCE_RULE_VERSION) return reviewRecommendation(input);
+  const reviewedAt = typeof input.reviewedAt === "string" ? new Date(input.reviewedAt) : input.reviewedAt;
+  const labels = [
+    ["LIQUIDITY_BASIS", "Liquidity basis"],
+    ["ACCOUNT_CLASSIFICATION", "Account classification"],
+    ["FACILITY_LINKAGE", "Facility A/B linkage"],
+    ["DISCLOSURE_RECOMMENDATION", "Disclosure recommendation"],
+    ["TREATMENT_PERIMETER", "Treatment perimeter"],
+    ["READINESS_POSITION", "Readiness position"],
+  ] as const;
+  return {
+    reviewedAt: reviewedAt.toISOString(),
+    items: labels.map(([claim, label]) => ({
+      claim,
+      label,
+      recordedClaim: "Frozen claim retained",
+      status: "UNRESOLVED" as const,
+      explanation: `The archived review rules ${ruleVersion} are not available in this client; the claim has not been reinterpreted with current rules.`,
+      evidenceIds: [],
+    })),
+    readyMismatch: false,
+    submissionAllowed: true,
+  };
+}
+
+function unresolvedRiskListForVersion(ruleVersion: string | undefined, decisions: DecisionState): string[] {
+  if (!ruleVersion || ruleVersion === CONSEQUENCE_RULE_VERSION) return unresolvedRiskList(decisions);
+  return [`Archived consequence rules ${ruleVersion} are unavailable; current rules were not used to reinterpret unresolved risks.`];
+}
+
 export function unresolvedRiskList(decisions: DecisionState): string[] {
   const risks: string[] = [];
   if (decisions.liquidityBasis !== "VERIFIED_480") risks.push("Usable liquidity is not verified at USD 480m.");
@@ -653,48 +920,60 @@ export function buildAfterActionReport(input: {
   injects: GlobalInject[];
   institutionalMessages: InstitutionalMessage[];
   timeline: ActivityEvent[];
+  submissionVersion?: number;
 }): AfterActionReport {
-  const requestedIds = new Set(input.evidenceRequests.map((request) => request.evidenceId));
-  const submissions = [...input.submissions].sort((a, b) => a.version - b.version);
+  const submissions = input.submissions
+    .filter((submission) => submission.participantId === input.participant.id && submission.sessionId === input.session.id)
+    .sort((a, b) => a.version - b.version);
+  const evidenceRequestHistory = input.evidenceRequests.filter((request) => (
+    request.participantId === input.participant.id && request.sessionId === input.session.id
+  ));
+  const institutionalMessageHistory = input.institutionalMessages.filter((message) => (
+    message.participantId === input.participant.id && message.sessionId === input.session.id
+  ));
+  const facilitatorInjectHistory = input.injects.filter((inject) => inject.sessionId === input.session.id);
   const generatedAt = new Date().toISOString();
-  const latestSubmission = submissions.at(-1);
-  const recommendationReview = reviewRecommendation({
-    decisions: latestSubmission?.decisions ?? input.decisions,
-    evidenceRequests: input.evidenceRequests,
-    reviewedAt: latestSubmission?.submittedAt ?? generatedAt,
-  });
-  const submissionRecommendationReviews = submissions.map((submission) => ({
-    submissionId: submission.id,
-    version: submission.version,
-    review: reviewRecommendation({
-      decisions: submission.decisions,
-      evidenceRequests: input.evidenceRequests,
-      reviewedAt: submission.submittedAt,
-    }),
+  const submissionReplays = submissions.map((submission) => buildSubmissionReplay({
+    submission,
+    evidenceRequests: evidenceRequestHistory,
+    institutionalMessages: institutionalMessageHistory,
+    injects: facilitatorInjectHistory,
   }));
-  const briefDecisions = latestSubmission?.decisions ?? input.decisions;
-  const briefPreparedAt = latestSubmission?.submittedAt ?? generatedAt;
-  const negotiationPreparationBrief = buildNegotiationPreparationBrief({
+  const selectedReplay = input.submissionVersion === undefined
+    ? submissionReplays.at(-1)
+    : submissionReplays.find((replay) => replay.version === input.submissionVersion);
+  const briefDecisions = selectedReplay?.decisions ?? structuredClone(input.decisions);
+  const requestedAtSelection = selectedReplay?.submittedAt ?? generatedAt;
+  const selectedEvidenceRequests = evidenceRequestHistory.filter((request) => (
+    new Date(request.requestedAt).getTime() <= new Date(requestedAtSelection).getTime()
+  ));
+  const requestedIds = new Set(selectedEvidenceRequests.map((request) => request.evidenceId));
+  const recommendationReview = selectedReplay?.recommendationReview ?? reviewRecommendation({
     decisions: briefDecisions,
-    evidenceRequests: input.evidenceRequests,
-    institutionalMessages: input.institutionalMessages,
-    preparedAt: briefPreparedAt,
+    evidenceRequests: selectedEvidenceRequests,
+    reviewedAt: generatedAt,
   });
-  const submissionBriefs = submissions.map((submission) => ({
-    submissionId: submission.id,
-    version: submission.version,
-    brief: buildNegotiationPreparationBrief({
-      decisions: submission.decisions,
-      evidenceRequests: input.evidenceRequests,
-      institutionalMessages: input.institutionalMessages,
-      preparedAt: submission.submittedAt,
-    }),
+  const negotiationPreparationBrief = selectedReplay?.negotiationPreparationBrief ?? buildNegotiationPreparationBrief({
+    decisions: briefDecisions,
+    evidenceRequests: selectedEvidenceRequests,
+    institutionalMessages: institutionalMessageHistory,
+    preparedAt: generatedAt,
+  });
+  const submissionRecommendationReviews = submissionReplays.map((replay) => ({
+    submissionId: replay.submissionId,
+    version: replay.version,
+    review: replay.recommendationReview,
+  }));
+  const submissionBriefs = submissionReplays.map((replay) => ({
+    submissionId: replay.submissionId,
+    version: replay.version,
+    brief: replay.negotiationPreparationBrief,
   }));
   const ignoredIds = new Set(recommendationReview.items
     .filter((item) => item.status === "UNSUPPORTED")
     .flatMap((item) => item.evidenceIds));
-  const consequences = deriveConsequences(briefDecisions);
-  const risks = unresolvedRiskList(briefDecisions);
+  const consequences = selectedReplay?.consequences ?? deriveConsequences(briefDecisions);
+  const risks = selectedReplay?.unresolvedRisks ?? unresolvedRiskList(briefDecisions);
   const readiness = briefDecisions.readiness?.replaceAll("_", " ").toLowerCase() ?? "not submitted";
   return {
     participant: {
@@ -710,23 +989,60 @@ export function buildAfterActionReport(input: {
       createdAt: input.session.createdAt,
     },
     generatedAt,
-    executiveSummary: `${input.participant.name} submitted a ${readiness} internal Debt Management Office negotiation-preparation brief. The record contains ${input.submissions.length} submission version${input.submissions.length === 1 ? "" : "s"}, ${requestedIds.size} evidence request${requestedIds.size === 1 ? "" : "s"}, and ${risks.length} unresolved risk${risks.length === 1 ? "" : "s"}.`,
-    decisions: input.decisions,
+    executiveSummary: selectedReplay
+      ? `${input.participant.name}'s version ${selectedReplay.version} is a ${readiness} internal Debt Management Office negotiation-preparation brief. The record contains ${submissions.length} submission version${submissions.length === 1 ? "" : "s"}, ${requestedIds.size} evidence request${requestedIds.size === 1 ? "" : "s"} by that submission, and ${risks.length} unresolved risk${risks.length === 1 ? "" : "s"}.`
+      : `${input.participant.name} has no submitted replay. This report shows working state and does not claim an exact historical reconstruction.`,
+    decisions: briefDecisions,
+    transferReflection: input.decisions.reflection,
+    ...(selectedReplay ? { selectedSubmissionVersion: selectedReplay.version } : {}),
+    replayProvenance: selectedReplay?.replayProvenance ?? replayProvenance(),
     submissions,
+    submissionReplays,
     evidenceRequested: EVIDENCE_CATALOG.filter((item) => requestedIds.has(item.id)),
     evidenceNotRequested: EVIDENCE_CATALOG.filter((item) => !requestedIds.has(item.id)),
     evidenceIgnored: EVIDENCE_CATALOG.filter((item) => ignoredIds.has(item.id)),
-    evidenceRequestHistory: input.evidenceRequests,
+    evidenceRequestHistory,
     recommendationReview,
     submissionRecommendationReviews,
     negotiationPreparationBrief,
     submissionBriefs,
-    institutionalMessages: input.institutionalMessages,
+    institutionalMessages: selectedReplay?.institutionalMessages ?? institutionalMessageHistory,
     consequences,
-    counterfactuals: deriveCounterfactuals(briefDecisions),
+    counterfactuals: selectedReplay?.counterfactuals ?? deriveCounterfactuals(briefDecisions),
     unresolvedRisks: risks,
-    advisorUsage: input.advisorTurns,
-    facilitatorInjects: input.injects,
-    timeline: [...input.timeline].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    advisorUsage: input.advisorTurns.filter((turn) => turn.participantId === input.participant.id && turn.sessionId === input.session.id),
+    facilitatorInjects: selectedReplay?.facilitatorInjects ?? facilitatorInjectHistory,
+    timeline: input.timeline
+      .filter((event) => event.sessionId === input.session.id && (event.participantId === undefined || event.participantId === input.participant.id))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+  };
+}
+
+export function selectAfterActionReportSubmission(report: AfterActionReport, version: number): AfterActionReport {
+  const replay = report.submissionReplays.find((item) => item.version === version);
+  if (!replay) return report;
+  const requestedIds = new Set(report.evidenceRequestHistory
+    .filter((request) => new Date(request.requestedAt).getTime() <= new Date(replay.submittedAt).getTime())
+    .map((request) => request.evidenceId));
+  const ignoredIds = new Set(replay.recommendationReview.items
+    .filter((item) => item.status === "UNSUPPORTED")
+    .flatMap((item) => item.evidenceIds));
+  const readiness = replay.decisions.readiness?.replaceAll("_", " ").toLowerCase() ?? "not submitted";
+  return {
+    ...report,
+    executiveSummary: `${report.participant.name}'s version ${replay.version} is a ${readiness} internal Debt Management Office negotiation-preparation brief. The record contains ${report.submissions.length} submission version${report.submissions.length === 1 ? "" : "s"}, ${requestedIds.size} evidence request${requestedIds.size === 1 ? "" : "s"} by that submission, and ${replay.unresolvedRisks.length} unresolved risk${replay.unresolvedRisks.length === 1 ? "" : "s"}.`,
+    decisions: structuredClone(replay.decisions),
+    selectedSubmissionVersion: replay.version,
+    replayProvenance: replay.replayProvenance,
+    evidenceRequested: EVIDENCE_CATALOG.filter((item) => requestedIds.has(item.id)),
+    evidenceNotRequested: EVIDENCE_CATALOG.filter((item) => !requestedIds.has(item.id)),
+    evidenceIgnored: EVIDENCE_CATALOG.filter((item) => ignoredIds.has(item.id)),
+    recommendationReview: replay.recommendationReview,
+    negotiationPreparationBrief: replay.negotiationPreparationBrief,
+    institutionalMessages: replay.institutionalMessages,
+    consequences: replay.consequences,
+    counterfactuals: replay.counterfactuals,
+    unresolvedRisks: replay.unresolvedRisks,
+    facilitatorInjects: replay.facilitatorInjects,
   };
 }

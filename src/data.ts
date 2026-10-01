@@ -1,5 +1,6 @@
 import { createClient, type RealtimeChannel, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { applyAdvisorFallbackCadence, isAdvisorGreeting, normalizeAdvisorCitations } from "./advisorPresentation";
+import { buildSubmissionContextSnapshot, CONSEQUENCE_RULE_VERSION, parseSubmissionContextSnapshot, SCENARIO_VERSION } from "./engine";
 import { EVIDENCE_CATALOG, EXERCISE_TITLE } from "./scenario";
 import { EMPTY_DECISIONS } from "./types";
 import type {
@@ -92,6 +93,7 @@ function mapEvidence(row: Record<string, unknown>): EvidenceRequest {
 }
 
 function mapSubmission(row: Record<string, unknown>): Submission {
+  const contextSnapshot = parseSubmissionContextSnapshot(row.context_snapshot);
   return {
     id: String(row.id),
     participantId: String(row.participant_id),
@@ -99,7 +101,21 @@ function mapSubmission(row: Record<string, unknown>): Submission {
     version: Number(row.version),
     decisions: decisionSnapshot(row.decisions as Partial<DecisionState>),
     submittedAt: iso(row.submitted_at),
+    ...(contextSnapshot ? { contextSnapshot: { ...contextSnapshot, decisions: decisionSnapshot(contextSnapshot.decisions) } } : {}),
   };
+}
+
+function normalizeStoredSubmission(submission: Submission): Submission {
+  const contextSnapshot = parseSubmissionContextSnapshot(submission.contextSnapshot);
+  const normalized = {
+    ...submission,
+    decisions: decisionSnapshot(submission.decisions),
+  };
+  if (!contextSnapshot) {
+    delete normalized.contextSnapshot;
+    return normalized;
+  }
+  return { ...normalized, contextSnapshot: { ...contextSnapshot, decisions: decisionSnapshot(contextSnapshot.decisions) } };
 }
 
 function mapInject(row: Record<string, unknown>): GlobalInject {
@@ -167,10 +183,7 @@ function localBundle(profile?: { name: string; organization: string; email: stri
     return {
       ...parsed,
       decisions: decisionSnapshot(parsed.decisions),
-      submissions: (parsed.submissions ?? []).map((submission) => ({
-        ...submission,
-        decisions: decisionSnapshot(submission.decisions),
-      })),
+      submissions: (parsed.submissions ?? []).map(normalizeStoredSubmission),
       messages: parsed.messages ?? [],
       advisorTurns: (parsed.advisorTurns ?? []).map((turn) => ({ ...turn, sources: mapAdvisorSources(turn.sources) })),
     };
@@ -229,7 +242,7 @@ function storedLocalParticipant(participantId: string): ParticipantBundle | unde
   return parsed.participant.id === participantId && isLocalBundle(parsed) ? {
     ...parsed,
     decisions: decisionSnapshot(parsed.decisions),
-    submissions: (parsed.submissions ?? []).map((submission) => ({ ...submission, decisions: decisionSnapshot(submission.decisions) })),
+    submissions: (parsed.submissions ?? []).map(normalizeStoredSubmission),
     messages: parsed.messages ?? [],
   } : undefined;
 }
@@ -433,17 +446,32 @@ export async function recordEvent(bundle: ParticipantBundle, type: string, detai
 export async function submitRecommendation(bundle: ParticipantBundle): Promise<ParticipantBundle> {
   if (!supabase || isLocalBundle(bundle)) {
     const version = bundle.submissions.length + 1;
+    const submittedAt = new Date().toISOString();
     const submission: Submission = {
       id: crypto.randomUUID(),
       participantId: bundle.participant.id,
       sessionId: bundle.session.id,
       version,
       decisions: decisionSnapshot(bundle.decisions),
-      submittedAt: new Date().toISOString(),
+      submittedAt,
+      contextSnapshot: buildSubmissionContextSnapshot({
+        participantId: bundle.participant.id,
+        sessionId: bundle.session.id,
+        decisions: bundle.decisions,
+        version,
+        submittedAt,
+        evidenceRequests: bundle.evidenceRequests,
+        injects: bundle.injects,
+        institutionalMessages: bundle.messages,
+      }),
     };
     return saveLocal({ ...bundle, submissions: [...bundle.submissions, submission] });
   }
-  const result = await supabase.rpc("submit_futureslab_recommendation", { p_participant_id: bundle.participant.id });
+  const result = await supabase.rpc("submit_futureslab_recommendation", {
+    p_participant_id: bundle.participant.id,
+    p_scenario_version: SCENARIO_VERSION,
+    p_consequence_rule_version: CONSEQUENCE_RULE_VERSION,
+  });
   if (result.error) throw result.error;
   return { ...bundle, submissions: [...bundle.submissions, mapSubmission(result.data as Record<string, unknown>)] };
 }
