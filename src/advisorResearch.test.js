@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { scriptedAdvisorTurn } from "./data";
+import { EMPTY_DECISIONS } from "./types";
 import {
   RESEARCH_CARDS,
   citationFor,
@@ -21,9 +23,33 @@ const advisorFunctionSource = readFileSync(
   new URL("../supabase/functions/advisor-chat/index.ts", import.meta.url),
   "utf8",
 );
+const participantSource = readFileSync(new URL("./ParticipantApp.tsx", import.meta.url), "utf8");
+const participantReference = readFileSync(
+  new URL("../public/kuvera_debt_management_office.html", import.meta.url),
+  "utf8",
+);
+const caseFileSource = participantReference.slice(
+  participantReference.indexOf('id="referenceOverlay"'),
+  participantReference.indexOf('id="advisorsListOverlay"'),
+);
 const approvedDocumentClaimIds = [...approvedCardsSection.matchAll(/^- claim_id: (\S+)/gm)]
   .map((match) => match[1])
   .sort();
+
+function participantBundle(evidenceIds = []) {
+  const now = new Date().toISOString();
+  return {
+    session: { id: "local-test", title: "Test", kind: "REHEARSAL", status: "RUNNING", currentStage: 7, durationSeconds: 1200, remainingSeconds: 1200, submissionsClosed: false, createdAt: now, expiresAt: now },
+    participant: { id: "participant-test", sessionId: "local-test", name: "Test", organization: "Test", email: "test@example.org", currentStage: 0, lastActiveAt: now, consentedAt: now },
+    decisions: { ...EMPTY_DECISIONS },
+    evidenceRequests: evidenceIds.map((evidenceId) => ({ id: `request-${evidenceId}`, sessionId: "local-test", participantId: "participant-test", evidenceId, requestedAt: now, availableAt: now, releasedAt: now })),
+    submissions: [],
+    injects: [],
+    messages: [],
+    advisorTurns: [],
+    timeline: [],
+  };
+}
 
 describe("advisor research retrieval", () => {
   it("indexes exactly the approved research cards and never the blocked progress DOCX", () => {
@@ -65,7 +91,7 @@ describe("advisor research retrieval", () => {
 
   it("enforces scenario authority and only supplies returned evidence", () => {
     const authorityLabels = [
-      "1. Participant-visible Kuvera facts and deterministic scenario state.",
+      "1. Participant-visible Kuvera sources and returned institutional evidence.",
       "2. Official G20 and Common Framework sources.",
       "3. Illustrative templates",
       "4. Empirical research",
@@ -76,10 +102,44 @@ describe("advisor research retrieval", () => {
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
     expect(advisorFunctionSource).toContain(
-      "Research explains the scenario. It must never replace, revise, or overwrite Kuvera's canonical facts",
+      "Research explains mechanisms and reasoning patterns. It must never replace, revise, or manufacture Kuvera facts",
     );
     expect(advisorFunctionSource).toContain("Boolean(row.released_at)");
     expect(advisorFunctionSource).toContain("new Date(String(row.available_at)).getTime() <= now");
+  });
+
+  it("keeps evidence-specific facts out of baseline advisor context and includes them after return", () => {
+    const baselineBlock = advisorFunctionSource.match(/const BASELINE_SCENARIO_SOURCES[\s\S]*?\n\];/)?.[0] ?? "";
+    const evidenceBlock = advisorFunctionSource.match(/const EVIDENCE_SCENARIO_SOURCES[\s\S]*?\n\];/)?.[0] ?? "";
+
+    expect(baselineBlock).toContain("Kuvera reports USD 780m");
+    expect(baselineBlock).toContain("Facility B's relationship to the account is unconfirmed");
+    expect(baselineBlock).toContain("Permitted disclosure and the creditor's commitment status begin unresolved");
+    expect(baselineBlock).not.toMatch(/USD (?:240|60|480)m/);
+    expect(baselineBlock).not.toContain("depends on the same RA-01 pool");
+    expect(evidenceBlock).toContain("USD 240m is restricted and USD 60m is protected, producing USD 480m usable liquidity");
+    expect(evidenceBlock).toContain("depends on the same RA-01 pool used by Facility A");
+    expect(advisorFunctionSource).toContain('const withheld = "WITHHELD_PENDING_PARTICIPANT_VISIBLE_EVIDENCE"');
+    expect(advisorFunctionSource).toContain('availableEvidenceIds.has("treasury-reconciliation") ? record.liquidityBasis : withheld');
+    expect(advisorFunctionSource).toContain('availableEvidenceIds.has("confidentiality-opinion") ? record.disclosure : withheld');
+  });
+
+  it("applies the same pre-evidence and post-evidence boundary in scripted advisor fallback", () => {
+    const baseline = participantBundle();
+    const liquidityBefore = scriptedAdvisorTurn(baseline, "amara", "What is Kuvera's usable liquidity?").answer;
+    const linkageBefore = scriptedAdvisorTurn(baseline, "daniel", "Does Facility B share the account?").answer;
+    const disclosureBefore = scriptedAdvisorTurn(baseline, "daniel", "What disclosure is permitted?").answer;
+    const commitmentBefore = scriptedAdvisorTurn(baseline, "daniel", "What is the creditor commitment status?").answer;
+
+    expect(liquidityBefore).not.toMatch(/USD (?:240|60|480)m/);
+    expect(linkageBefore).toContain("remains unconfirmed");
+    expect(disclosureBefore).toContain("does not yet establish Kuvera's permitted disclosure boundary");
+    expect(commitmentBefore).toContain("not established");
+
+    expect(scriptedAdvisorTurn(participantBundle(["treasury-reconciliation"]), "amara", "What is Kuvera's usable liquidity?").answer).toContain("USD 480m usable");
+    expect(scriptedAdvisorTurn(participantBundle(["facility-b"]), "daniel", "Does Facility B share the account?").answer).toContain("connecting Facility B to the RA-01 arrangement");
+    expect(scriptedAdvisorTurn(participantBundle(["confidentiality-opinion"]), "daniel", "What disclosure is permitted?").answer).toContain("permits a redacted functional summary");
+    expect(scriptedAdvisorTurn(participantBundle(["creditor-status"]), "daniel", "What is the creditor commitment status?").answer).toContain("headquarters authorization remains outstanding");
   });
 
   it("retains structured citations while removing internal claim markers from visible prose", () => {
@@ -151,5 +211,46 @@ describe("advisor research retrieval", () => {
     expect(prompt.toLowerCase()).not.toContain(".docx");
     expect(boundaryCheck).toBeGreaterThan(-1);
     expect(providerCall).toBeGreaterThan(boundaryCheck);
+  });
+});
+
+describe("participant evidence-discovery boundary", () => {
+  it("keeps the exact usable-liquidity result out of the static Case File", () => {
+    expect(caseFileSource).toContain("$780m");
+    expect(caseFileSource).toContain("Usable amount</small>");
+    expect(caseFileSource).not.toMatch(/(?:USD |\$)480m/i);
+    expect(caseFileSource).not.toMatch(/(?:USD |\$)240m/i);
+    expect(caseFileSource).not.toMatch(/(?:USD |\$)60m/i);
+  });
+
+  it("keeps Facility B linkage and disclosure permission unresolved in the static Case File", () => {
+    expect(caseFileSource).toContain("Facility B's relationship to RA-01 is unconfirmed");
+    expect(caseFileSource).toContain("Permitted disclosure unresolved");
+    expect(caseFileSource).not.toContain("Creditor knows it draws from the same copper-revenue pool as Facility A");
+    expect(caseFileSource).not.toContain("Same creditor / same pool");
+    expect(caseFileSource).not.toContain("Present through shared pool");
+  });
+
+  it("uses decision options to record claims without explaining the canonical path", () => {
+    const stageSource = participantSource.slice(
+      participantSource.indexOf("function StageContent"),
+      participantSource.indexOf("function InstitutionalRequestDesk"),
+    );
+    expect(stageSource).toContain('treasuryReconciliationAvailable ? "USD 480m verified usable"');
+    expect(stageSource).toContain('detail: "Record Facilities A and B as sharing a revenue pool."');
+    expect(stageSource).toContain('detail: "Recommend release of a summary with selected details removed."');
+    expect(stageSource).not.toContain("Both facilities depend on RA-01 and must be carried in the dependency analysis.");
+    expect(stageSource).not.toContain("Share control, balances, and dependency without restricted contract text.");
+  });
+
+  it("keeps honest unresolved choices available", () => {
+    const choiceGroupSource = participantSource.slice(
+      participantSource.indexOf("function ChoiceGroup"),
+      participantSource.indexOf("function TextArea"),
+    );
+    expect(participantSource).toContain('{ value: "UNRESOLVED", title: "Keep the basis unresolved"');
+    expect(participantSource).toContain('{ value: "UNRESOLVED", title: "Linkage unresolved"');
+    expect(participantSource).toContain('{ value: "DEFER", title: "Defer perimeter recommendation"');
+    expect(choiceGroupSource).not.toContain("disabled=");
   });
 });

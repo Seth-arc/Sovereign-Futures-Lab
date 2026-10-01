@@ -10,12 +10,348 @@ import type {
   GlobalInject,
   InstitutionalMessage,
   ParticipantProfile,
+  RecommendationReview,
   Submission,
   WorkshopSession,
 } from "./types";
 
 export function evidenceIsAvailable(request: EvidenceRequest, now = new Date()): boolean {
-  return request.releasedAt !== undefined || new Date(request.availableAt).getTime() <= now.getTime();
+  const reviewTime = now.getTime();
+  const releasedByReview = request.releasedAt !== undefined && new Date(request.releasedAt).getTime() <= reviewTime;
+  return releasedByReview || new Date(request.availableAt).getTime() <= reviewTime;
+}
+
+export function reviewRecommendation(input: {
+  decisions: DecisionState;
+  evidenceRequests: EvidenceRequest[];
+  reviewedAt: Date | string;
+}): RecommendationReview {
+  const reviewedAt = typeof input.reviewedAt === "string" ? new Date(input.reviewedAt) : input.reviewedAt;
+  const availableIds = new Set(input.evidenceRequests
+    .filter((request) => evidenceIsAvailable(request, reviewedAt))
+    .map((request) => request.evidenceId));
+  const has = (evidenceId: string) => availableIds.has(evidenceId);
+  const linkageEvidence = ["facility-b", "cross-collateralization"].filter(has);
+
+  const liquidity = (() => {
+    if (!input.decisions.liquidityBasis || input.decisions.liquidityBasis === "UNRESOLVED") return {
+      claim: "LIQUIDITY_BASIS" as const,
+      label: "Liquidity basis",
+      recordedClaim: input.decisions.liquidityBasis === "UNRESOLVED" ? "Unresolved" : "Not recorded",
+      status: "UNRESOLVED" as const,
+      explanation: "The recommendation preserves that usable liquidity has not been established.",
+      evidenceIds: [],
+    };
+    if (input.decisions.liquidityBasis === "REPORTED_780") return has("treasury-reconciliation") ? {
+      claim: "LIQUIDITY_BASIS" as const,
+      label: "Liquidity basis",
+      recordedClaim: "USD 780m reported, not verified",
+      status: "UNSUPPORTED" as const,
+      explanation: "The returned Treasury reconciliation establishes USD 480m as usable liquidity; USD 780m remains only the gross reported balance.",
+      evidenceIds: ["treasury-reconciliation"],
+    } : {
+      claim: "LIQUIDITY_BASIS" as const,
+      label: "Liquidity basis",
+      recordedClaim: "USD 780m reported, not verified",
+      status: "SUPPORTED" as const,
+      explanation: "The shared case record supports USD 780m only as a reported, provisional figure.",
+      evidenceIds: [],
+    };
+    return has("treasury-reconciliation") ? {
+      claim: "LIQUIDITY_BASIS" as const,
+      label: "Liquidity basis",
+      recordedClaim: "USD 480m verified usable",
+      status: "SUPPORTED" as const,
+      explanation: "The returned Treasury reconciliation establishes the USD 480m usable-liquidity basis.",
+      evidenceIds: ["treasury-reconciliation"],
+    } : {
+      claim: "LIQUIDITY_BASIS" as const,
+      label: "Liquidity basis",
+      recordedClaim: "USD 480m verified usable",
+      status: "UNSUPPORTED" as const,
+      explanation: "The Treasury cash reconciliation has not returned, so USD 480m is not established in the available record.",
+      evidenceIds: [],
+    };
+  })();
+
+  const account = (() => {
+    if (!input.decisions.accountClassification || input.decisions.accountClassification === "UNRESOLVED") return {
+      claim: "ACCOUNT_CLASSIFICATION" as const,
+      label: "Account classification",
+      recordedClaim: input.decisions.accountClassification === "UNRESOLVED" ? "Unresolved" : "Not recorded",
+      status: "UNRESOLVED" as const,
+      explanation: "The recommendation preserves that the account-control classification is not established.",
+      evidenceIds: [],
+    };
+    if (input.decisions.accountClassification === "EFFECTIVE_CONTROL") {
+      if (has("account-control")) return {
+        claim: "ACCOUNT_CLASSIFICATION" as const,
+        label: "Account classification",
+        recordedClaim: "Quasi-collateral / effective control",
+        status: "SUPPORTED" as const,
+        explanation: "The returned account-control terms establish consent and payment-sweep constraints.",
+        evidenceIds: ["account-control"],
+      };
+      if (has("facility-a")) return {
+        claim: "ACCOUNT_CLASSIFICATION" as const,
+        label: "Account classification",
+        recordedClaim: "Quasi-collateral / effective control",
+        status: "CONDITIONAL" as const,
+        explanation: "Facility A confirms an account waterfall, but the withdrawal and control terms remain open.",
+        evidenceIds: ["facility-a"],
+      };
+      return {
+        claim: "ACCOUNT_CLASSIFICATION" as const,
+        label: "Account classification",
+        recordedClaim: "Quasi-collateral / effective control",
+        status: "UNSUPPORTED" as const,
+        explanation: "The restricted-account control terms have not returned, so effective control is not established.",
+        evidenceIds: [],
+      };
+    }
+    return {
+      claim: "ACCOUNT_CLASSIFICATION" as const,
+      label: "Account classification",
+      recordedClaim: "Ordinary operating account",
+      status: "UNSUPPORTED" as const,
+      explanation: has("account-control")
+        ? "The returned account-control terms conflict with an ordinary-account classification."
+        : "The available record does not establish that RA-01 is an ordinary operating account.",
+      evidenceIds: has("account-control") ? ["account-control"] : [],
+    };
+  })();
+
+  const facilityLinkage = (() => {
+    if (!input.decisions.facilityLinkage || input.decisions.facilityLinkage === "UNRESOLVED") return {
+      claim: "FACILITY_LINKAGE" as const,
+      label: "Facility A/B linkage",
+      recordedClaim: input.decisions.facilityLinkage === "UNRESOLVED" ? "Unresolved" : "Not recorded",
+      status: "UNRESOLVED" as const,
+      explanation: "The recommendation preserves that Facility B's relationship to RA-01 is unconfirmed.",
+      evidenceIds: [],
+    };
+    if (input.decisions.facilityLinkage === "SHARED_POOL") {
+      if (linkageEvidence.length) return {
+        claim: "FACILITY_LINKAGE" as const,
+        label: "Facility A/B linkage",
+        recordedClaim: "Shared revenue pool",
+        status: "SUPPORTED" as const,
+        explanation: "Returned Facility B or dependency evidence establishes the shared RA-01 revenue pool.",
+        evidenceIds: linkageEvidence,
+      };
+      if (has("facility-a")) return {
+        claim: "FACILITY_LINKAGE" as const,
+        label: "Facility A/B linkage",
+        recordedClaim: "Shared revenue pool",
+        status: "CONDITIONAL" as const,
+        explanation: "Facility A's RA-01 link is available, but Facility B or dependency evidence has not returned.",
+        evidenceIds: ["facility-a"],
+      };
+      return {
+        claim: "FACILITY_LINKAGE" as const,
+        label: "Facility A/B linkage",
+        recordedClaim: "Shared revenue pool",
+        status: "UNSUPPORTED" as const,
+        explanation: "Facility B or dependency evidence has not returned, so a shared pool is not established.",
+        evidenceIds: [],
+      };
+    }
+    return {
+      claim: "FACILITY_LINKAGE" as const,
+      label: "Facility A/B linkage",
+      recordedClaim: "Independent facilities",
+      status: "UNSUPPORTED" as const,
+      explanation: linkageEvidence.length
+        ? "Returned Facility B or dependency evidence conflicts with treating the facilities as independent."
+        : "The available record does not establish that Facility B is independent of RA-01.",
+      evidenceIds: linkageEvidence,
+    };
+  })();
+
+  const disclosure = (() => {
+    if (!input.decisions.disclosure) return {
+      claim: "DISCLOSURE_RECOMMENDATION" as const,
+      label: "Disclosure recommendation",
+      recordedClaim: "Not recorded",
+      status: "UNRESOLVED" as const,
+      explanation: "No disclosure recommendation has been recorded.",
+      evidenceIds: [],
+    };
+    if (input.decisions.disclosure === "REDACTED") return has("confidentiality-opinion") ? {
+      claim: "DISCLOSURE_RECOMMENDATION" as const,
+      label: "Disclosure recommendation",
+      recordedClaim: "Redacted functional summary",
+      status: "SUPPORTED" as const,
+      explanation: "The returned legal opinion permits a redacted functional summary.",
+      evidenceIds: ["confidentiality-opinion"],
+    } : {
+      claim: "DISCLOSURE_RECOMMENDATION" as const,
+      label: "Disclosure recommendation",
+      recordedClaim: "Redacted functional summary",
+      status: "CONDITIONAL" as const,
+      explanation: "A functional summary may meet the information need, but the legal confidentiality opinion has not returned.",
+      evidenceIds: [],
+    };
+    if (input.decisions.disclosure === "FULL") return {
+      claim: "DISCLOSURE_RECOMMENDATION" as const,
+      label: "Disclosure recommendation",
+      recordedClaim: "Full contract disclosure",
+      status: "UNSUPPORTED" as const,
+      explanation: has("confidentiality-opinion")
+        ? "The returned legal opinion requires consent for full contract text, and no consent evidence is available."
+        : "The legal confidentiality opinion and any consent for full contract text are not available.",
+      evidenceIds: has("confidentiality-opinion") ? ["confidentiality-opinion"] : [],
+    };
+    return {
+      claim: "DISCLOSURE_RECOMMENDATION" as const,
+      label: "Disclosure recommendation",
+      recordedClaim: "Withhold pending consent",
+      status: "SUPPORTED" as const,
+      explanation: "The available record does not establish permission for unrestricted disclosure, and the recommendation preserves that dependency.",
+      evidenceIds: has("confidentiality-opinion") ? ["confidentiality-opinion"] : [],
+    };
+  })();
+
+  const treatment = (() => {
+    if (!input.decisions.treatmentPerimeter || input.decisions.treatmentPerimeter === "DEFER") return {
+      claim: "TREATMENT_PERIMETER" as const,
+      label: "Treatment perimeter",
+      recordedClaim: input.decisions.treatmentPerimeter === "DEFER" ? "Deferred" : "Not recorded",
+      status: "UNRESOLVED" as const,
+      explanation: "The recommendation preserves that the evidence does not yet define the treatment perimeter.",
+      evidenceIds: [],
+    };
+    if (input.decisions.treatmentPerimeter === "BOTH_FACILITIES") {
+      if (linkageEvidence.length) return {
+        claim: "TREATMENT_PERIMETER" as const,
+        label: "Treatment perimeter",
+        recordedClaim: "Facilities A and B",
+        status: "SUPPORTED" as const,
+        explanation: "Returned Facility B or dependency evidence supports carrying both facilities in the dependency analysis.",
+        evidenceIds: linkageEvidence,
+      };
+      if (has("facility-a")) return {
+        claim: "TREATMENT_PERIMETER" as const,
+        label: "Treatment perimeter",
+        recordedClaim: "Facilities A and B",
+        status: "CONDITIONAL" as const,
+        explanation: "Facility A's RA-01 link is available, but Facility B's dependency remains open.",
+        evidenceIds: ["facility-a"],
+      };
+      return {
+        claim: "TREATMENT_PERIMETER" as const,
+        label: "Treatment perimeter",
+        recordedClaim: "Facilities A and B",
+        status: "UNSUPPORTED" as const,
+        explanation: "Facility B or dependency evidence has not returned to support carrying both facilities.",
+        evidenceIds: [],
+      };
+    }
+    if (linkageEvidence.length) return {
+      claim: "TREATMENT_PERIMETER" as const,
+      label: "Treatment perimeter",
+      recordedClaim: "Facility A only",
+      status: "UNSUPPORTED" as const,
+      explanation: "Returned Facility B or dependency evidence conflicts with excluding Facility B from the dependency analysis.",
+      evidenceIds: linkageEvidence,
+    };
+    return has("facility-a") ? {
+      claim: "TREATMENT_PERIMETER" as const,
+      label: "Treatment perimeter",
+      recordedClaim: "Facility A only",
+      status: "CONDITIONAL" as const,
+      explanation: "Facility A is established, but Facility B's relationship to RA-01 remains open.",
+      evidenceIds: ["facility-a"],
+    } : {
+      claim: "TREATMENT_PERIMETER" as const,
+      label: "Treatment perimeter",
+      recordedClaim: "Facility A only",
+      status: "UNSUPPORTED" as const,
+      explanation: "Facility A evidence has not returned, and Facility B's relationship remains open.",
+      evidenceIds: [],
+    };
+  })();
+
+  const materialItems = [liquidity, account, facilityLinkage, disclosure, treatment];
+  const unsupported = materialItems.filter((item) => item.status === "UNSUPPORTED");
+  const open = materialItems.filter((item) => item.status === "CONDITIONAL" || item.status === "UNRESOLVED");
+  const unsupportedLabels = unsupported.map((item) => item.label).join(", ");
+  const openLabels = open.map((item) => item.label).join(", ");
+  const readiness = (() => {
+    if (!input.decisions.readiness) return {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Not recorded",
+      status: "UNRESOLVED" as const,
+      explanation: "No readiness position has been recorded.",
+      evidenceIds: [],
+    };
+    if (input.decisions.readiness === "NOT_READY") return materialItems.some((item) => item.status !== "SUPPORTED") ? {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Not ready",
+      status: "SUPPORTED" as const,
+      explanation: "The not-ready posture is consistent with the open or unsupported material claims in this review.",
+      evidenceIds: [],
+    } : {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Not ready",
+      status: "CONDITIONAL" as const,
+      explanation: "All reviewed material claims are supported; name any separate dependency keeping the package not ready.",
+      evidenceIds: [],
+    };
+    if (input.decisions.readiness === "READY_WITH_CONDITIONS") return unsupported.length ? {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Ready with conditions",
+      status: "UNSUPPORTED" as const,
+      explanation: `A condition does not support firm claims that exceed or conflict with the evidence: ${unsupportedLabels}.`,
+      evidenceIds: [],
+    } : {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Ready with conditions",
+      status: "SUPPORTED" as const,
+      explanation: open.length
+        ? "The conditional posture is consistent with the named open evidence dependencies."
+        : "The reviewed material claims are supported, and the posture retains any separately recorded conditions.",
+      evidenceIds: [],
+    };
+    if (unsupported.length) return {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Ready",
+      status: "UNSUPPORTED" as const,
+      explanation: `The ready posture exceeds material claims that are unsupported by the available evidence: ${unsupportedLabels}.`,
+      evidenceIds: [],
+    };
+    if (open.length) return {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Ready",
+      status: "CONDITIONAL" as const,
+      explanation: `Readiness is not yet unconditional because these material dependencies remain open: ${openLabels}.`,
+      evidenceIds: [],
+    };
+    return {
+      claim: "READINESS_POSITION" as const,
+      label: "Readiness position",
+      recordedClaim: "Ready",
+      status: "SUPPORTED" as const,
+      explanation: "Each reviewed material claim is supported by the evidence available at this moment.",
+      evidenceIds: [],
+    };
+  })();
+  const readyMismatch = input.decisions.readiness === "READY" && materialItems.some((item) => item.status !== "SUPPORTED");
+
+  return {
+    reviewedAt: reviewedAt.toISOString(),
+    items: [...materialItems, readiness],
+    readyMismatch,
+    ...(readyMismatch ? { mismatchExplanation: "READY exceeds the current evidence state. The participant may revise or submit this mismatch; the debrief record will retain it." } : {}),
+    submissionAllowed: true,
+  };
 }
 
 export function deriveConsequences(decisions: DecisionState): Consequence[] {
@@ -173,14 +509,26 @@ export function buildAfterActionReport(input: {
   timeline: ActivityEvent[];
 }): AfterActionReport {
   const requestedIds = new Set(input.evidenceRequests.map((request) => request.evidenceId));
-  const ignoredIds = new Set<string>();
-  if (requestedIds.has("treasury-reconciliation") && input.decisions.liquidityBasis !== "VERIFIED_480") ignoredIds.add("treasury-reconciliation");
-  if (requestedIds.has("account-control") && input.decisions.accountClassification !== "EFFECTIVE_CONTROL") ignoredIds.add("account-control");
-  if ((requestedIds.has("facility-b") || requestedIds.has("cross-collateralization")) && input.decisions.facilityLinkage !== "SHARED_POOL") {
-    if (requestedIds.has("facility-b")) ignoredIds.add("facility-b");
-    if (requestedIds.has("cross-collateralization")) ignoredIds.add("cross-collateralization");
-  }
-  if (requestedIds.has("confidentiality-opinion") && input.decisions.disclosure !== "REDACTED") ignoredIds.add("confidentiality-opinion");
+  const submissions = [...input.submissions].sort((a, b) => a.version - b.version);
+  const generatedAt = new Date().toISOString();
+  const latestSubmission = submissions.at(-1);
+  const recommendationReview = reviewRecommendation({
+    decisions: latestSubmission?.decisions ?? input.decisions,
+    evidenceRequests: input.evidenceRequests,
+    reviewedAt: latestSubmission?.submittedAt ?? generatedAt,
+  });
+  const submissionRecommendationReviews = submissions.map((submission) => ({
+    submissionId: submission.id,
+    version: submission.version,
+    review: reviewRecommendation({
+      decisions: submission.decisions,
+      evidenceRequests: input.evidenceRequests,
+      reviewedAt: submission.submittedAt,
+    }),
+  }));
+  const ignoredIds = new Set(recommendationReview.items
+    .filter((item) => item.status === "UNSUPPORTED")
+    .flatMap((item) => item.evidenceIds));
   const consequences = deriveConsequences(input.decisions);
   const risks = unresolvedRiskList(input.decisions);
   const readiness = input.decisions.readiness?.replaceAll("_", " ").toLowerCase() ?? "not submitted";
@@ -197,14 +545,16 @@ export function buildAfterActionReport(input: {
       kind: input.session.kind,
       createdAt: input.session.createdAt,
     },
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     executiveSummary: `${input.participant.name} submitted a ${readiness} Debt Management Office recommendation. The record contains ${input.submissions.length} submission version${input.submissions.length === 1 ? "" : "s"}, ${requestedIds.size} evidence request${requestedIds.size === 1 ? "" : "s"}, and ${risks.length} unresolved risk${risks.length === 1 ? "" : "s"}.`,
     decisions: input.decisions,
-    submissions: [...input.submissions].sort((a, b) => a.version - b.version),
+    submissions,
     evidenceRequested: EVIDENCE_CATALOG.filter((item) => requestedIds.has(item.id)),
     evidenceNotRequested: EVIDENCE_CATALOG.filter((item) => !requestedIds.has(item.id)),
     evidenceIgnored: EVIDENCE_CATALOG.filter((item) => ignoredIds.has(item.id)),
     evidenceRequestHistory: input.evidenceRequests,
+    recommendationReview,
+    submissionRecommendationReviews,
     institutionalMessages: input.institutionalMessages,
     consequences,
     counterfactuals: deriveCounterfactuals(input.decisions),

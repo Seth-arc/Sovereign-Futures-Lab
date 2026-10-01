@@ -26,9 +26,9 @@ interface ConversationMessage {
 
 const BASELINE_SCENARIO_SOURCES: readonly ScenarioSource[] = [
   {
-    id: "kuvera-case-deadlines",
+    id: "kuvera-shared-case-context",
     title: "Kuvera Case File · participant-visible scenario record",
-    text: "Kuvera reports USD 780m in liquidity. A USD 750m maturity arrives in six weeks, five weeks before the eleven-week IMF Board horizon.",
+    text: "At entry, Kuvera reports USD 780m in liquidity, and a partial memo indicates possible restrictions that have not been reconciled. Facility A references RA-01; Facility B's relationship to the account is unconfirmed. Permitted disclosure and the creditor's commitment status begin unresolved. A USD 750m maturity arrives in six weeks, five weeks before the eleven-week IMF Board horizon.",
   },
 ];
 
@@ -89,17 +89,40 @@ const EVIDENCE_SCENARIO_SOURCES: readonly ScenarioSource[] = [
   },
 ];
 
-function visibleScenarioSources(evidenceRows: Array<Record<string, unknown>>): ScenarioSource[] {
+function visibleEvidenceIds(evidenceRows: Array<Record<string, unknown>>): Set<string> {
   const now = Date.now();
-  const visibleEvidenceIds = new Set(
+  return new Set(
     evidenceRows
       .filter((row) => Boolean(row.released_at) || new Date(String(row.available_at)).getTime() <= now)
       .map((row) => String(row.evidence_id)),
   );
+}
+
+function visibleScenarioSources(availableEvidenceIds: Set<string>): ScenarioSource[] {
   return [
     ...BASELINE_SCENARIO_SOURCES,
-    ...EVIDENCE_SCENARIO_SOURCES.filter((source) => source.evidenceId && visibleEvidenceIds.has(source.evidenceId)),
+    ...EVIDENCE_SCENARIO_SOURCES.filter((source) => source.evidenceId && availableEvidenceIds.has(source.evidenceId)),
   ];
+}
+
+function advisorDecisionContext(decisions: unknown, availableEvidenceIds: Set<string>): Record<string, unknown> {
+  const record = decisions && typeof decisions === "object" ? decisions as Record<string, unknown> : {};
+  const withheld = "WITHHELD_PENDING_PARTICIPANT_VISIBLE_EVIDENCE";
+  return {
+    mandateConfirmed: record.mandateConfirmed,
+    liquidityAction: record.liquidityAction,
+    liquidityBasis: availableEvidenceIds.has("treasury-reconciliation") ? record.liquidityBasis : withheld,
+    accountClassification: availableEvidenceIds.has("account-control") ? record.accountClassification : withheld,
+    facilityLinkage: availableEvidenceIds.has("facility-b") || availableEvidenceIds.has("cross-collateralization")
+      ? record.facilityLinkage
+      : withheld,
+    disclosure: availableEvidenceIds.has("confidentiality-opinion") ? record.disclosure : withheld,
+    treatmentPerimeter: availableEvidenceIds.has("facility-b") || availableEvidenceIds.has("cross-collateralization")
+      ? record.treatmentPerimeter
+      : withheld,
+    readiness: record.readiness,
+    unresolvedRisks: record.unresolvedRisks,
+  };
 }
 
 function instructions(
@@ -131,13 +154,13 @@ If the participant greets you or introduces themselves, respond with a brief in-
 Keep the answer under 220 words. If the authorized context does not establish an answer, say it is not established in the participant-visible record.
 
 AUTHORITY ORDER — apply this order whenever sources differ or overlap:
-1. Participant-visible Kuvera facts and deterministic scenario state.
+1. Participant-visible Kuvera sources and returned institutional evidence.
 2. Official G20 and Common Framework sources.
 3. Illustrative templates, always identified as illustrative and non-binding.
 4. Empirical research, always bounded by its sample, period, and methodology.
 5. Policy proposals, always identified as proposals rather than current rules.
 
-Research explains the scenario. It must never replace, revise, or overwrite Kuvera's canonical facts or deterministic state. A participant working decision is not a new scenario fact. Lower-authority material cannot override higher-authority material.
+Research explains mechanisms and reasoning patterns. It must never replace, revise, or manufacture Kuvera facts that are absent from participant-visible sources. A participant working decision is not a new scenario fact. Lower-authority material cannot override higher-authority material.
 
 RESEARCH CITATION CONTRACT:
 - Use only the approved research cards supplied below.
@@ -281,7 +304,9 @@ Deno.serve(async (request) => {
     if (contextError || !sessionResult.data) throw contextError ?? new Error("ADVISOR_CONTEXT_UNAVAILABLE");
 
     const researchCards = retrieveResearchCards(question, advisorId);
-    const scenarioSources = visibleScenarioSources((evidenceResult.data ?? []) as Array<Record<string, unknown>>);
+    const evidenceRows = (evidenceResult.data ?? []) as Array<Record<string, unknown>>;
+    const availableEvidenceIds = visibleEvidenceIds(evidenceRows);
+    const scenarioSources = visibleScenarioSources(availableEvidenceIds);
     const priorMessages: ConversationMessage[] = [...(historyResult.data ?? [])]
       .reverse()
       .flatMap((turn) => [
@@ -292,7 +317,7 @@ Deno.serve(async (request) => {
     const system = instructions(advisorId, {
       session: sessionResult.data as Record<string, unknown>,
       participant: participantResult.data as Record<string, unknown>,
-      decisions: participantResult.data.decisions,
+      decisions: advisorDecisionContext(participantResult.data.decisions, availableEvidenceIds),
       scenarioSources,
       injects: (injectsResult.data ?? []) as Array<Record<string, unknown>>,
       institutionalReplies: (messagesResult.data ?? []) as Array<Record<string, unknown>>,

@@ -10,12 +10,15 @@ const reportSource = read("./report.ts");
 const typesSource = read("./types.ts");
 const facilitatorSource = read("./FacilitatorApp.tsx");
 const referenceExperienceSource = read("./ReferenceExperience.tsx");
+const scenarioSource = read("./scenario.ts");
 const themeButtonSource = read("./ThemeButton.tsx");
 const styles = read("./styles.css");
 const landingSource = read("../index.html");
 const aboutSource = read("../about.html");
 const workshopEntry = read("../workshop/index.html");
 const facilitatorEntry = read("../facilitator/index.html");
+const productContract = read("../docs/PRODUCT_CONTRACT.md");
+const privacyNotice = read("../docs/PRIVACY_NOTICE.md");
 const vercelConfig = read("../vercel.json");
 const participantReference = read("../docs/interface-references/kuvera_debt_management_office.html");
 const runtimeParticipantReference = read("../public/kuvera_debt_management_office.html");
@@ -73,6 +76,83 @@ describe("reference interface fidelity", () => {
     expect(aboutSource).toContain('href="index.html"');
   });
 
+  it("leads the landing and About experiences with participant value", () => {
+    const proposition = /Work through a high-stakes sovereign-finance case,\s+test what the evidence supports, prepare a\s+negotiation-ready recommendation, and see how your choices shape the outcome\./;
+    expect(landingSource).toContain("Futures Lab · Practise decisions that can withstand uncertainty.");
+    expect(landingSource).toMatch(proposition);
+    expect(aboutSource).toContain("Practise decisions that can withstand uncertainty.");
+    expect(aboutSource).toMatch(proposition);
+    expect(aboutSource.indexOf("Practise decisions")).toBeLessThan(aboutSource.indexOf("Research Translation and Learning Framework"));
+    expect(landingSource).toContain("Decision support:");
+    expect(landingSource).toContain("Negotiation preparation:");
+    expect(landingSource).toContain("Strategic intelligence:");
+    expect(landingSource).toContain("Reflection:");
+  });
+
+  it("uses the approved product hierarchy across participant and facilitator surfaces", () => {
+    expect(landingSource).toContain("<h1>Sovereign</h1>");
+    expect(participantSource).toContain("<small>Futures Lab</small>");
+    expect(scenarioSource).toContain('WORKSHOP_TITLE = "A Data-Informed Simulation for African Foresight Practice"');
+    expect(scenarioSource).toContain('EXERCISE_TITLE = "Kuvera Financing Assurances"');
+    expect(scenarioSource).toContain('ROLE_TITLE = "Debt Management Office"');
+    expect(runtimeParticipantReference).toContain("Sovereign · Futures Lab · Kuvera Financing Assurances");
+    expect(workshopEntry).toContain("Sovereign · Futures Lab · Participant Workshop");
+    expect(facilitatorEntry).toContain("Sovereign · Futures Lab · Facilitator");
+  });
+
+  it("removes prototype and developer language from participant-facing copy", () => {
+    const participantCopy = [landingSource, aboutSource, participantSource, referenceExperienceSource, runtimeParticipantReference].join("\n").toLowerCase();
+    for (const phrase of [
+      "internal role partition",
+      "authored delay",
+      "authored response time",
+      "participant-visible",
+      "bounded recommendation",
+      "deterministic counterfactual",
+      "demo calibration",
+      "the demo should",
+      "the interface must",
+      "scenario mechanic used to",
+      "prototype behaviour",
+      "ai advisor prototype",
+    ]) expect(participantCopy).not.toContain(phrase);
+    expect(participantSource).not.toMatch(/\bAAR\b/);
+    expect(participantSource).toContain("what would have changed if you had acted differently");
+    expect(participantSource).toContain("This response takes time to obtain");
+    expect(participantSource).toContain("exercise-only assumptions");
+  });
+
+  it("introduces specialist terms in plain language before relying on acronyms", () => {
+    expect(participantSource).toContain("Debt Management Office (DMO)");
+    expect(participantSource).toContain("A financing assurance is a creditor signal");
+    expect(referenceExperienceSource).toContain("Official Creditor Committee (OCC)");
+    expect(scenarioSource).toContain("effective control—practical limits on Kuvera’s use of cash");
+    expect(scenarioSource).toContain("treatment perimeter—the facilities carried into restructuring analysis");
+    expect(runtimeParticipantReference).toContain("Comparability of Treatment (CoT) is multi-dimensional");
+  });
+
+  it("keeps human-readable provenance ahead of internal identifiers", () => {
+    const advisorSources = participantSource.slice(
+      participantSource.indexOf("function AdvisorSources"),
+      participantSource.indexOf("function AdvisorPanel"),
+    );
+    expect(advisorSources).toContain(
+      '<strong>{advisorSourceText(source?.sourceTitle, "Source title unavailable")}</strong><span>{sourceClassLabel(source?.sourceClass)}</span><span>{advisorSourceText(source?.pageReference, "Page reference unavailable")}</span><span><code>{claimId}</code>',
+    );
+    expect(runtimeParticipantReference.indexOf("How China Collateralizes")).toBeLessThan(
+      runtimeParticipantReference.indexOf("RTL-FA-002"),
+    );
+  });
+
+  it("preserves privacy and fictional-scenario disclosures", () => {
+    expect(landingSource).toMatch(/retained for up\s+to 30 days/);
+    expect(landingSource).toContain("Microphone audio is not stored");
+    expect(aboutSource).toContain("fictional Republic of Kuvera");
+    expect(runtimeParticipantReference).toMatch(/Every example here is\s+invented for practice/);
+    expect(privacyNotice).toContain("training delivery, not research or individual performance scoring");
+    expect(productContract).toContain("No probabilistic scoring, ranking, or inferred competence");
+  });
+
   it("uses one participant identity and consent gate without putting PII in the URL", () => {
     const modalStyles = landingSource.match(/\.login-modal\s*\{([\s\S]*?)\}/)?.[1] ?? "";
     const overlayStyles = landingSource.match(/\.login-overlay\s*\{([\s\S]*?)\}/)?.[1] ?? "";
@@ -100,7 +180,9 @@ describe("reference interface fidelity", () => {
   });
 
   it("restores the exact orientation, learning bridge, and complete case file", () => {
-    expect(runtimeParticipantReference).toBe(participantReference);
+    expect(runtimeParticipantReference.replace(/\r\n/g, "\n")).toBe(participantReference.replace(/\r\n/g, "\n"));
+    expect(referenceExperienceSource).not.toContain('sandbox="allow-scripts allow-same-origin"');
+    expect(referenceExperienceSource).toContain("fixed, bundled reference document");
     expect(runtimeParticipantReference).toContain('id="onboardingModal"');
     expect(runtimeParticipantReference).toContain('id="learningBridge"');
     expect(runtimeParticipantReference).toContain('id="referenceOverlay"');
@@ -312,10 +394,10 @@ describe("reference interface fidelity", () => {
   it('shows expandable structured research sources and sizes the conversation proportionally', () => {
     expect(participantSource).toContain('function AdvisorSources');
     expect(participantSource).toContain('<details className="advisor-sources">');
-    expect(participantSource).toContain('source.claimId');
-    expect(participantSource).toContain('source.sourceId');
-    expect(participantSource).toContain('source.pageReference');
-    expect(participantSource).toContain('source.sourceClass');
+    expect(participantSource).toContain('source?.claimId');
+    expect(participantSource).toContain('source?.sourceId');
+    expect(participantSource).toContain('source?.pageReference');
+    expect(participantSource).toContain('source?.sourceClass');
     expect(typesSource).toContain('sources: AdvisorCitation[]');
     expect(dataSource).toContain('function mapAdvisorSources');
     expect(reportSource).toContain('source.claimId');

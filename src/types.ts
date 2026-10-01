@@ -9,6 +9,14 @@ export type DisclosureLevel = "FULL" | "REDACTED" | "WITHHOLD";
 export type TreatmentPerimeter = "BOTH_FACILITIES" | "FACILITY_A_ONLY" | "DEFER";
 export type AdvisorId = "amara" | "daniel";
 export type InstitutionRole = "TREASURY" | "LEGAL" | "OCC" | "IMF" | "CREDITOR";
+export type EvidenceSupportStatus = "SUPPORTED" | "CONDITIONAL" | "UNRESOLVED" | "UNSUPPORTED";
+export type MaterialRecommendationClaim =
+  | "LIQUIDITY_BASIS"
+  | "ACCOUNT_CLASSIFICATION"
+  | "FACILITY_LINKAGE"
+  | "DISCLOSURE_RECOMMENDATION"
+  | "TREATMENT_PERIMETER"
+  | "READINESS_POSITION";
 
 export interface WorkshopSession {
   id: string;
@@ -148,6 +156,29 @@ export interface Counterfactual {
   fixedAssumptions: string;
 }
 
+export interface EvidenceSupportItem {
+  claim: MaterialRecommendationClaim;
+  label: string;
+  recordedClaim: string;
+  status: EvidenceSupportStatus;
+  explanation: string;
+  evidenceIds: string[];
+}
+
+export interface RecommendationReview {
+  reviewedAt: string;
+  items: EvidenceSupportItem[];
+  readyMismatch: boolean;
+  mismatchExplanation?: string;
+  submissionAllowed: true;
+}
+
+export interface SubmissionRecommendationReview {
+  submissionId: string;
+  version: number;
+  review: RecommendationReview;
+}
+
 export interface AfterActionReport {
   participant: Pick<ParticipantProfile, "id" | "name" | "organization" | "email">;
   session: Pick<WorkshopSession, "id" | "title" | "kind" | "createdAt">;
@@ -159,6 +190,8 @@ export interface AfterActionReport {
   evidenceNotRequested: EvidenceDefinition[];
   evidenceIgnored: EvidenceDefinition[];
   evidenceRequestHistory: EvidenceRequest[];
+  recommendationReview: RecommendationReview;
+  submissionRecommendationReviews: SubmissionRecommendationReview[];
   institutionalMessages: InstitutionalMessage[];
   consequences: Consequence[];
   counterfactuals: Counterfactual[];

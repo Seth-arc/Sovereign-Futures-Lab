@@ -1,4 +1,4 @@
-import type { AdvisorId } from "./types";
+import type { AdvisorCitation, AdvisorId } from "./types";
 
 export const ADVISOR_RESPONSE_REVEAL_INTERVAL_MS = 36;
 
@@ -20,4 +20,30 @@ export function applyAdvisorFallbackCadence(advisorId: AdvisorId, answer: string
   return advisorId === "amara"
     ? `Let's place this in context. ${answer}`
     : `The key distinction is this. ${answer}`;
+}
+
+function citationField(record: Record<string, unknown>, camelCase: string, snakeCase: string): string {
+  const value = record[camelCase] ?? record[snakeCase];
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+export function normalizeAdvisorCitations(value: unknown): AdvisorCitation[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const citation: AdvisorCitation = {
+      claimId: citationField(record, "claimId", "claim_id"),
+      sourceId: citationField(record, "sourceId", "source_id"),
+      sourceTitle: citationField(record, "sourceTitle", "source_title"),
+      pageReference: citationField(record, "pageReference", "page_reference"),
+      sourceClass: citationField(record, "sourceClass", "source_class"),
+    };
+    return Object.values(citation).every(Boolean) ? [citation] : [];
+  });
+}
+
+export function sourceClassLabel(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "Classification unavailable";
+  return value.trim().toLowerCase().split("_").map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(" ");
 }

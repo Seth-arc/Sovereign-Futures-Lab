@@ -29,6 +29,10 @@ const advisorSourcesText = (turn: AfterActionReport["advisorUsage"][number]) => 
   ? turn.sources.map((source) => `${source.claimId} · ${source.sourceId} · ${source.sourceTitle} · ${source.pageReference} · ${source.sourceClass}`).join("; ")
   : "No external research cited";
 
+const recommendationReviewText = (report: AfterActionReport) => report.recommendationReview.items
+  .map((item) => `${item.label}: ${item.status} — ${item.recordedClaim}. ${item.explanation}`)
+  .join("\n");
+
 export function afterActionReportHtml(report: AfterActionReport, identified = true): string {
   const identity = identified
     ? `<p><strong>${escapeHtml(report.participant.name)}</strong><br>${escapeHtml(report.participant.organization)}<br>${escapeHtml(report.participant.email)}</p>`
@@ -44,19 +48,19 @@ export function afterActionReportHtml(report: AfterActionReport, identified = tr
   ];
   const timelineRows = report.timeline.map((event) => `<tr><td>${escapeHtml(new Date(event.createdAt).toLocaleTimeString())}</td><td>${escapeHtml(event.type.replaceAll("_", " "))}</td><td><code>${escapeHtml(JSON.stringify(event.detail))}</code></td></tr>`).join("");
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Futureslab After-Action Report</title>
+<html lang="en"><head><meta charset="utf-8"><title>Futures Lab After-Action Report</title>
 <style>
 body{font:15px/1.55 Arial,sans-serif;color:#182522;max-width:940px;margin:48px auto;padding:0 32px}header{border-bottom:3px solid #aa6f32;padding-bottom:22px;margin-bottom:30px}.kicker{color:#6b4d2e;text-transform:uppercase;letter-spacing:.12em;font-size:12px}h1{font:700 34px Georgia,serif;margin:.2em 0}h2{font:700 22px Georgia,serif;border-bottom:1px solid #d8d2c6;padding-bottom:8px;margin-top:32px}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:9px;border-bottom:1px solid #e4dfd6}th{background:#f4f1eb}.tag{display:inline-block;padding:3px 7px;background:#e8eee9;margin:2px}li{margin:.5em 0}.meta{color:#596560}code{white-space:pre-wrap;font-size:11px}@media print{body{margin:0;max-width:none}.no-print{display:none}}</style></head>
-<body><header><div class="kicker">Sovereign Room · Kuvera Financing Assurances</div><h1>After-Action Report</h1>${identity}<p class="meta">${escapeHtml(report.session.kind)} session · Generated ${escapeHtml(new Date(report.generatedAt).toLocaleString())}</p></header>
+<body><header><div class="kicker">Sovereign · Futures Lab · Kuvera Financing Assurances</div><h1>After-Action Report</h1>${identity}<p class="meta">${escapeHtml(report.session.kind)} session · Generated ${escapeHtml(new Date(report.generatedAt).toLocaleString())}</p></header>
 <section><h2>Executive summary</h2><p>${escapeHtml(report.executiveSummary)}</p></section>
 <section><h2>Mandate and authority boundary</h2><p>${escapeHtml(report.decisions.mandateRationale || "Not recorded")}</p></section>
 <section><h2>Recorded recommendation</h2><table><tbody>${decisionRows.map(([key,value]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(value)}</td></tr>`).join("")}</tbody></table><p><strong>Final rationale.</strong> ${escapeHtml(report.decisions.finalRationale || "Not recorded")}</p></section>
-<section><h2>Information and evidence</h2><h3>Requested</h3><ul>${report.evidenceRequested.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.sourceLabel)}</li>`).join("") || "<li>None</li>"}</ul><h3>Returned evidence not incorporated into the final record</h3><ul>${report.evidenceIgnored.map((item) => `<li>${escapeHtml(item.title)}</li>`).join("") || "<li>None identified by the deterministic comparison.</li>"}</ul><h3>Not requested</h3><ul>${report.evidenceNotRequested.map((item) => `<li>${escapeHtml(item.title)}</li>`).join("") || "<li>None</li>"}</ul></section>
+<section><h2>Evidence incorporation</h2><p class="meta">Deterministic recommendation review at ${escapeHtml(new Date(report.recommendationReview.reviewedAt).toLocaleString())}. These statuses are not a score or competence judgment.</p><ul>${report.recommendationReview.items.map((item) => `<li><strong>${escapeHtml(item.label)} — ${escapeHtml(item.status)}</strong><br>${escapeHtml(item.recordedClaim)}. ${escapeHtml(item.explanation)}</li>`).join("")}</ul>${report.recommendationReview.readyMismatch ? `<p><strong>Readiness mismatch retained.</strong> ${escapeHtml(report.recommendationReview.mismatchExplanation)}</p>` : ""}<h3>Requested evidence</h3><ul>${report.evidenceRequested.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.sourceLabel)}</li>`).join("") || "<li>None</li>"}</ul><h3>Returned evidence conflicting with a recorded claim</h3><ul>${report.evidenceIgnored.map((item) => `<li>${escapeHtml(item.title)}</li>`).join("") || "<li>None identified by the recommendation review.</li>"}</ul><h3>Not requested</h3><ul>${report.evidenceNotRequested.map((item) => `<li>${escapeHtml(item.title)}</li>`).join("") || "<li>None</li>"}</ul></section>
 <section><h2>Institutional correspondence</h2>${report.institutionalMessages.map((message) => `<article><p><strong>To ${escapeHtml(label(message.institution))}:</strong> ${escapeHtml(message.question)}</p><p>${message.reply ? `<strong>Reply:</strong> ${escapeHtml(message.reply)}` : "Awaiting facilitator reply at exercise close."}</p><p class="meta">${escapeHtml(message.status)} · sent ${escapeHtml(new Date(message.createdAt).toLocaleString())}${message.answeredAt ? ` · answered ${escapeHtml(new Date(message.answeredAt).toLocaleString())}` : ""}</p></article>`).join("") || "<p>No exceptional institutional requests recorded.</p>"}</section>
 <section><h2>Deterministic consequences</h2>${report.consequences.map((item) => `<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.outcome)}</p><p class="meta">Basis: ${escapeHtml(item.basis)}</p></article>`).join("")}</section>
 <section><h2>Unresolved risks</h2><ul>${report.unresolvedRisks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("") || "<li>No blocking uncertainty recorded in the bounded exercise.</li>"}</ul></section>
 <section><h2>Counterfactual pathways</h2>${report.counterfactuals.map((item) => `<article><h3>${escapeHtml(item.alternative)}</h3><p>${escapeHtml(item.projectedDifference)}</p><p class="meta">Held fixed: ${escapeHtml(item.fixedAssumptions)}</p></article>`).join("")}</section>
-<section><h2>Submission history and information available</h2><ol>${report.submissions.map((item) => { const available = report.evidenceRequestHistory.filter((request) => (request.releasedAt ? new Date(request.releasedAt) : new Date(request.availableAt)).getTime() <= new Date(item.submittedAt).getTime()).map((request) => report.evidenceRequested.find((definition) => definition.id === request.evidenceId)?.title).filter(Boolean); return `<li><strong>Version ${item.version}</strong>, ${escapeHtml(new Date(item.submittedAt).toLocaleString())} — ${escapeHtml(label(item.decisions.readiness))}<br><span class="meta">Evidence then available: ${escapeHtml(available.join("; ") || "No requested evidence had returned")}</span></li>`; }).join("") || "<li>No recommendation submitted.</li>"}</ol></section>
+<section><h2>Submission history and information available</h2><ol>${report.submissions.map((item) => { const available = report.evidenceRequestHistory.filter((request) => Math.min(new Date(request.availableAt).getTime(), request.releasedAt ? new Date(request.releasedAt).getTime() : Number.POSITIVE_INFINITY) <= new Date(item.submittedAt).getTime()).map((request) => report.evidenceRequested.find((definition) => definition.id === request.evidenceId)?.title).filter(Boolean); const recordedReview = report.submissionRecommendationReviews.find((entry) => entry.submissionId === item.id)?.review; return `<li><strong>Version ${item.version}</strong>, ${escapeHtml(new Date(item.submittedAt).toLocaleString())} — ${escapeHtml(label(item.decisions.readiness))}<br><span class="meta">Evidence then available: ${escapeHtml(available.join("; ") || "No requested evidence had returned")}</span>${recordedReview?.readyMismatch ? `<br><strong>READY mismatch retained:</strong> ${escapeHtml(recordedReview.mismatchExplanation)}` : ""}</li>`; }).join("") || "<li>No recommendation submitted.</li>"}</ol></section>
 <section><h2>AI-advisor record</h2>${report.advisorUsage.map((turn) => `<article><p><strong>${escapeHtml(turn.advisorId)}:</strong> ${escapeHtml(turn.question)}</p><p>${escapeHtml(turn.answer)}</p><p class="meta">Sources: ${escapeHtml(advisorSourcesText(turn))} · ${escapeHtml(turn.mode)}</p></article>`).join("") || "<p>No advisor interaction recorded.</p>"}</section>
 <section><h2>Facilitator interventions</h2>${report.facilitatorInjects.map((inject) => `<article><p><strong>${escapeHtml(inject.title)}</strong></p><p>${escapeHtml(inject.body)}</p><p class="meta">${escapeHtml(new Date(inject.sentAt).toLocaleString())}</p></article>`).join("") || "<p>No global facilitator inject recorded.</p>"}</section>
 <section><h2>Participant reflection</h2><p>${escapeHtml(report.decisions.reflection || "Not recorded")}</p></section>
@@ -86,7 +90,7 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
     pdf.text(lines, margin, y);
     y += height + gap;
   };
-  add("SOVEREIGN ROOM · KUVERA FINANCING ASSURANCES", 9, 10);
+  add("SOVEREIGN · FUTURES LAB · KUVERA FINANCING ASSURANCES", 9, 10);
   add("After-Action Report", 22, 12);
   add(`${report.participant.name} · ${report.participant.organization} · ${report.participant.email}`, 10, 18);
   add("Executive summary", 15, 6);
@@ -95,8 +99,8 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add(report.decisions.mandateRationale || "Not recorded", 10, 14);
   add("Recorded recommendation", 15, 6);
   add(`Readiness: ${label(report.decisions.readiness)}\nLiquidity: ${label(report.decisions.liquidityBasis)}\nAccount: ${label(report.decisions.accountClassification)}\nFacility linkage: ${label(report.decisions.facilityLinkage)}\nDisclosure: ${label(report.decisions.disclosure)}\nTreatment perimeter: ${label(report.decisions.treatmentPerimeter)}\nRationale: ${report.decisions.finalRationale || "Not recorded"}`, 10, 14);
-  add("Evidence requested and not incorporated", 15, 6);
-  add(`Requested: ${report.evidenceRequested.map((item) => item.title).join("; ") || "None"}\nReturned but not incorporated: ${report.evidenceIgnored.map((item) => item.title).join("; ") || "None identified"}\nNot requested: ${report.evidenceNotRequested.map((item) => item.title).join("; ") || "None"}`, 10, 14);
+  add("Evidence incorporation", 15, 6);
+  add(`${recommendationReviewText(report)}${report.recommendationReview.readyMismatch ? `\nREADY mismatch retained: ${report.recommendationReview.mismatchExplanation}` : ""}\nRequested: ${report.evidenceRequested.map((item) => item.title).join("; ") || "None"}\nReturned evidence conflicting with a recorded claim: ${report.evidenceIgnored.map((item) => item.title).join("; ") || "None identified"}\nNot requested: ${report.evidenceNotRequested.map((item) => item.title).join("; ") || "None"}`, 10, 14);
   add("Institutional correspondence", 15, 6);
   add(report.institutionalMessages.length ? report.institutionalMessages.map((message) => `${label(message.institution)} — ${message.question}\n${message.reply ? `Reply: ${message.reply}` : "Awaiting reply at exercise close."}`).join("\n\n") : "No exceptional institutional requests recorded.", 10, 14);
   add("Deterministic consequences", 15, 6);
@@ -106,7 +110,10 @@ export async function downloadReportPdf(report: AfterActionReport): Promise<void
   add("Counterfactual pathways", 15, 6);
   report.counterfactuals.forEach((item) => add(`${item.alternative}\n${item.projectedDifference}\nHeld fixed: ${item.fixedAssumptions}`, 10, 9));
   add("Submission history", 15, 6);
-  add(report.submissions.length ? report.submissions.map((item) => `Version ${item.version} · ${new Date(item.submittedAt).toLocaleString()} · ${label(item.decisions.readiness)}`).join("\n") : "No recommendation submitted.", 10, 14);
+  add(report.submissions.length ? report.submissions.map((item) => {
+    const recordedReview = report.submissionRecommendationReviews.find((entry) => entry.submissionId === item.id)?.review;
+    return `Version ${item.version} · ${new Date(item.submittedAt).toLocaleString()} · ${label(item.decisions.readiness)}${recordedReview?.readyMismatch ? `\nREADY mismatch retained: ${recordedReview.mismatchExplanation}` : ""}`;
+  }).join("\n") : "No recommendation submitted.", 10, 14);
   add("AI-advisor usage and citations", 15, 6);
   add(report.advisorUsage.length ? report.advisorUsage.map((turn) => `${turn.advisorId}: ${turn.question}\n${turn.answer}\nSources: ${advisorSourcesText(turn)} · ${turn.mode}`).join("\n\n") : "No advisor interaction recorded.", 10, 14);
   add("Facilitator interventions", 15, 6);
@@ -159,7 +166,7 @@ export async function downloadWorkshopPdf(reports: AfterActionReport[], anonymou
     pdf.text(lines, margin, y);
     y += height + gap;
   };
-  add("SOVEREIGN ROOM · KUVERA FINANCING ASSURANCES", 9, 10);
+  add("SOVEREIGN · FUTURES LAB · KUVERA FINANCING ASSURANCES", 9, 10);
   add("Workshop comparison", 22, 8);
   add(`${reports.length} individual decision records. Pathways are compared without scores or rankings.`, 10, 16);
   const pathCounts = new Map<string, number>();
@@ -183,7 +190,7 @@ export function workshopComparisonHtml(reports: AfterActionReport[], anonymous: 
   const paths = new Map<string, number>();
   reports.forEach((report) => paths.set(decisionPathKey(report.decisions), (paths.get(decisionPathKey(report.decisions)) ?? 0) + 1));
   const table = reports.map((report, index) => `<tr><td>${anonymous ? `Participant ${index + 1}` : escapeHtml(report.participant.name)}</td><td>${escapeHtml(label(report.decisions.readiness))}</td><td>${escapeHtml(label(report.decisions.liquidityBasis))}</td><td>${escapeHtml(label(report.decisions.disclosure))}</td><td>${report.evidenceRequested.length}</td><td>${report.unresolvedRisks.length}</td></tr>`).join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Futureslab Workshop Comparison</title><style>body{font:15px/1.5 Arial,sans-serif;color:#182522;max-width:1100px;margin:40px auto;padding:0 28px}h1,h2{font-family:Georgia,serif}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}th{background:#f1eee7}.path{padding:10px;border-left:3px solid #aa6f32;margin:8px 0}.meta{color:#60706a}</style></head><body><p class="meta">Sovereign Room · Kuvera Financing Assurances</p><h1>Workshop comparison</h1><p>${reports.length} individual decision records. This comparison describes pathways and evidence use; it does not rank participants.</p><h2>Decision pathways</h2>${[...paths].map(([path,count]) => `<div class="path"><strong>${count} participant${count === 1 ? "" : "s"}</strong><br>${escapeHtml(path)}</div>`).join("")}<h2>Participant records</h2><table><thead><tr><th>Participant</th><th>Readiness</th><th>Liquidity</th><th>Disclosure</th><th>Evidence requests</th><th>Open risks</th></tr></thead><tbody>${table}</tbody></table></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Futures Lab Workshop Comparison</title><style>body{font:15px/1.5 Arial,sans-serif;color:#182522;max-width:1100px;margin:40px auto;padding:0 28px}h1,h2{font-family:Georgia,serif}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}th{background:#f1eee7}.path{padding:10px;border-left:3px solid #aa6f32;margin:8px 0}.meta{color:#60706a}</style></head><body><p class="meta">Sovereign · Futures Lab · Kuvera Financing Assurances</p><h1>Workshop comparison</h1><p>${reports.length} individual decision records. This comparison describes pathways and evidence use; it does not rank participants.</p><h2>Decision pathways</h2>${[...paths].map(([path,count]) => `<div class="path"><strong>${count} participant${count === 1 ? "" : "s"}</strong><br>${escapeHtml(path)}</div>`).join("")}<h2>Participant records</h2><table><thead><tr><th>Participant</th><th>Readiness</th><th>Liquidity</th><th>Disclosure</th><th>Evidence requests</th><th>Open risks</th></tr></thead><tbody>${table}</tbody></table></body></html>`;
 }
 
 export function downloadWorkshopHtml(reports: AfterActionReport[], anonymous: boolean): void {

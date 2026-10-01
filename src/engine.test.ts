@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildAfterActionReport, deriveConsequences, deriveCounterfactuals, unresolvedRiskList } from "./engine";
-import type { DecisionState } from "./types";
+import { buildAfterActionReport, deriveConsequences, deriveCounterfactuals, reviewRecommendation, unresolvedRiskList } from "./engine";
+import { afterActionReportHtml } from "./report";
+import type { DecisionState, EvidenceRequest } from "./types";
 
 const resolved: DecisionState = {
   mandateConfirmed: true,
@@ -20,6 +21,27 @@ const resolved: DecisionState = {
   finalRationale: "The package is analytically ready, subject to authorization.",
   reflection: "Verification changed the liquidity basis.",
 };
+
+const reviewMoment = "2026-10-14T10:20:00Z";
+
+function evidence(evidenceId: string, available: boolean): EvidenceRequest {
+  return {
+    id: `request-${evidenceId}`,
+    sessionId: "session-1",
+    participantId: "participant-1",
+    evidenceId,
+    requestedAt: "2026-10-14T10:00:00Z",
+    availableAt: available ? "2026-10-14T10:10:00Z" : "2026-10-14T10:30:00Z",
+  };
+}
+
+function recommendationReview(decisions: DecisionState, evidenceRequests: EvidenceRequest[] = []) {
+  return reviewRecommendation({ decisions, evidenceRequests, reviewedAt: reviewMoment });
+}
+
+function supportFor(review: ReturnType<typeof recommendationReview>, claim: string) {
+  return review.items.find((item) => item.claim === claim);
+}
 
 describe("deterministic consequence engine", () => {
   it("pins the verified liquidity and shared-pool outcomes", () => {
@@ -64,5 +86,87 @@ describe("deterministic consequence engine", () => {
     });
     expect(report.institutionalMessages).toHaveLength(1);
     expect(report.institutionalMessages[0].reply).toContain("redacted functional summary");
+  });
+});
+
+describe("recommendation evidence-support review", () => {
+  it("marks USD 480m unsupported before Treasury evidence is available", () => {
+    const review = recommendationReview(resolved, [evidence("treasury-reconciliation", false)]);
+    expect(supportFor(review, "LIQUIDITY_BASIS")?.status).toBe("UNSUPPORTED");
+    expect(supportFor(review, "LIQUIDITY_BASIS")?.explanation).toContain("has not returned");
+  });
+
+  it("marks USD 480m supported after Treasury evidence is available", () => {
+    const review = recommendationReview(resolved, [evidence("treasury-reconciliation", true)]);
+    expect(supportFor(review, "LIQUIDITY_BASIS")?.status).toBe("SUPPORTED");
+  });
+
+  it("does not retain the provisional USD 780m basis after reconciliation is available", () => {
+    const review = recommendationReview({ ...resolved, liquidityBasis: "REPORTED_780" }, [evidence("treasury-reconciliation", true)]);
+    expect(supportFor(review, "LIQUIDITY_BASIS")?.status).toBe("UNSUPPORTED");
+    expect(supportFor(review, "LIQUIDITY_BASIS")?.evidenceIds).toContain("treasury-reconciliation");
+  });
+
+  it("does not support a shared-pool claim before Facility B or dependency evidence", () => {
+    const withoutFacilityEvidence = recommendationReview(resolved);
+    expect(supportFor(withoutFacilityEvidence, "FACILITY_LINKAGE")?.status).toBe("UNSUPPORTED");
+
+    const withFacilityAOnly = recommendationReview(resolved, [evidence("facility-a", true)]);
+    expect(supportFor(withFacilityAOnly, "FACILITY_LINKAGE")?.status).toBe("CONDITIONAL");
+    expect(supportFor(withFacilityAOnly, "FACILITY_LINKAGE")?.explanation).toContain("Facility B");
+  });
+
+  it("treats unresolved linkage with no evidence as unresolved rather than incorrect", () => {
+    const review = recommendationReview({ ...resolved, facilityLinkage: "UNRESOLVED" });
+    expect(supportFor(review, "FACILITY_LINKAGE")?.status).toBe("UNRESOLVED");
+  });
+
+  it("marks redacted disclosure conditional before the legal opinion returns", () => {
+    const review = recommendationReview(resolved, [evidence("confidentiality-opinion", false)]);
+    expect(supportFor(review, "DISCLOSURE_RECOMMENDATION")?.status).toBe("CONDITIONAL");
+    expect(supportFor(review, "DISCLOSURE_RECOMMENDATION")?.explanation).toContain("has not returned");
+  });
+
+  it("keeps NOT_READY with unresolved evidence as a valid submission posture", () => {
+    const review = recommendationReview({
+      ...resolved,
+      liquidityBasis: "UNRESOLVED",
+      accountClassification: "UNRESOLVED",
+      facilityLinkage: "UNRESOLVED",
+      treatmentPerimeter: "DEFER",
+      readiness: "NOT_READY",
+    });
+    expect(supportFor(review, "READINESS_POSITION")?.status).toBe("SUPPORTED");
+    expect(review.submissionAllowed).toBe(true);
+  });
+
+  it("produces a visible mismatch when READY includes a blocking unsupported claim", () => {
+    const review = recommendationReview({ ...resolved, readiness: "READY" });
+    expect(supportFor(review, "LIQUIDITY_BASIS")?.status).toBe("UNSUPPORTED");
+    expect(supportFor(review, "READINESS_POSITION")?.status).toBe("UNSUPPORTED");
+    expect(review.readyMismatch).toBe(true);
+    expect(review.mismatchExplanation).toContain("READY exceeds");
+    expect(review.submissionAllowed).toBe(true);
+  });
+
+  it("uses the same evidence-incorporation review and language in the AAR", () => {
+    const evidenceRequests = [evidence("treasury-reconciliation", true)];
+    const expected = reviewRecommendation({ decisions: resolved, evidenceRequests, reviewedAt: reviewMoment });
+    const report = buildAfterActionReport({
+      participant: { id: "participant-1", sessionId: "session-1", name: "Amina", organization: "Kuvera DMO", email: "amina@example.org", currentStage: 7, lastActiveAt: reviewMoment, consentedAt: "2026-10-14T10:00:00Z" },
+      session: { id: "session-1", title: "Kuvera Financing Assurances", kind: "LIVE", status: "DEBRIEF", currentStage: 7, durationSeconds: 1200, remainingSeconds: 0, submissionsClosed: true, createdAt: "2026-10-14T10:00:00Z", expiresAt: "2026-11-13T10:00:00Z" },
+      decisions: resolved,
+      evidenceRequests,
+      submissions: [{ id: "submission-1", participantId: "participant-1", sessionId: "session-1", version: 1, decisions: resolved, submittedAt: reviewMoment }],
+      advisorTurns: [],
+      injects: [],
+      institutionalMessages: [],
+      timeline: [],
+    });
+    expect(report.recommendationReview).toEqual(expected);
+    expect(report.submissionRecommendationReviews[0].review).toEqual(expected);
+    const liquidityReview = supportFor(expected, "LIQUIDITY_BASIS");
+    expect(liquidityReview).toBeDefined();
+    expect(afterActionReportHtml(report)).toContain(liquidityReview!.explanation);
   });
 });

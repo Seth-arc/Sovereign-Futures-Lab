@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { applyAdvisorFallbackCadence, isAdvisorGreeting, revealAdvisorResponse, splitAdvisorResponse } from "./advisorPresentation";
+import {
+  applyAdvisorFallbackCadence,
+  isAdvisorGreeting,
+  normalizeAdvisorCitations,
+  revealAdvisorResponse,
+  sourceClassLabel,
+  splitAdvisorResponse,
+} from "./advisorPresentation";
 
 describe("advisor response presentation", () => {
   it("reveals a response progressively without changing the stored wording", () => {
@@ -19,5 +26,24 @@ describe("advisor response presentation", () => {
   it("keeps the scripted fallback in each advisor's cadence", () => {
     expect(applyAdvisorFallbackCadence("amara", "The record is incomplete.")).toMatch(/^Let's place this in context\./);
     expect(applyAdvisorFallbackCadence("daniel", "The record is incomplete.")).toMatch(/^The key distinction is this\./);
+  });
+
+  it("normalizes legacy citation fields and safely labels missing classifications", () => {
+    expect(normalizeAdvisorCitations([{
+      claim_id: "CLAIM-CF-004",
+      source_id: "SRC-G20-LL-2024",
+      source_title: "G20 Common Framework note",
+      page_reference: "PDF p. 11",
+      source_class: "OFFICIAL_INSTITUTIONAL_LESSONS",
+    }])).toEqual([{
+      claimId: "CLAIM-CF-004",
+      sourceId: "SRC-G20-LL-2024",
+      sourceTitle: "G20 Common Framework note",
+      pageReference: "PDF p. 11",
+      sourceClass: "OFFICIAL_INSTITUTIONAL_LESSONS",
+    }]);
+    expect(normalizeAdvisorCitations([{ claimId: "incomplete" }])).toEqual([]);
+    expect(sourceClassLabel(undefined)).toBe("Classification unavailable");
+    expect(sourceClassLabel("OFFICIAL_INSTITUTIONAL_LESSONS")).toBe("Official Institutional Lessons");
   });
 });

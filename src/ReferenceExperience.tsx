@@ -26,7 +26,7 @@ function alignOrientationCopy(referenceDocument: Document) {
   if (title.textContent === "What you are here to do") {
     setContent(
       "What you are here to do",
-      "You are the <b>Debt Management Office</b> inside Kuvera’s Finance Ministry. You maintain the claims record, request evidence, map dependencies, and prepare a recommendation. Treasury, Legal, creditors, the OCC, and IMF staff are simulated by the platform or facilitator.<br><br>The live room uses the eight-stage process shown behind this orientation. The facilitator unlocks each new stage; every earlier unlocked stage remains available for revision.",
+      "You are the <b>Debt Management Office (DMO)</b> inside Kuvera’s Finance Ministry. You maintain the claims record, request evidence, map dependencies, and prepare a recommendation. Treasury, Legal, creditors, the Official Creditor Committee (OCC), and IMF staff are represented by the exercise or facilitator.<br><br>The live room uses the eight-stage process shown behind this orientation. The facilitator unlocks each new stage; every earlier unlocked stage remains available for revision.",
       "Role · Debt Management Office",
     );
   } else if (title.textContent === "Casework starts with the facilitator") {
@@ -62,13 +62,13 @@ function alignOrientationCopy(referenceDocument: Document) {
   } else if (title.textContent === "Two advisors, on call") {
     setContent(
       "Two advisors, on call",
-      "<b>Amara Okoye</b> covers the country, creditor architecture, and Common Framework sequence. <b>Daniel Mensah</b> covers contracts, restricted accounts, effective control, disclosure, and comparability.<br><br>Open AI advisors from the lower-left control. Their answers are grounded in participant-visible evidence and cannot choose your recommendation or reveal hidden state.",
+      "<b>Amara Okoye</b> covers the country, creditor architecture, and Common Framework sequence. <b>Daniel Mensah</b> covers contracts, restricted accounts, effective control (practical limits on Kuvera’s use of cash), disclosure, and Comparability of Treatment.<br><br>Open AI advisors from the lower-left control. Their answers are grounded in evidence available in your case record and cannot choose your recommendation or reveal hidden state.",
       "Look bottom left · AI advisors",
     );
   } else if (title.textContent === "The debrief is the point") {
     setContent(
       "The debrief is the point",
-      "The final participant stage records what changed your reasoning. The facilitator then uses the private after-action reports to reconstruct decisions, evidence use, realistic consequences, unresolved risks, and deterministic counterfactual pathways.<br><br>Nothing is scored or ranked.",
+      "The final participant stage records what changed your reasoning. The facilitator then uses the private after-action reviews to reconstruct decisions, evidence use, realistic consequences, unresolved risks, and what would have changed if you had acted differently.<br><br>Nothing is scored or ranked.",
       "Step 8 · Reflection, then facilitator debrief",
     );
   }
@@ -198,11 +198,13 @@ export function ReferenceExperience({ surface, onClose, onComplete }: { surface:
           <button type="button" className="primary-button" onClick={onClose}>Return to workshop</button>
         </div>
       ) : referenceDocument ? (
+        // This frame renders only the fixed, bundled reference document above.
+        // It intentionally remains same-origin because the wrapper coordinates
+        // its focus, completion state, and accessible case-file scroll region.
         <iframe
           ref={frameRef}
           srcDoc={referenceDocument}
           title={TITLES[surface]}
-          sandbox="allow-scripts allow-same-origin"
           onLoad={prepareReference}
           onError={() => setLoadError(true)}
         />
