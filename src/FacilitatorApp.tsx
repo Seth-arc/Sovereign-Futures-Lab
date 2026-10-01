@@ -26,7 +26,7 @@ import {
   downloadWorkshopPdf,
   workshopComparisonHtml,
 } from "./report";
-import { EVIDENCE_CATALOG, FACILITATOR_EMAIL, INJECT_PRESETS, STAGES } from "./scenario";
+import { EVIDENCE_CATALOG, FACILITATOR_EMAIL, FACILITATOR_STAGE_GUIDES, INJECT_PRESETS, STAGES } from "./scenario";
 import { ThemeButton } from "./ThemeButton";
 import type { AfterActionReport, DecisionState, ParticipantProfile, WorkshopSession } from "./types";
 
@@ -43,6 +43,23 @@ function sessionClock(session: WorkshopSession): number {
 function formatClock(seconds: number): string {
   const safe = Math.max(0, seconds);
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function participantProgressLabel(
+  participant: ParticipantProfile,
+  decisions: DecisionState,
+  session: WorkshopSession,
+  submissions: FacilitatorData["submissions"],
+): string {
+  if (session.status === "DEBRIEF") return "In debrief";
+  const submitted = submissions
+    .filter((item) => item.participantId === participant.id)
+    .sort((a, b) => b.version - a.version)[0];
+  if (submitted) return `Submitted · version ${submitted.version}`;
+  if (session.status === "DRAFT" || session.status === "LOBBY") return "Joined";
+  if (participant.currentStage === 0 && !decisions.mandateConfirmed && !decisions.mandateRationale.trim()) return "Preparing";
+  const stageIndex = Math.min(Math.max(participant.currentStage, 0), STAGES.length - 1);
+  return `Working in stage ${stageIndex + 1} · ${STAGES[stageIndex].short}`;
 }
 
 export function FacilitatorApp() {
@@ -90,6 +107,8 @@ export function FacilitatorApp() {
   if (authState !== "AUTHORIZED") return <FacilitatorLogin state={authState} error={error} setError={setError} setState={setAuthState} />;
 
   const reports = selected ? data.participants.map(({ participant, decisions }) => reportFor(participant, decisions, selected, data)) : [];
+  const currentStageIndex = selected ? Math.min(Math.max(selected.currentStage, 0), STAGES.length - 1) : 0;
+  const currentGuide = FACILITATOR_STAGE_GUIDES[currentStageIndex];
 
   async function create(kind: "REHEARSAL" | "LIVE") {
     setBusy(true); setError("");
@@ -115,6 +134,8 @@ export function FacilitatorApp() {
 
   async function beginDebrief() {
     if (!selected || selected.status === "DEBRIEF" || selected.status === "CLOSED") return;
+    const confirmed = window.confirm("Begin debrief? This will close submissions, pause the casework clock, and open the participant debrief and transfer view. Submitted versions will remain preserved.");
+    if (!confirmed) return;
     const transition = beginDebriefSession(selected, new Date());
     const updated = await patchSession({
       status: transition.status,
@@ -135,8 +156,51 @@ export function FacilitatorApp() {
         {!selected ? <section className="empty-state"><h1>No workshop session</h1><p>Create a rehearsal or live session to begin.</p></section> : <>
           <div className="facilitator-heading"><div><span className="eyebrow">{selected.kind} session</span><h1>{selected.title}</h1><p>Join code <strong className="join-code">{selected.joinCode}</strong> · {data.participants.length} participants</p></div><div className="facilitator-clock"><span>{selected.status}</span><strong>{formatClock(sessionClock(selected))}</strong><button type="button" disabled={selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void toggleClock()}>{selected.status === "RUNNING" ? "Pause" : selected.status === "DEBRIEF" ? "Debrief in progress" : selected.status === "CLOSED" ? "Session closed" : "Start / resume"}</button></div></div>
           {error && <div className="error-panel" role="alert">{error}</div>}{notice && <div className="success-panel" role="status">{notice}</div>}
-          {view === "overview" && <><section className="control-strip"><div><small>Current phase · {selected.status === "DEBRIEF" ? "debrief and transfer" : "concrete experience"}</small><strong>{selected.currentStage + 1}. {STAGES[selected.currentStage].title}</strong></div><button type="button" disabled={selected.currentStage === 0 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession({ current_stage: selected.currentStage - 1 })}>Previous</button><button type="button" disabled={selected.currentStage === 7 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession({ current_stage: selected.currentStage + 1 })}>Unlock next stage</button><button type="button" disabled={busy || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void beginDebrief()}>{selected.status === "DEBRIEF" ? "Debrief begun" : "Begin debrief"}</button></section><div className="metric-grid"><Metric label="Connected participants" value={data.participants.length} /><Metric label="Active in last 2 min" value={data.participants.filter(({ participant }) => Date.now() - new Date(participant.lastActiveAt).getTime() < 120000).length} /><Metric label="Submitted" value={data.participants.filter(({ participant }) => data.submissions.some((item) => item.participantId === participant.id)).length} /><Metric label="Pending requests" value={data.messages.filter((item) => item.status === "PENDING").length} /></div></>}
-          {view === "participants" && <ParticipantMonitor data={data} reports={reports} afterRemove={() => void refreshSessions(selected.id)} />}
+          {view === "overview" && <>
+            <section className="control-strip">
+              <div><small>Stage {currentStageIndex + 1} · {STAGES[currentStageIndex].title}</small><strong>{currentGuide.learningPurpose}</strong></div>
+              <button type="button" disabled={selected.currentStage === 0 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession({ current_stage: selected.currentStage - 1 })}>Previous</button>
+              <button type="button" disabled={selected.currentStage === STAGES.length - 1 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession({ current_stage: selected.currentStage + 1 })}>Unlock next stage</button>
+              <button type="button" disabled={busy || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void beginDebrief()}>{selected.status === "DEBRIEF" ? "Debrief begun" : "Begin debrief"}</button>
+            </section>
+            <section className="console-card facilitator-guide" aria-labelledby="facilitator-guide-title">
+              <header>
+                <div><span className="eyebrow">Current stage cue card</span><h2 id="facilitator-guide-title">{STAGES[currentStageIndex].title}</h2></div>
+                <span className="pill">Stage {currentStageIndex + 1} of {STAGES.length}</span>
+              </header>
+              <div className="facilitator-guide-grid">
+                <div>
+                  <h3>Opening question</h3>
+                  <blockquote>{currentGuide.openingQuestion}</blockquote>
+                </div>
+                <div>
+                  <h3>Listen for</h3>
+                  <ul>{currentGuide.listenFor.map((cue) => <li key={cue}>{cue}</li>)}</ul>
+                </div>
+              </div>
+              <details>
+                <summary>Supporting facilitation cues</summary>
+                <dl>
+                  <div><dt>Likely misconception</dt><dd>{currentGuide.misconception}</dd></div>
+                  <div><dt>Unlock cue</dt><dd>{currentGuide.unlockCondition}</dd></div>
+                  <div><dt>Debrief connection</dt><dd>{currentGuide.debriefConnection}</dd></div>
+                </dl>
+              </details>
+            </section>
+            {selected.status === "DEBRIEF" && <section className="console-card debrief-sequence" aria-labelledby="debrief-sequence-title">
+              <span className="eyebrow">Facilitator sequence</span>
+              <h2 id="debrief-sequence-title">Debrief and transfer</h2>
+              <ol>
+                <li>Reconstruct the evidence state at the submitted version.</li>
+                <li>Compare decision pathways without scoring or ranking.</li>
+                <li>Discuss one material consequence as a fictional exercise outcome.</li>
+                <li>Run one counterfactual and name the assumptions held fixed.</li>
+                <li>Ask what participants will transfer to real decision preparation.</li>
+              </ol>
+            </section>}
+            <div className="metric-grid"><Metric label="Connected participants" value={data.participants.length} /><Metric label="Active in last 2 min" value={data.participants.filter(({ participant }) => Date.now() - new Date(participant.lastActiveAt).getTime() < 120000).length} /><Metric label="Submitted" value={data.participants.filter(({ participant }) => data.submissions.some((item) => item.participantId === participant.id)).length} /><Metric label="Pending requests" value={data.messages.filter((item) => item.status === "PENDING").length} /></div>
+          </>}
+          {view === "participants" && <ParticipantMonitor data={data} reports={reports} session={selected} afterRemove={() => void refreshSessions(selected.id)} />}
           {view === "communications" && <RequestDesk data={data} afterReply={() => void refreshSessions(selected.id)} />}
           {view === "injects" && <div className="facilitator-grid"><InjectDesk session={selected} afterSend={() => void refreshSessions(selected.id)} /><EvidenceDesk data={data} afterRelease={() => void refreshSessions(selected.id)} /></div>}
           {view === "analytics" && <ReportDesk reports={reports} />}
@@ -155,12 +219,12 @@ function FacilitatorLogin({ state, error, setError, setState }: { state: string;
 
 function Metric({ label, value }: { label: string; value: number }) { return <div className="metric"><strong>{value}</strong><span>{label}</span></div>; }
 
-function ParticipantMonitor({ data, reports, afterRemove }: { data: FacilitatorData; reports: AfterActionReport[]; afterRemove: () => void }) {
+function ParticipantMonitor({ data, reports, session, afterRemove }: { data: FacilitatorData; reports: AfterActionReport[]; session: WorkshopSession; afterRemove: () => void }) {
   const [query, setQuery] = useState("");
   const [report, setReport] = useState<AfterActionReport | null>(null);
   const [error, setError] = useState("");
   const rows = data.participants.filter(({ participant }) => `${participant.name} ${participant.organization} ${participant.email}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="console-card wide"><header><div><span className="eyebrow">Live operating picture</span><h2>Participant progress</h2></div><label className="compact-label">Search participants<input placeholder="Name, organization, or email" value={query} onChange={(event) => setQuery(event.target.value)} /></label></header>{error && <div className="error-panel" role="alert">{error}</div>}<div className="table-wrap"><table><thead><tr><th scope="col">Participant</th><th scope="col">Stage</th><th scope="col">Evidence</th><th scope="col">Liquidity</th><th scope="col">Readiness</th><th scope="col">Open risks</th><th scope="col">Last active</th><th scope="col">Actions</th></tr></thead><tbody>{rows.map(({ participant, decisions }) => { const participantReport = reports.find((item) => item.participant.id === participant.id); const requests = data.evidence.filter((item) => item.participantId === participant.id); const pending = requests.filter((item) => !item.releasedAt && new Date(item.availableAt).getTime() > Date.now()).length; return <tr key={participant.id}><td><strong>{participant.name}</strong><small>{participant.organization}<br />{participant.email}</small></td><td>{participant.currentStage + 1}. {STAGES[participant.currentStage].short}</td><td>{requests.length} requested<small>{pending} pending</small></td><td>{decisions.liquidityBasis?.replaceAll("_", " ") ?? "—"}</td><td>{decisions.readiness?.replaceAll("_", " ") ?? "Not submitted"}</td><td>{participantReport?.unresolvedRisks.length ?? 0}</td><td>{new Date(participant.lastActiveAt).toLocaleTimeString()}</td><td><button type="button" className="text-button" onClick={() => setReport(participantReport ?? null)}>Open AAR</button><button type="button" className="text-button danger-text" onClick={() => { if (confirm(`Remove ${participant.name} and their workshop record as an invalid or duplicate registration?`)) void removeParticipant(participant.id).then(afterRemove).catch((caught) => setError(caught instanceof Error ? caught.message : "Unable to remove participant")); }}>Remove</button></td></tr>; })}</tbody></table></div>{rows.length === 0 && <p className="empty-copy">No participants match this view.</p>}{report && <ReportModal report={report} onClose={() => setReport(null)} />}</section>;
+  return <section className="console-card wide"><header><div><span className="eyebrow">Live operating picture</span><h2>Participant progress</h2></div><label className="compact-label">Search participants<input placeholder="Name, organization, or email" value={query} onChange={(event) => setQuery(event.target.value)} /></label></header>{error && <div className="error-panel" role="alert">{error}</div>}<div className="table-wrap"><table><thead><tr><th scope="col">Participant</th><th scope="col">Progress</th><th scope="col">Evidence</th><th scope="col">Liquidity</th><th scope="col">Readiness</th><th scope="col">Open risks</th><th scope="col">Last active</th><th scope="col">Actions</th></tr></thead><tbody>{rows.map(({ participant, decisions }) => { const participantReport = reports.find((item) => item.participant.id === participant.id); const requests = data.evidence.filter((item) => item.participantId === participant.id); const pending = requests.filter((item) => !item.releasedAt && new Date(item.availableAt).getTime() > Date.now()).length; return <tr key={participant.id}><td><strong>{participant.name}</strong><small>{participant.organization}<br />{participant.email}</small></td><td>{participantProgressLabel(participant, decisions, session, data.submissions)}</td><td>{requests.length} requested<small>{pending} pending</small></td><td>{decisions.liquidityBasis?.replaceAll("_", " ") ?? "—"}</td><td>{decisions.readiness?.replaceAll("_", " ") ?? "Not submitted"}</td><td>{participantReport?.unresolvedRisks.length ?? 0}</td><td>{new Date(participant.lastActiveAt).toLocaleTimeString()}</td><td><button type="button" className="text-button" onClick={() => setReport(participantReport ?? null)}>Open AAR</button><button type="button" className="text-button danger-text" onClick={() => { if (confirm(`Remove ${participant.name} and their workshop record as an invalid or duplicate registration?`)) void removeParticipant(participant.id).then(afterRemove).catch((caught) => setError(caught instanceof Error ? caught.message : "Unable to remove participant")); }}>Remove</button></td></tr>; })}</tbody></table></div>{rows.length === 0 && <p className="empty-copy">No participants match this view.</p>}{report && <ReportModal report={report} onClose={() => setReport(null)} />}</section>;
 }
 
 function InjectDesk({ session, afterSend }: { session: WorkshopSession; afterSend: () => void }) {

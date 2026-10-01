@@ -110,6 +110,12 @@ The scenario engine owns outcomes and counterfactuals. AI advisors may explain r
 
 The facilitator can create rehearsal/live sessions, start or pause the clock, unlock stages, broadcast injects, release delayed evidence early, answer exceptional participant requests while role-playing an institution, inspect participant progress, remove an invalid or duplicate registration, close submissions, initiate debrief, anonymize the projected comparison, and export authorized reports.
 
+The Live overview provides one concise instructional guide for each participant stage. Every guide contains a learning purpose, opening question, two or three listen-for cues, likely novice misconception, discussion- or decision-based unlock condition, and debrief connection. Supporting cues use progressive disclosure. Guide copy may frame questions and dependencies but may not disclose canonical case answers before the corresponding evidence is available to participants. The overview names the actual stage and its learning purpose; it does not use a generic experiential-learning phase label.
+
+Participant progress is descriptive rather than inferential: **joined** before casework, **preparing** before active stage work, **working in stage** when a record is in progress, **submitted** when a version exists, and **in debrief** after the session transition. A participant's highest saved stage is navigation state, not proof of stage completion. The interface therefore never labels a stage complete from that value alone.
+
+Delivery timing is approximately **6 minutes for preparation**, **20 minutes for timed casework**, and **10–12 minutes for debrief and transfer**. Beginning debrief requires a confirmation that submissions will close, the clock will pause, and participant debriefs will open. The facilitator sequence is to reconstruct submission-time evidence, compare decision pathways without scoring or ranking, discuss one fictional consequence, run one counterfactual with fixed assumptions named, and ask for transfer.
+
 The facilitator cannot silently edit a participant submission or replace deterministic consequences with an improvised outcome.
 
 ## Data and privacy

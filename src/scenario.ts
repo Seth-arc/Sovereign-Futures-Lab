@@ -48,6 +48,113 @@ export const STAGES = [
   },
 ] as const;
 
+export interface FacilitatorStageGuide {
+  learningPurpose: string;
+  openingQuestion: string;
+  listenFor: readonly [string, string, string?];
+  misconception: string;
+  unlockCondition: string;
+  debriefConnection: string;
+}
+
+export const FACILITATOR_STAGE_GUIDES = [
+  {
+    learningPurpose: "Separate DMO analysis and recommendation authority from sovereign commitment authority.",
+    openingQuestion: "What can the DMO decide now, and what must it hand off?",
+    listenFor: [
+      "A distinction between maintaining the record, advising the Finance Ministry, and making a sovereign commitment.",
+      "Named dependencies on Treasury, Legal, or the Finance Ministry Lead.",
+    ],
+    misconception: "Preparing a recommendation is the same as authorizing a sovereign commitment.",
+    unlockCondition: "Unlock Liquidity when participants can state the DMO authority boundary in their own words.",
+    debriefConnection: "Return to whether the submitted brief stayed within the authority boundary.",
+  },
+  {
+    learningPurpose: "Distinguish a reported balance from liquidity that can support the package.",
+    openingQuestion: "What would need to be true before a reported balance could support the package?",
+    listenFor: [
+      "Questions about restrictions, protections, control, and practical access.",
+      "A deliberate choice between verification and proceeding with a named caveat.",
+      "Recognition that a caveat preserves uncertainty rather than resolving it.",
+    ],
+    misconception: "A reported balance is automatically usable cash.",
+    unlockCondition: "Unlock Evidence when participants name a material verification question and record their first move.",
+    debriefConnection: "Compare how the first move shaped the evidence available at submission.",
+  },
+  {
+    learningPurpose: "Prioritize evidence requests against the decision dependencies that matter most.",
+    openingQuestion: "Which uncertainty could most change your recommendation, and who can resolve it?",
+    listenFor: [
+      "Requests tied to a specific decision rather than general information gathering.",
+      "Awareness that requested evidence is not yet available evidence.",
+      "A reason for requesting now or proceeding with uncertainty.",
+    ],
+    misconception: "Requesting every document creates a stronger evidence basis immediately.",
+    unlockCondition: "Unlock Record when participants have requested or deliberately deferred evidence and can explain the priority.",
+    debriefConnection: "Reconstruct which requests had actually returned when the brief was submitted.",
+  },
+  {
+    learningPurpose: "Update the debt record only to the conclusion supported at the decision moment.",
+    openingQuestion: "What does the evidence available now establish, and what does it leave open?",
+    listenFor: [
+      "Use of returned evidence rather than request status alone.",
+      "A clear distinction between provisional, verified, and unresolved conclusions.",
+      "A rationale that names any remaining caveat.",
+    ],
+    misconception: "Selecting a precise figure makes it verified.",
+    unlockCondition: "Unlock Linkage when participants record a liquidity basis and explain its evidence boundary.",
+    debriefConnection: "Test whether the submitted liquidity basis matched the evidence then available.",
+  },
+  {
+    learningPurpose: "Assess account control and cross-facility dependency as related but distinct claims.",
+    openingQuestion: "What evidence would let you classify the account and the relationship between the facilities separately?",
+    listenFor: [
+      "Separate reasoning about account control and facility linkage.",
+      "Attention to operational dependency as well as formal legal labels.",
+      "An unresolved selection when the record does not establish a conclusion.",
+    ],
+    misconception: "A formal label alone establishes whether the facilities are operationally linked.",
+    unlockCondition: "Unlock Disclosure when participants record both claims or preserve uncertainty and name the missing dependency.",
+    debriefConnection: "Compare the linkage claim with the treatment perimeter in the submitted brief.",
+  },
+  {
+    learningPurpose: "Set a disclosure boundary and treatment perimeter without exceeding the available authority or evidence.",
+    openingQuestion: "What can the DMO responsibly share, and which facilities should remain in scope?",
+    listenFor: [
+      "A disclosure level tied to permission actually available.",
+      "A treatment perimeter tied to recorded facility dependencies.",
+      "Explicit conditions where Legal or another institution must act next.",
+    ],
+    misconception: "Transparency requires sharing every underlying document in full.",
+    unlockCondition: "Unlock Submit when participants record both recommendations and explain any condition or deferral.",
+    debriefConnection: "Examine whether disclosure and perimeter choices were coherent with the evidence state.",
+  },
+  {
+    learningPurpose: "Assemble a coherent internal preparation brief that separates the selected position from its support.",
+    openingQuestion: "What should the Finance Ministry Lead know, question, and hand off before advancing?",
+    listenFor: [
+      "A readiness position consistent with named conditions and uncertainties.",
+      "A specific next institutional handoff.",
+      "Use of the Recommendation check as decision support, not a score.",
+    ],
+    misconception: "A confident position removes the need to state unresolved evidence or conditions.",
+    unlockCondition: "Open the debrief waiting state when a versioned brief has been submitted; do not require a ready posture.",
+    debriefConnection: "Use the preserved version to reconstruct what the participant knew and recommended.",
+  },
+  {
+    learningPurpose: "Reconstruct the submitted decision and transfer one lesson to future work under uncertainty.",
+    openingQuestion: "Looking at the submitted record, where did evidence most change or constrain the decision?",
+    listenFor: [
+      "Reconstruction from the submitted version rather than hindsight.",
+      "Comparison of pathways without ranking participants.",
+      "A concrete change the participant would make in real preparation.",
+    ],
+    misconception: "The deterministic consequence is a real-world prediction or a competence finding.",
+    unlockCondition: "Close the session after participants inspect their debrief and record a transfer reflection.",
+    debriefConnection: "End by asking what the participant will do differently in a real decision under uncertainty.",
+  },
+] as const satisfies readonly FacilitatorStageGuide[];
+
 export const EVIDENCE_CATALOG: EvidenceDefinition[] = [
   {
     id: "treasury-reconciliation",

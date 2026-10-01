@@ -17,6 +17,12 @@ It is not a replacement for the full Sovereign Room platform. The participant su
 
 Supabase Storage is intentionally not required for this workshop slice: microphone audio is discarded after transcription, and reports are regenerated from retained records and downloaded directly to the facilitator's device. This removes an unnecessary file-retention surface.
 
+## Facilitator delivery sequence
+
+Plan for approximately **6 minutes of participant preparation**, **20 minutes of timed casework**, and **10–12 minutes of debrief and transfer**. Preparation covers Orientation and the Learning Bridge outside the casework clock. During casework, the Live overview presents one concise cue card for the current stage: its learning purpose, opening question, listen-for cues, misconception, discussion-based unlock condition, and debrief connection. Unlock a stage when the stated discussion or decision condition is present, not merely because a participant has visited the preceding stage or time has elapsed.
+
+Selecting **Begin debrief** requires confirmation because it closes submissions, pauses the casework clock, and opens the participant debrief. The facilitator then reconstructs the submission-time evidence state, compares decision pathways without ranking, discusses one fictional consequence, runs one counterfactual while naming its fixed assumptions, and asks participants what they will transfer to real decision preparation.
+
 ## Runtime surfaces
 
 - `/` — exact Sovereign landing reference, including its topography motion engine, theme control, login transition, and integrated six-section About modal

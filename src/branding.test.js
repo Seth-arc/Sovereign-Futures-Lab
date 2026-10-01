@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { FACILITATOR_STAGE_GUIDES, STAGES } from "./scenario";
 
 const read = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8");
 const participantSource = read("./ParticipantApp.tsx");
@@ -273,6 +274,58 @@ describe("reference interface fidelity", () => {
     expect(facilitatorSource).toContain("current_stage: transition.currentStage");
     expect(participantSource).toContain("subscribeToWorkshop");
     expect(participantSource).toContain("setStage(participantEntryStage(fresh.session, fresh.participant))");
+  });
+
+  it("defines a complete facilitator guide for every participant stage", () => {
+    expect(FACILITATOR_STAGE_GUIDES).toHaveLength(STAGES.length);
+    FACILITATOR_STAGE_GUIDES.forEach((guide) => {
+      expect(guide.learningPurpose.trim()).not.toBe("");
+      expect(guide.openingQuestion.trim()).not.toBe("");
+      expect(guide.listenFor.length).toBeGreaterThanOrEqual(2);
+      expect(guide.listenFor.length).toBeLessThanOrEqual(3);
+      expect(guide.listenFor.every((cue) => cue.trim().length > 0)).toBe(true);
+      expect(guide.misconception.trim()).not.toBe("");
+      expect(guide.unlockCondition.trim()).not.toBe("");
+      expect(guide.unlockCondition).not.toMatch(/\b(seconds?|minutes?|elapsed|clock)\b/i);
+      expect(guide.debriefConnection.trim()).not.toBe("");
+    });
+  });
+
+  it("keeps restricted case answers out of guidance before evidence can return", () => {
+    const preReturnGuidance = JSON.stringify(FACILITATOR_STAGE_GUIDES.slice(0, 3));
+    expect(preReturnGuidance).not.toMatch(/\b(?:480|240|60)\b|shared (?:revenue )?pool|same RA-01|redacted functional summary|headquarters authorization/i);
+  });
+
+  it("shows the current guide and describes participant progress without treating a visited stage as complete", () => {
+    const progressHelper = facilitatorSource.slice(
+      facilitatorSource.indexOf("function participantProgressLabel"),
+      facilitatorSource.indexOf("export function FacilitatorApp"),
+    );
+    expect(facilitatorSource).toContain("FACILITATOR_STAGE_GUIDES[currentStageIndex]");
+    expect(facilitatorSource).toContain("currentGuide.learningPurpose");
+    expect(facilitatorSource).toContain("currentGuide.openingQuestion");
+    expect(facilitatorSource).not.toContain("Current phase");
+    expect(progressHelper).toContain('return "Joined"');
+    expect(progressHelper).toContain('return "Preparing"');
+    expect(progressHelper).toContain("Working in stage");
+    expect(progressHelper).toContain("Submitted · version");
+    expect(progressHelper).toContain('return "In debrief"');
+    expect(progressHelper).not.toMatch(/complete/i);
+  });
+
+  it("explains the effect of Begin debrief and presents the non-ranking sequence", () => {
+    const beginDebrief = facilitatorSource.slice(
+      facilitatorSource.indexOf("async function beginDebrief"),
+      facilitatorSource.indexOf("return <div", facilitatorSource.indexOf("async function beginDebrief")),
+    );
+    expect(beginDebrief).toContain("window.confirm");
+    expect(beginDebrief).toContain("close submissions");
+    expect(beginDebrief).toContain("pause the casework clock");
+    expect(beginDebrief).toContain("open the participant debrief and transfer view");
+    expect(facilitatorSource).toContain("Reconstruct the evidence state at the submitted version.");
+    expect(facilitatorSource).toContain("Compare decision pathways without scoring or ranking.");
+    expect(facilitatorSource).toContain("Run one counterfactual and name the assumptions held fixed.");
+    expect(facilitatorSource).toContain("Ask what participants will transfer to real decision preparation.");
   });
 
   it("restores completed or already-started casework without forcing preparation on refresh", () => {
