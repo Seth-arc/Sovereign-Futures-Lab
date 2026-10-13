@@ -31,6 +31,8 @@ const landingSource = read("../index.html");
 const aboutSource = read("../about.html");
 const workshopEntry = read("../workshop/index.html");
 const facilitatorEntry = read("../facilitator/index.html");
+const readme = read("../README.md");
+const postCopySetup = read("../docs/POST_COPY_SETUP.md");
 const productContract = read("../docs/PRODUCT_CONTRACT.md");
 const migrationSource = read("../supabase/migrations/202609280001_futureslab.sql");
 const privacyNotice = read("../docs/PRIVACY_NOTICE.md");
@@ -509,6 +511,33 @@ describe("reference interface fidelity", () => {
       expect(document).not.toMatch(/delet(?:e|ion|ing)[^.]{0,100}(?:retains?|preserves?|survives?)[^.]{0,60}(?:audit|activity event)/i);
     }
     expect(migrationSource).toContain("session_id uuid not null references public.futureslab_sessions(id) on delete cascade");
+  });
+
+  it("keeps the deployment instructions on one migration and repository-layout contract", () => {
+    const deploymentDocuments = [readme, postCopySetup, deploymentRunbook];
+    const migrations = [
+      "202609280001_futureslab.sql",
+      "202610010001_freeze_submission_context.sql",
+      "202610130001_secure_participant_rejoin.sql",
+      "202610130002_atomic_facilitator_actions.sql",
+      "202610130003_authenticated_table_privileges.sql",
+    ];
+
+    for (const document of deploymentDocuments) {
+      for (const migration of migrations) expect(document).toContain(migration);
+      expect(document).toContain("submit_futureslab_recommendation(uuid, text, text)");
+      expect(document).not.toContain("submit_futureslab_recommendation(uuid)");
+      expect(document).not.toMatch(/VITE_[A-Z_]*(?:SERVICE_ROLE|OPENAI|GROQ|AI_PROVIDER)[A-Z_]*\s*=/);
+      expect(document).not.toContain("cd futureslab");
+    }
+
+    expect(readme).toContain("[deployment and rehearsal runbook](docs/DEPLOYMENT.md)");
+    const standaloneRootGuidance = "When `package.json` is at the imported repository root, use **Root Directory: leave blank**.";
+    const nestedRootGuidance = "Only when this application is the `futureslab` folder inside a larger imported repository, use **Root Directory: `futureslab`**.";
+    for (const document of deploymentDocuments) {
+      expect(document).toContain(standaloneRootGuidance);
+      expect(document).toContain(nestedRootGuidance);
+    }
   });
 
   it("restores completed or already-started casework without forcing preparation on refresh", () => {

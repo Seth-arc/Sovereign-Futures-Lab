@@ -78,16 +78,24 @@ npx supabase projects list
 npx supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-Preview and apply the committed migration:
+For a new project, choose exactly one migration method. Either preview and apply the complete chain with the CLI:
 
 ```powershell
 npx supabase db push --dry-run
 npx supabase db push
 ```
 
-The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. The forward migration `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract. The forward migration `supabase/migrations/202610130001_secure_participant_rejoin.sql` replaces the join RPC so an existing participant can be returned only to its original authenticated anonymous user. The forward migration `supabase/migrations/202610130002_atomic_facilitator_actions.sql` adds the scoped facilitator-action RPC so each operational mutation and its required activity event commit or roll back together. Apply all migrations in timestamp order with either `db push` or the Supabase SQL editor, not both. Do not edit or reapply an earlier migration to upgrade an existing project.
+or run every file listed below once in the Supabase SQL editor in timestamp order. Do not use both methods on the same project.
 
-For an existing project, export any required workshop reports, test the forward migration against a disposable or rehearsal project, then run the dry run and apply it outside a live workshop window. The migration deliberately leaves pre-existing `context_snapshot` values null; those rows must remain labeled `legacy · current-rule reconstruction`.
+The complete committed migration chain is:
+
+1. `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules.
+2. `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract.
+3. `supabase/migrations/202610130001_secure_participant_rejoin.sql` replaces the join RPC so an existing participant can be returned only to its original authenticated anonymous user.
+4. `supabase/migrations/202610130002_atomic_facilitator_actions.sql` adds the scoped facilitator-action RPC so each operational mutation and its required activity event commit or roll back together.
+5. `supabase/migrations/202610130003_authenticated_table_privileges.sql` grants the authenticated role only the table operations used by participant and facilitator clients; existing RLS policies continue to decide which rows each user may access.
+
+For an existing project, never edit or rerun the initial migration or any migration already recorded as applied. Export any required workshop reports, test the unapplied forward migrations against a disposable or rehearsal project, then run the dry run and apply those forward migrations in timestamp order outside a live workshop window. The snapshot migration deliberately leaves pre-existing `context_snapshot` values null; those rows must remain labeled `legacy · current-rule reconstruction`.
 
 If the Supabase CLI is configured against a disposable local project, apply the full migration chain with `npx supabase db reset` before the linked-project dry run. Never use `db reset --linked`.
 
@@ -127,7 +135,7 @@ order by submitted_at desc
 limit 5;
 ```
 
-Pass means the nullable `jsonb` column exists, the only join RPC signature is `(text, text, text, text)`, the only submission RPC signature is `(uuid, text, text)`, the facilitator-action RPC signature is `(text, uuid, jsonb)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
+Pass means the nullable `jsonb` column exists, the only join RPC signature is `join_futureslab_session(text, text, text, text)`, the only submission RPC signature is `submit_futureslab_recommendation(uuid, text, text)`, the facilitator-action RPC signature is `perform_futureslab_facilitator_action(text, uuid, jsonb)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
 
 Run the disposable database tests after reset:
 
@@ -301,12 +309,14 @@ Before production use of research-backed answers, the product owner must also co
 
 ## 9. Configure Vercel
 
-Import the GitHub repository into Vercel.
+Import the GitHub repository into Vercel, then choose the root that matches the imported layout:
 
-Because `package.json`, `vite.config.ts`, and `vercel.json` are at the repository root, use:
+- When `package.json` is at the imported repository root, use **Root Directory: leave blank**.
+- Only when this application is the `futureslab` folder inside a larger imported repository, use **Root Directory: `futureslab`**.
+
+The remaining settings are the same for either layout:
 
 ```text
-Root Directory: leave blank
 Framework Preset: Vite
 Install Command: npm ci
 Build Command: npm run build
@@ -482,7 +492,7 @@ After the workshop:
 The workshop is ready only when all of these are true:
 
 - tests, production build, and dependency audit pass from the committed release;
-- the Supabase migration and both JWT-protected Edge Functions are deployed;
+- the complete Supabase migration chain and both JWT-protected Edge Functions are deployed;
 - RLS and unauthorized-access checks pass;
 - facilitator email delivery works;
 - anonymous sign-in capacity supports the venue network;

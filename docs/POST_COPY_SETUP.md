@@ -1,14 +1,14 @@
 # Futureslab post-copy setup guide
 
-Use this checklist after copying the complete `futureslab` folder into its destination GitHub repository.
+Use this checklist after copying the application into its destination GitHub repository. The **application root** below means the directory that contains `package.json`: it is the repository root for a standalone import, or the `futureslab` directory when this application is nested inside a larger repository.
 
 > [!IMPORTANT]
-> Keep `futureslab` intact as one directory. Do not merge its files into the parent repository's existing root unless `futureslab` is intended to become the repository root.
+> Keep the application files together. Do not merge them into a parent repository's existing root unless this application is intended to become that repository root.
 
 ## 1. Verify the copied folder
 
 - [ ] Open PowerShell.
-- [ ] Change to the copied `futureslab` directory. Replace the example path with its actual location.
+- [ ] Change to the application root. Use the repository root for a standalone checkout. The following is a nested-folder example; replace it with the actual path.
 
 ```powershell
 Set-Location -LiteralPath "C:\path\to\your-repository\futureslab"
@@ -45,7 +45,7 @@ Get-ChildItem -Force
 
 ## 2. Install and verify locally
 
-Run every command in this section from inside the copied `futureslab` directory.
+Run every command in this section from the application root.
 
 - [ ] Install the locked dependencies.
 
@@ -97,7 +97,7 @@ Stop the development server by returning to PowerShell and pressing `Ctrl+C`.
 
 ## 3. Commit the folder to GitHub
 
-Run these commands from the parent Git repository—not from an unrelated directory.
+Run these commands from the Git repository root—not from an unrelated directory.
 
 - [ ] Change to the repository root.
 
@@ -111,13 +111,15 @@ Set-Location -LiteralPath "C:\path\to\your-repository"
 git status
 ```
 
-- [ ] Stage and commit Futureslab.
+- [ ] Stage and commit Futureslab. For a nested `futureslab` folder, use:
 
 ```powershell
 git add futureslab
 git commit -m "Add Futureslab workshop platform"
 git push
 ```
+
+For a standalone repository whose root is the application root, use `git add .` instead of `git add futureslab`.
 
 Do not commit any of the following:
 
@@ -134,8 +136,16 @@ Do not commit any of the following:
 Use the full [deployment and rehearsal runbook](./DEPLOYMENT.md) while completing this section.
 
 - [ ] Create a Supabase project in the region approved for workshop data.
-- [ ] Open the Supabase SQL editor.
-- [ ] Run `supabase/migrations/202609280001_futureslab.sql` once.
+- [ ] Apply the complete committed migration chain in timestamp order:
+
+  1. `supabase/migrations/202609280001_futureslab.sql`
+  2. `supabase/migrations/202610010001_freeze_submission_context.sql`
+  3. `supabase/migrations/202610130001_secure_participant_rejoin.sql`
+  4. `supabase/migrations/202610130002_atomic_facilitator_actions.sql`
+  5. `supabase/migrations/202610130003_authenticated_table_privileges.sql`
+
+  For a new project, choose either `npx supabase db push` or the Supabase SQL editor for the complete chain; do not use both. For an existing project, apply only unapplied forward migrations in timestamp order. Never edit or rerun `202609280001_futureslab.sql` as though it were new history.
+- [ ] Run the read-only migration verification queries in [DEPLOYMENT.md](./DEPLOYMENT.md#3-create-and-link-supabase). Confirm that `public.futureslab_submissions.context_snapshot` is a nullable `jsonb` column and that the active submission RPC signature is `submit_futureslab_recommendation(uuid, text, text)`.
 - [ ] Enable anonymous authentication for participants.
 - [ ] Enable email OTP authentication for the facilitator.
 - [ ] Configure the production Site URL and permitted Vercel preview URLs.
@@ -176,7 +186,7 @@ Provider model names and availability can change. Confirm the current model iden
 
 ## 6. Configure the local environment
 
-Return to the `futureslab` directory.
+Return to the application root. This is a nested-folder example:
 
 ```powershell
 Set-Location -LiteralPath "C:\path\to\your-repository\futureslab"
@@ -212,8 +222,8 @@ npm run dev
 - [ ] Import the GitHub repository into Vercel.
 - [ ] Set the Vercel root directory correctly:
 
-  - If `futureslab` is a directory inside the repository, set **Root Directory** to `futureslab`.
-  - If the contents of `futureslab` are the repository root, leave **Root Directory** empty.
+  - When `package.json` is at the imported repository root, use **Root Directory: leave blank**.
+  - Only when this application is the `futureslab` folder inside a larger imported repository, use **Root Directory: `futureslab`**.
 
 - [ ] Add these environment variables to Vercel for Production and Preview:
 

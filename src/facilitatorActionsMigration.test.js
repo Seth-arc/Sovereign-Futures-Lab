@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../supabase/migrations/202610130002_atomic_facilitator_actions.sql", import.meta.url), "utf8");
+const privilegeMigration = readFileSync(new URL("../supabase/migrations/202610130003_authenticated_table_privileges.sql", import.meta.url), "utf8");
 const dataSource = readFileSync(new URL("./data.ts", import.meta.url), "utf8");
 const databaseTest = readFileSync(new URL("../supabase/tests/database/facilitator_actions_atomicity.test.sql", import.meta.url), "utf8");
 
@@ -25,5 +26,12 @@ describe("atomic facilitator action migration contract", () => {
     expect(databaseTest).toContain("TEST_AUDIT_FAILURE");
     expect(databaseTest).toContain("an activity-event failure rolls back the mutation");
     expect(databaseTest).toContain("a participant cannot invoke a facilitator action");
+  });
+
+  it("grants the security-invoker RPC its narrow table privileges without weakening RLS", () => {
+    expect(privilegeMigration).toContain("grant select, insert, update, delete on table public.futureslab_sessions to authenticated");
+    expect(privilegeMigration).toContain("grant select, delete on table public.futureslab_participants to authenticated");
+    expect(privilegeMigration).toContain("grant select, insert on table public.futureslab_activity_events to authenticated");
+    expect(privilegeMigration).not.toMatch(/grant all|disable row level security/i);
   });
 });

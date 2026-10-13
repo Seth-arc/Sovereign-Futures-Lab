@@ -33,10 +33,9 @@ Selecting **Begin debrief** requires confirmation because it closes submissions,
 
 ## Local setup
 
-The human operator runs commands in this repository:
+Run commands from the application root: the directory that contains `package.json`. In this standalone repository, that is the repository root. If this application is copied into a larger repository as `futureslab`, change into that nested folder first.
 
 ```powershell
-cd futureslab
 npm install
 Copy-Item .env.example .env.local
 npm run dev
@@ -46,24 +45,27 @@ For offline UI rehearsal, set `VITE_FORCE_LOCAL_MODE=true`. Local mode keeps eac
 
 ## Cloud setup
 
-1. Create a Supabase project.
-2. Run `supabase/migrations/202609280001_futureslab.sql` in the SQL editor.
-3. Enable anonymous sign-ins and email OTP sign-ins in Supabase Authentication.
-4. Add the Vercel production and preview URLs to the Supabase redirect allow-list.
-5. Deploy the Edge Functions in `supabase/functions/`.
-6. Set function secrets for at least one AI provider; see `docs/DEPLOYMENT.md`.
-7. Create a Vercel project from the GitHub repository, using `futureslab` as its root directory.
-8. Configure the browser-safe variables from `.env.example` in Vercel.
+The canonical procedure is the [deployment and rehearsal runbook](docs/DEPLOYMENT.md). Follow it rather than treating this overview as a separate deployment process.
+
+The complete committed migration chain is:
+
+1. `supabase/migrations/202609280001_futureslab.sql`
+2. `supabase/migrations/202610010001_freeze_submission_context.sql`
+3. `supabase/migrations/202610130001_secure_participant_rejoin.sql`
+4. `supabase/migrations/202610130002_atomic_facilitator_actions.sql`
+5. `supabase/migrations/202610130003_authenticated_table_privileges.sql`
+
+A new Supabase project must apply the complete chain in timestamp order using either `npx supabase db push` or the Supabase SQL editor, never both. An existing project receives only its unapplied forward migrations; never edit or rerun the initial migration as new history. Verify that `futureslab_submissions.context_snapshot` exists and that the active submission RPC is `submit_futureslab_recommendation(uuid, text, text)` as described in the runbook.
+
+When `package.json` is at the imported repository root, use **Root Directory: leave blank**. Only when this application is the `futureslab` folder inside a larger imported repository, use **Root Directory: `futureslab`**. Vercel receives only the browser-safe `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_FORCE_LOCAL_MODE` values. Supabase service-role credentials and AI-provider keys remain server-side Supabase secrets and must never be placed in `VITE_*` variables or browser code.
 
 Target dates: rehearsal-ready by **October 4, 2026** and live workshop delivery on **October 14, 2026**.
 
 ## Verification commands
 
-These commands have not been run by the coding agent:
+Run these commands from the application root for each candidate release:
 
 ```powershell
-cd futureslab
-npm install
 npm test
 npm run build
 ```
