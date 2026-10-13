@@ -468,6 +468,49 @@ describe("reference interface fidelity", () => {
     expect(productContract).toContain("A failed refresh preserves the last successful dataset");
   });
 
+  it("separates anonymous comparisons from always-identified facilitator exports", () => {
+    const reportDesk = facilitatorSource.slice(
+      facilitatorSource.indexOf("function ReportDesk"),
+      facilitatorSource.indexOf("function ReportModal"),
+    );
+    expect(reportDesk).toContain("Anonymous group comparison");
+    expect(reportDesk).toContain("exclude participant name, organization, email, and participant ID");
+    expect(reportDesk).toContain("Identified facilitator-only records");
+    expect(reportDesk).toContain("Roster CSV and full JSON are always identified");
+    expect(reportDesk).toContain("no anonymity setting applies to these formats");
+    expect(reportDesk).not.toContain("setAnonymous");
+    expect(reportDesk).not.toContain("Anonymize projected comparison");
+    expect(reportDesk).toContain("runIdentifiedExport");
+    expect(reportDesk.indexOf("identifiedExportDisclosure")).toBeLessThan(reportDesk.indexOf("downloadWorkshopCsv(reports)"));
+    expect(reportDesk.indexOf("identifiedExportDisclosure")).toBeLessThan(reportDesk.indexOf("downloadWorkshopJson(reports)"));
+  });
+
+  it("confirms close effects and preserves the selected session until deletion succeeds", () => {
+    const closeAction = facilitatorSource.slice(
+      facilitatorSource.indexOf("async function closeSelectedSession"),
+      facilitatorSource.indexOf("const syncLabel"),
+    );
+    for (const effect of ["Submissions will close", "clock will stop", "participants will become read-only", "Records remain until retention expiry or deliberate deletion", "cannot reopen"]) {
+      expect(closeAction).toContain(effect);
+    }
+    const deletion = facilitatorSource.slice(
+      facilitatorSource.indexOf("async function deleteSelectedSession"),
+      facilitatorSource.indexOf("async function closeSelectedSession"),
+    );
+    expect(deletion).toContain("deletionConfirmationMatches(deleteConfirmation, selected.joinCode)");
+    expect(deletion.indexOf("await deleteSession(sessionId)")).toBeLessThan(deletion.indexOf("setSelected(null)"));
+    expect(deletion).toContain("The session remains selected");
+    expect(facilitatorSource).toContain("Export is optional and is not required for privacy deletion");
+  });
+
+  it("documents that cascade deletion leaves no in-platform session audit", () => {
+    for (const document of [productContract, privacyNotice, deploymentRunbook]) {
+      expect(document).toMatch(/no in-platform session audit/i);
+      expect(document).not.toMatch(/delet(?:e|ion|ing)[^.]{0,100}(?:retains?|preserves?|survives?)[^.]{0,60}(?:audit|activity event)/i);
+    }
+    expect(migrationSource).toContain("session_id uuid not null references public.futureslab_sessions(id) on delete cascade");
+  });
+
   it("restores completed or already-started casework without forcing preparation on refresh", () => {
     const restoration = participantSource.slice(
       participantSource.indexOf("const participantId = localStorage.getItem(PARTICIPANT_KEY)"),

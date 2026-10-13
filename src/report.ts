@@ -10,18 +10,42 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#039;");
 }
 
+function redactParticipantIdentity(content: string, reports: AfterActionReport[]): string {
+  const identities = new Set(reports.flatMap((report) => [report.participant.id, report.participant.name, report.participant.organization, report.participant.email]));
+  return [...identities]
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .reduce((redacted, identity) => redacted.replaceAll(identity, "[participant identity removed]").replaceAll(escapeHtml(identity), "[participant identity removed]"), content);
+}
+
 function download(name: string, type: string, content: BlobPart): void {
-  const url = URL.createObjectURL(new Blob([content], { type }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  let url = "";
+  try {
+    url = URL.createObjectURL(new Blob([content], { type }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = name;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }
 
 function filename(report: AfterActionReport, extension: string): string {
   const safe = report.participant.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return `futureslab-aar-${safe || report.participant.id}.${extension}`;
+  return `futureslab-identified-aar-${safe || report.participant.id}.${extension}`;
+}
+
+export function identifiedExportDisclosure(contents: string): string {
+  return `This identified export includes ${contents}. It is facilitator-only and must be stored and shared only with authorized facilitators. Continue?`;
+}
+
+export async function runIdentifiedExport(confirmDisclosure: () => boolean, startDownload: () => void | Promise<void>): Promise<boolean> {
+  if (!confirmDisclosure()) return false;
+  await startDownload();
+  return true;
 }
 
 const label = (value: string | undefined) => value?.replaceAll("_", " ").toLowerCase() ?? "Not recorded";
@@ -64,10 +88,8 @@ function briefHtml(brief: NegotiationPreparationBrief): string {
   return `<table><tbody><tr><th scope="row">Position</th><td>${escapeHtml(brief.position)}</td></tr><tr><th scope="row">Evidence basis</th><td>${evidence}</td></tr><tr><th scope="row">Known uncertainties</th><td>${uncertainties}</td></tr><tr><th scope="row">Disclosure boundary</th><td>${escapeHtml(brief.disclosureBoundary)}</td></tr><tr><th scope="row">Treatment perimeter</th><td>${escapeHtml(brief.treatmentPerimeter)}</td></tr><tr><th scope="row">Conditions to advance</th><td>${escapeHtml(brief.conditionsToAdvance)}</td></tr><tr><th scope="row">Next institutional handoff</th><td>${escapeHtml(brief.nextInstitutionalHandoff)}</td></tr><tr><th scope="row">Recommendation to the Finance Ministry Lead</th><td>${escapeHtml(brief.financeMinistryRecommendation)}</td></tr></tbody></table>`;
 }
 
-export function afterActionReportHtml(report: AfterActionReport, identified = true): string {
-  const identity = identified
-    ? `<p><strong>${escapeHtml(report.participant.name)}</strong><br>${escapeHtml(report.participant.organization)}<br>${escapeHtml(report.participant.email)}</p>`
-    : `<p><strong>Participant ${escapeHtml(report.participant.id.slice(0, 8))}</strong></p>`;
+export function afterActionReportHtml(report: AfterActionReport): string {
+  const identity = `<p><strong>${escapeHtml(report.participant.name)}</strong><br>${escapeHtml(report.participant.organization)}<br>${escapeHtml(report.participant.email)}</p>`;
   const timelineRows = report.timeline.map((event) => `<tr><td>${escapeHtml(new Date(event.createdAt).toLocaleTimeString())}</td><td>${escapeHtml(event.type.replaceAll("_", " "))}</td><td><code>${escapeHtml(JSON.stringify(event.detail))}</code></td></tr>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Futures Lab ${escapeHtml(REPORT_LABELS.reportTitle)}</title>
@@ -181,14 +203,25 @@ export function workshopCsv(reports: AfterActionReport[]): string {
 }
 
 export function downloadWorkshopCsv(reports: AfterActionReport[]): void {
-  download("futureslab-workshop-export.csv", "text/csv;charset=utf-8", workshopCsv(reports));
+  download("futureslab-identified-roster.csv", "text/csv;charset=utf-8", workshopCsv(reports));
 }
 
 export function downloadWorkshopJson(reports: AfterActionReport[]): void {
-  download("futureslab-workshop-export.json", "application/json;charset=utf-8", JSON.stringify({ exportedAt: new Date().toISOString(), reports }, null, 2));
+  download("futureslab-identified-workshop-records.json", "application/json;charset=utf-8", JSON.stringify({ exportedAt: new Date().toISOString(), reports }, null, 2));
 }
 
-export async function downloadWorkshopPdf(reports: AfterActionReport[], anonymous: boolean): Promise<void> {
+export function anonymousWorkshopPdfText(reports: AfterActionReport[]): string {
+  const content = reports.map((report, index) => {
+    const versions = report.submissionBriefs.map((entry) => {
+      const replay = report.submissionReplays.find((item) => item.submissionId === entry.submissionId);
+      return `Submitted version ${entry.version}\nReplay provenance: ${replay?.replayProvenance.label ?? "legacy · current-rule reconstruction"}${replay ? ` · scenario ${replay.replayProvenance.scenarioVersion} · consequence rules ${replay.replayProvenance.consequenceRuleVersion}` : ""}\n${briefText(entry.brief)}`;
+    }).join("\n\n");
+    return `Participant ${index + 1}\nSelected replay: ${provenanceText(report)}${report.selectedSubmissionVersion ? ` · version ${report.selectedSubmissionVersion}` : ""}\n${briefText(report.negotiationPreparationBrief)}${versions ? `\n\n${versions}` : ""}`;
+  }).join("\n\n");
+  return redactParticipantIdentity(content, reports);
+}
+
+export async function downloadWorkshopPdf(reports: AfterActionReport[]): Promise<void> {
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ unit: "pt", format: "a4" });
   const margin = 48;
@@ -203,33 +236,30 @@ export async function downloadWorkshopPdf(reports: AfterActionReport[], anonymou
     y += height + gap;
   };
   add("SOVEREIGN · FUTURES LAB · KUVERA FINANCING ASSURANCES", 9, 10);
-  add(REPORT_LABELS.workshopComparisonTitle, 22, 8);
+  add(`Anonymous ${REPORT_LABELS.workshopComparisonTitle}`, 22, 8);
   add(`${reports.length} individual decision records. Pathways are compared without scores or rankings.`, 10, 16);
   const pathCounts = new Map<string, number>();
   reports.forEach((report) => pathCounts.set(decisionPathKey(report.decisions), (pathCounts.get(decisionPathKey(report.decisions)) ?? 0) + 1));
   add("Decision pathways", 15, 7);
   [...pathCounts].forEach(([path, count]) => add(`${count} participant${count === 1 ? "" : "s"}: ${path}`, 10, 7));
   add("Participant records", 15, 7);
-  reports.forEach((report, index) => {
-    const name = anonymous ? `Participant ${index + 1}` : `${report.participant.name} · ${report.participant.organization}`;
-    const versions = report.submissionBriefs.map((entry) => `Submitted version ${entry.version}\n${briefText(entry.brief)}`).join("\n\n");
-    add(`${name}\nSelected replay: ${provenanceText(report)}${report.selectedSubmissionVersion ? ` · version ${report.selectedSubmissionVersion}` : ""}\n${briefText(report.negotiationPreparationBrief)}${versions ? `\n\n${versions}` : ""}`, 10, 9);
-  });
+  anonymousWorkshopPdfText(reports).split("\n\n").forEach((record) => add(record, 10, 9));
   add("This comparison describes recorded process in a fictional training scenario. It is not a ranking or evidence of individual competence.", 8, 0);
-  pdf.save("futureslab-workshop-comparison.pdf");
+  pdf.save("futureslab-anonymous-workshop-comparison.pdf");
 }
 
 export function decisionPathKey(decisions: DecisionState): string {
   return [decisions.liquidityAction, decisions.liquidityBasis, decisions.facilityLinkage, decisions.disclosure, decisions.readiness].map((value) => value ?? "UNRECORDED").join(" · ");
 }
 
-export function workshopComparisonHtml(reports: AfterActionReport[], anonymous: boolean): string {
+export function workshopComparisonHtml(reports: AfterActionReport[]): string {
   const paths = new Map<string, number>();
   reports.forEach((report) => paths.set(decisionPathKey(report.decisions), (paths.get(decisionPathKey(report.decisions)) ?? 0) + 1));
-  const briefs = reports.map((report, index) => `<article><h3>${anonymous ? `Participant ${index + 1}` : escapeHtml(report.participant.name)}</h3><p class="meta">Selected replay: ${escapeHtml(provenanceText(report))}${report.selectedSubmissionVersion ? ` · version ${report.selectedSubmissionVersion}` : ""}</p>${briefHtml(report.negotiationPreparationBrief)}${report.submissionBriefs.map((entry) => { const replay = report.submissionReplays.find((item) => item.submissionId === entry.submissionId); return `<h4>Submitted version ${entry.version}</h4><p class="meta">${escapeHtml(replay?.replayProvenance.label ?? "legacy · current-rule reconstruction")}</p>${briefHtml(entry.brief)}`; }).join("")}</article>`).join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Futures Lab ${escapeHtml(REPORT_LABELS.workshopComparisonTitle)}</title><style>body{font:15px/1.5 Arial,sans-serif;color:#182522;max-width:1100px;margin:40px auto;padding:0 28px}h1,h2,h3{font-family:Georgia,serif}table{width:100%;border-collapse:collapse;margin-bottom:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}th{width:220px;background:#f1eee7}.path{padding:10px;border-left:3px solid #aa6f32;margin:8px 0}.meta{color:#60706a}</style></head><body><p class="meta">Sovereign · Futures Lab · ${escapeHtml(EXERCISE_TITLE)}</p><h1>${escapeHtml(REPORT_LABELS.workshopComparisonTitle)}</h1><p>${reports.length} individual decision records. This comparison describes pathways and evidence use; it does not rank participants.</p><h2>Decision pathways</h2>${[...paths].map(([path,count]) => `<div class="path"><strong>${count} participant${count === 1 ? "" : "s"}</strong><br>${escapeHtml(path)}</div>`).join("")}<h2>${escapeHtml(REPORT_LABELS.briefTitle)}s</h2>${briefs}</body></html>`;
+  const briefs = reports.map((report, index) => `<article><h3>Participant ${index + 1}</h3><p class="meta">Selected replay: ${escapeHtml(provenanceText(report))}${report.selectedSubmissionVersion ? ` · version ${report.selectedSubmissionVersion}` : ""}</p>${briefHtml(report.negotiationPreparationBrief)}${report.submissionBriefs.map((entry) => { const replay = report.submissionReplays.find((item) => item.submissionId === entry.submissionId); return `<h4>Submitted version ${entry.version}</h4><p class="meta">${escapeHtml(replay?.replayProvenance.label ?? "legacy · current-rule reconstruction")}${replay ? ` · scenario ${escapeHtml(replay.replayProvenance.scenarioVersion)} · consequence rules ${escapeHtml(replay.replayProvenance.consequenceRuleVersion)}` : ""}</p>${briefHtml(entry.brief)}`; }).join("")}</article>`).join("");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Futures Lab Anonymous ${escapeHtml(REPORT_LABELS.workshopComparisonTitle)}</title><style>body{font:15px/1.5 Arial,sans-serif;color:#182522;max-width:1100px;margin:40px auto;padding:0 28px}h1,h2,h3{font-family:Georgia,serif}table{width:100%;border-collapse:collapse;margin-bottom:28px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}th{width:220px;background:#f1eee7}.path{padding:10px;border-left:3px solid #aa6f32;margin:8px 0}.meta{color:#60706a}</style></head><body><p class="meta">Sovereign · Futures Lab · ${escapeHtml(EXERCISE_TITLE)}</p><h1>Anonymous ${escapeHtml(REPORT_LABELS.workshopComparisonTitle)}</h1><p>Numbered participant labels only; participant name, organization, email, and participant ID are omitted.</p><p>${reports.length} individual decision records. This comparison describes pathways and evidence use; it does not rank participants.</p><h2>Decision pathways</h2>${[...paths].map(([path,count]) => `<div class="path"><strong>${count} participant${count === 1 ? "" : "s"}</strong><br>${escapeHtml(path)}</div>`).join("")}<h2>${escapeHtml(REPORT_LABELS.briefTitle)}s</h2>${briefs}</body></html>`;
+  return redactParticipantIdentity(html, reports);
 }
 
-export function downloadWorkshopHtml(reports: AfterActionReport[], anonymous: boolean): void {
-  download("futureslab-workshop-comparison.html", "text/html;charset=utf-8", workshopComparisonHtml(reports, anonymous));
+export function downloadWorkshopHtml(reports: AfterActionReport[]): void {
+  download("futureslab-anonymous-workshop-comparison.html", "text/html;charset=utf-8", workshopComparisonHtml(reports));
 }

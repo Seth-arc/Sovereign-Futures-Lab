@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { saveTransferReflection, submitRecommendation, type ParticipantBundle } from "./data";
 import { beginDebriefSession, buildAfterActionReport, buildNegotiationPreparationBrief, buildParticipantDebrief, buildSubmissionContextSnapshot, buildSubmissionReplay, caseworkClockActionLabel, CONSEQUENCE_RULE_VERSION, debriefConfirmationMessage, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, nextParticipantStageUnlock, participantAvailableStage, participantEntryStage, remainingSessionSeconds, reviewRecommendation, SCENARIO_VERSION, selectAfterActionReportSubmission, toggleCaseworkClock, unresolvedRiskList } from "./engine";
-import { afterActionReportHtml, workshopComparisonHtml, workshopCsv } from "./report";
+import { afterActionReportHtml, anonymousWorkshopPdfText, identifiedExportDisclosure, runIdentifiedExport, workshopComparisonHtml, workshopCsv } from "./report";
 import type { DecisionState, EvidenceRequest, ParticipantProfile, Submission, WorkshopSession } from "./types";
 
 const resolved: DecisionState = {
@@ -310,7 +310,7 @@ describe("negotiation-preparation brief", () => {
     expect(report.negotiationPreparationBrief).toEqual(buildNegotiationPreparationBrief({ decisions: second, evidenceRequests: [evidence("treasury-reconciliation", true)], preparedAt: reviewMoment }));
     expect(report.submissionBriefs.map((item) => item.brief.nextInstitutionalHandoff)).toEqual([first.nextHandoff, second.nextHandoff]);
     expect(afterActionReportHtml(report)).toContain(second.nextHandoff);
-    expect(workshopComparisonHtml([report], false)).toContain(second.nextHandoff);
+    expect(workshopComparisonHtml([report])).toContain(second.nextHandoff);
     expect(workshopCsv([report])).toContain(second.nextHandoff);
   });
 
@@ -544,5 +544,39 @@ describe("frozen submission replay", () => {
     expect(afterActionReportHtml(report)).toContain(SCENARIO_VERSION);
     expect(workshopCsv([report])).toContain(CONSEQUENCE_RULE_VERSION);
     expect(JSON.stringify(report)).toContain('"mode":"FROZEN"');
+  });
+
+  it("keeps participant identity out of anonymous HTML and PDF content", () => {
+    const submission = frozenSubmission(resolved, 1, reviewMoment, [evidence("treasury-reconciliation", true)]);
+    const report = buildAfterActionReport({
+      participant,
+      session: { ...runningSession, status: "DEBRIEF", currentStage: 7, submissionsClosed: true },
+      decisions: resolved,
+      evidenceRequests: [evidence("treasury-reconciliation", true)],
+      submissions: [submission],
+      advisorTurns: [], injects: [inject], institutionalMessages: [answeredMessage], timeline: [],
+    });
+    const identityBearingReport = structuredClone(report);
+    identityBearingReport.negotiationPreparationBrief.nextInstitutionalHandoff = `${participant.name} at ${participant.organization}, ${participant.email}, ${participant.id}`;
+    for (const content of [workshopComparisonHtml([identityBearingReport]), anonymousWorkshopPdfText([identityBearingReport])]) {
+      expect(content).not.toContain(participant.name);
+      expect(content).not.toContain(participant.organization);
+      expect(content).not.toContain(participant.email);
+      expect(content).not.toContain(participant.id);
+      expect(content).toContain("Participant 1");
+      expect(content).toContain("frozen");
+      expect(content).toContain("version 1");
+    }
+  });
+
+  it("does not start an identified download before disclosure confirmation", async () => {
+    let downloads = 0;
+    const disclosure = identifiedExportDisclosure("participant name, organization, email address, and participant ID");
+    expect(disclosure).toContain("facilitator-only");
+    expect(disclosure).toContain("participant ID");
+    expect(await runIdentifiedExport(() => false, () => { downloads += 1; })).toBe(false);
+    expect(downloads).toBe(0);
+    expect(await runIdentifiedExport(() => true, () => { downloads += 1; })).toBe(true);
+    expect(downloads).toBe(1);
   });
 });

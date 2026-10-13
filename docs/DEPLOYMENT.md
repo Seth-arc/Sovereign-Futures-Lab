@@ -276,7 +276,9 @@ After creating the jobs:
 - inspect Cron History for success;
 - confirm both jobs remain active before the live workshop.
 
-Do not delete a live session early until all required facilitator exports have been downloaded and opened successfully.
+If authorized records are required after application deletion, download and open them first. Never make an export a prerequisite for an authorized privacy deletion.
+
+Session deletion cascades through participant records, submissions, evidence requests, injects, institutional messages, advisor transcripts, and activity events. No in-platform session audit survives deletion; there is no separate durable deletion-audit surface in this deployment.
 
 ## 8. Review the privacy notice
 
@@ -337,8 +339,8 @@ Required checks:
 6. The authorized facilitator receives a magic link and can create a rehearsal session.
 7. Starting, pausing, resuming, sequential stage unlocking, injects, evidence release, institutional replies, and debrief closure update participants through Realtime. Browsing any facilitator cue card must not produce a participant update.
 8. Advisor text, microphone transcription, scripted text fallback, and spoken browser playback work.
-9. Individual PDF, HTML, and JSON exports open correctly.
-10. Workshop comparison HTML, roster CSV, and JSON exports open correctly.
+9. Each identified individual PDF, HTML, and JSON disclosure appears before its download, and each export opens correctly.
+10. Anonymous workshop-comparison HTML/PDF contain no participant name, organization, email, or participant ID. Identified roster CSV and workshop JSON require their own facilitator-only disclosures and open correctly.
 11. Refreshing a participant tab resumes the same participant record.
 12. Closing and reopening the facilitator tab preserves the session data in Supabase.
 
@@ -367,9 +369,9 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 17. Inspect an AI-provider request in a controlled rehearsal environment and confirm it contains only selected bounded card fields and short excerpts, never a source file, repository path, PDF, DOCX, or full report body.
 18. Submit version 1 before a delayed evidence item returns, allow it to return, change the working recommendation, and submit version 2. Confirm both remain selectable in the participant debrief and facilitator AAR; version 1 excludes the later evidence and retains its original decisions and consequences, while version 2 reflects its own frozen state.
 19. Start, pause, and resume casework, then allow the clock to reach `00:00`. Confirm **Time expired** appears while submissions remain open and no debrief or closure happens automatically. Begin debrief with one participant unsubmitted and one `NOT_READY` or unresolved record; confirm the summary names participant and submission counts, current clock, and all three effects before the non-blocking transition. Confirm further submission is blocked only after debrief begins.
-20. Export and open every individual and workshop-level format. Confirm HTML, PDF, CSV, and JSON name the selected submission version, scenario version, consequence-rule version, and either frozen or legacy replay provenance.
-21. Preview the anonymized projected comparison while identified reports remain facilitator-only.
-22. Delete a disposable rehearsal session and confirm related application records disappear.
+20. Export and open every individual and workshop-level format. Confirm HTML, PDF, CSV, and JSON name the selected submission version, scenario version, consequence-rule version, and either frozen or legacy replay provenance. Confirm every identified download is preceded by its personal-data and facilitator-only disclosure.
+21. Search the anonymous group-comparison HTML and PDF for every test participant's name, organization, email, and participant ID; none may appear. Confirm the roster CSV and workshop JSON are visibly identified and are not governed by an anonymity switch.
+22. Cancel closing once, then close deliberately and confirm submissions close, the clock stops, and participants become read-only while records remain. Attempt deletion with the wrong join code and confirm nothing changes; force a deletion failure and confirm the session remains selected. Then delete a disposable rehearsal with the exact code and confirm all related application records, including activity events, disappear and no in-platform session audit remains.
 23. Verify local emergency mode separately and download its handoff file.
 24. Compare the participant and facilitator shells with the preserved interface references at a 1440px Chrome or Edge viewport.
 25. Confirm Escape, dialog focus trapping, focus return, keyboard-only operation, and no horizontal shell shift when opening or closing every modal workspace.
@@ -410,7 +412,7 @@ Cloud mode also has no verified cross-device recovery. The anonymous Supabase se
 
 The console must show **Loading facilitator data**, **Live**, **Refreshing**, or **Data may be stale** as applicable, plus the last successful refresh time. A refresh failure must leave the last successful data visible and provide Retry; returning to a visible tab must refresh immediately. The sync indicator is intentionally not a polling live region.
 
-Before release, throttle the network and switch quickly from session A to session B; confirm a late session-A response cannot replace B. Take Supabase offline and confirm the current dataset remains visible but stale, then restore connectivity and use Retry. Force clock, stage, debrief, inject, evidence-release, institutional-reply, participant-removal, close, and delete failures once. Confirm each matching control alone shows pending, double-clicks issue one request, failures show a bounded error without changing the current view, and unsent inject/reply drafts remain. After successful audited actions, confirm both the mutation and its activity event exist; neither may exist alone.
+Before release, throttle the network and switch quickly from session A to session B; confirm a late session-A response cannot replace B. Take Supabase offline and confirm the current dataset remains visible but stale, then restore connectivity and use Retry. Force clock, stage, debrief, inject, evidence-release, institutional-reply, participant-removal, close, and delete failures once. Confirm each matching control alone shows pending, double-clicks issue one request, failures show a bounded error without changing the current view, and unsent inject/reply drafts remain. After successful actions described as audited, confirm both the mutation and its activity event exist; neither may exist alone. Deletion is the exception: the confirmed cascade removes the session and its activity events, so no in-platform session audit survives.
 
 For the facilitator lifecycle gate, join two participant browsers, unlock through Stage 4 while one participant remains in Stage 2, and browse cue cards 1, 3, 5, and 8. Neither participant may gain or lose access. Unlock the remaining casework stages one at a time and confirm each session update reaches both participants through Realtime. Let the clock expire, then deliberately pause or begin debrief; expiry itself must not close submissions. The debrief confirmation must remain available when participants are unsubmitted, `NOT_READY`, unresolved, or conditional.
 
@@ -470,7 +472,7 @@ Before admitting participants:
 After the workshop:
 
 1. begin debrief and close submissions;
-2. export and open all required facilitator reports and the roster CSV;
+2. export and open any authorized facilitator reports required after deletion; skip this step when privacy deletion must proceed without making another copy;
 3. close the live session;
 4. retain it until exports are verified;
 5. delete it early only if authorized, otherwise allow the 30-day jobs to purge it.

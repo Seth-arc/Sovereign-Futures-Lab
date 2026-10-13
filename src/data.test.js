@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { decisionSnapshot, participantJoinErrorMessage, PARTICIPANT_REJOIN_MESSAGE, saveDecisions, submitRecommendation } from "./data";
+import { decisionSnapshot, deletionConfirmationMatches, participantJoinErrorMessage, PARTICIPANT_REJOIN_MESSAGE, saveDecisions, submitRecommendation } from "./data";
 import { EMPTY_DECISIONS } from "./types";
 
 const handoff = "Finance Ministry Lead to confirm the OCC instruction.";
@@ -73,5 +73,14 @@ describe("participant join errors", () => {
     expect(message).toContain("original browser");
     expect(message).toContain("contact the facilitator");
     expect(message).not.toMatch(/name|organization|record id|decisions/i);
+  });
+});
+
+describe("session deletion confirmation", () => {
+  it("accepts only the exact selected join code", () => {
+    expect(deletionConfirmationMatches("FLA1B2C3", "FLA1B2C3")).toBe(true);
+    expect(deletionConfirmationMatches("fla1b2c3", "FLA1B2C3")).toBe(false);
+    expect(deletionConfirmationMatches(" FLA1B2C3 ", "FLA1B2C3")).toBe(false);
+    expect(deletionConfirmationMatches("FLA1B2C3")).toBe(false);
   });
 });

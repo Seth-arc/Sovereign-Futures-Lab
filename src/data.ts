@@ -40,6 +40,10 @@ export interface ParticipantBundle {
 const LOCAL_KEY = "futureslab-local-bundle";
 export const PARTICIPANT_REJOIN_MESSAGE = "We could not resume this registration in this browser. Return to the original browser or contact the facilitator.";
 
+export function deletionConfirmationMatches(typed: string, joinCode?: string): boolean {
+  return Boolean(joinCode) && typed === joinCode;
+}
+
 export function participantJoinErrorMessage(error: unknown): string {
   const message = error instanceof Error
     ? error.message
