@@ -85,7 +85,7 @@ npx supabase db push --dry-run
 npx supabase db push
 ```
 
-The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. The forward migration `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract. Apply both in timestamp order with either `db push` or the Supabase SQL editor, not both. Do not edit or reapply the initial migration to upgrade an existing project.
+The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. The forward migration `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract. The forward migration `supabase/migrations/202610130001_secure_participant_rejoin.sql` replaces the join RPC so an existing participant can be returned only to its original authenticated anonymous user. Apply all migrations in timestamp order with either `db push` or the Supabase SQL editor, not both. Do not edit or reapply an earlier migration to upgrade an existing project.
 
 For an existing project, export any required workshop reports, test the forward migration against a disposable or rehearsal project, then run the dry run and apply it outside a live workshop window. The migration deliberately leaves pre-existing `context_snapshot` values null; those rows must remain labeled `legacy · current-rule reconstruction`.
 
@@ -104,7 +104,8 @@ select p.proname, pg_get_function_identity_arguments(p.oid) as arguments
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.proname = 'submit_futureslab_recommendation';
+  and p.proname in ('join_futureslab_session', 'submit_futureslab_recommendation')
+order by p.proname, arguments;
 
 select
   count(*) filter (where context_snapshot is null) as legacy_rows,
@@ -126,7 +127,16 @@ order by submitted_at desc
 limit 5;
 ```
 
-Pass means the nullable `jsonb` column exists, the only submission RPC signature is `(uuid, text, text)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
+Pass means the nullable `jsonb` column exists, the only join RPC signature is `(text, text, text, text)`, the only submission RPC signature is `(uuid, text, text)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
+
+Run the disposable database tests after reset:
+
+```powershell
+npx supabase test db
+npx supabase migration list
+```
+
+The participant rejoin test must confirm same-owner resume, one row per session/email, the exact bounded duplicate error, unchanged ownership, and RLS read access for the original owner only. Treat this as a mandatory manual gate when a disposable local Supabase stack is unavailable; a passing source-contract test alone is not sufficient.
 
 After migration:
 
@@ -333,7 +343,7 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 
 1. Verify the landing motion, theme switch, About modal, modal keyboard behavior, validation, consent, and workshop transition.
 2. Verify all six About sections and the standalone `/about` route.
-3. Verify Orientation opens automatically over the live room after initial sign-in and after rejoining with the same email, uses the same eight-stage process rail as the exercise, and does not reopen on a normal page refresh.
+3. Verify Orientation opens automatically over the live room after initial sign-in, uses the same eight-stage process rail as the exercise, and does not reopen on a normal same-browser refresh.
 4. Verify locked stages read `Await facilitator`, and Mandate reopens the role brief.
 5. Verify the top navigation, Glossary, theme control, Exit, Learning Bridge, and all six Case File tabs preserve participant work; confirm light mode uses the neutral-grey canvas and differentiated surfaces without pure-white fields.
 6. Confirm only the Case File dossier content scrolls.
@@ -386,6 +396,19 @@ Test these cases intentionally in the rehearsal session:
 - venue internet failure: participants switch to local emergency mode and download handoff files at completion.
 
 Local emergency mode is individual and browser-local. It does not provide facilitator monitoring, Realtime synchronization, cloud transcription, or automatic cross-device recovery.
+
+Cloud mode also has no verified cross-device recovery. The anonymous Supabase session in the original browser owns the participant row. Entering the same workshop code and email in a different browser must show the bounded recovery message, must not create a row or transfer ownership, and must not expose any participant record. The participant must return to the original browser or contact the facilitator.
+
+### Participant ownership gate
+
+Before approving a release:
+
+1. create a disposable rehearsal session;
+2. join in browser A and save a recognizable, non-sensitive test decision;
+3. in a clean browser B, use the same join code and email;
+4. confirm browser B is told to return to the original browser or contact the facilitator and cannot see browser A's data;
+5. refresh browser A and confirm its original record remains available;
+6. query the rehearsal data and confirm one participant row remains, owned by browser A's original `user_id`.
 
 ## 14. Monitoring and rollback
 

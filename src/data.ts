@@ -38,6 +38,16 @@ export interface ParticipantBundle {
 }
 
 const LOCAL_KEY = "futureslab-local-bundle";
+export const PARTICIPANT_REJOIN_MESSAGE = "We could not resume this registration in this browser. Return to the original browser or contact the facilitator.";
+
+export function participantJoinErrorMessage(error: unknown): string {
+  const message = error instanceof Error
+    ? error.message
+    : error && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : "";
+  return message.includes("PARTICIPANT_EMAIL_IN_USE") ? PARTICIPANT_REJOIN_MESSAGE : message || "Unable to join the workshop.";
+}
 
 export function isLocalBundle(bundle: ParticipantBundle): boolean {
   return bundle.session.id.startsWith("local-");
@@ -284,7 +294,7 @@ export async function joinWorkshop(input: {
     p_organization: input.organization,
     p_email: input.email,
   });
-  if (result.error) throw result.error;
+  if (result.error) throw new Error(participantJoinErrorMessage(result.error));
   const payload = result.data as { session: Record<string, unknown>; participant: Record<string, unknown> };
   return loadParticipantBundle(mapParticipant(payload.participant).id, mapSession(payload.session), payload.participant);
 }

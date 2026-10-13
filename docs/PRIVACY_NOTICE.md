@@ -8,4 +8,6 @@ The workshop facilitator can review individual activity and detailed after-actio
 
 Workshop data is used for training delivery, not research or individual performance scoring. It is retained for up to 30 days after the workshop and may be deleted earlier by the facilitator. Identified CSV and report exports are restricted to the facilitator.
 
+Your cloud participant record remains linked to the anonymous sign-in session in the browser where you joined. Refreshing that browser can resume the same record. Entering the same workshop code and email in another browser does not transfer or reveal the record; return to the original browser or contact the facilitator. Cross-device recovery is not currently supported.
+
 By joining the workshop, you confirm that you understand this use of your information. If you do not consent, do not enter the workshop and speak with the facilitator.

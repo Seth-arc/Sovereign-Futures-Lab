@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { decisionSnapshot, saveDecisions, submitRecommendation } from "./data";
+import { decisionSnapshot, participantJoinErrorMessage, PARTICIPANT_REJOIN_MESSAGE, saveDecisions, submitRecommendation } from "./data";
 import { EMPTY_DECISIONS } from "./types";
 
 const handoff = "Finance Ministry Lead to confirm the OCC instruction.";
@@ -63,5 +63,15 @@ describe("negotiation brief persistence", () => {
     expect(migration).toContain("'decisions', v_participant.decisions");
     expect(migration).toContain("v_participant.submission_version");
     expect(migration).toContain("v_context_snapshot");
+  });
+});
+
+describe("participant join errors", () => {
+  it("turns the bounded ownership error into recovery guidance without participant data", () => {
+    const message = participantJoinErrorMessage({ message: "PARTICIPANT_EMAIL_IN_USE" });
+    expect(message).toBe(PARTICIPANT_REJOIN_MESSAGE);
+    expect(message).toContain("original browser");
+    expect(message).toContain("contact the facilitator");
+    expect(message).not.toMatch(/name|organization|record id|decisions/i);
   });
 });
