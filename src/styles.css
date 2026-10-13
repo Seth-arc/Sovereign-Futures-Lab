@@ -534,6 +534,14 @@ label { display: grid; gap: 7px; margin: 15px 0; color: var(--muted); font-size:
 .session-link strong { font-size: .74rem; font-weight: 500; }
 .session-link em { color: var(--attention); font-size: .58rem; font-style: normal; letter-spacing: .08em; }
 .facilitator-main { width: 100%; max-width: 1500px; min-width: 0; margin: 0 auto; padding: 34px clamp(20px, 4vw, 52px); }
+.facilitator-sync { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-2) var(--space-3); border: 1px solid var(--edge); border-radius: var(--radius); background: var(--surface); color: var(--muted); }
+.facilitator-sync > span { display: grid; gap: 1px; }
+.facilitator-sync strong { color: var(--text); font-size: var(--text-sm); font-weight: 600; }
+.facilitator-sync small { color: var(--quiet); font-size: var(--text-xs); }
+.facilitator-sync.refreshing { border-color: var(--team); }
+.facilitator-sync.stale { border-color: var(--attention); }
+.facilitator-sync.stale strong { color: var(--attention); }
+.facilitator-sync button { min-height: 40px; padding: var(--space-2) var(--space-3); border: 1px solid var(--edge-lit); border-radius: var(--radius); background: transparent; color: var(--text); }
 .facilitator-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 24px; }
 .facilitator-heading h1 { margin: 5px 0 7px; }
 .facilitator-heading p { margin: 0; color: var(--muted); }

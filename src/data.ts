@@ -641,11 +641,20 @@ export async function listWorkshopSessions(): Promise<WorkshopSession[]> {
   return (result.data ?? []).map((row) => mapSession(row as Record<string, unknown>));
 }
 
-export async function updateWorkshopSession(id: string, patch: Record<string, unknown>): Promise<void> {
-  if (!supabase) return;
-  const result = await supabase.from("futureslab_sessions").update(patch).eq("id", id);
+type FacilitatorAction = "UPDATE_SESSION" | "SEND_INJECT" | "RELEASE_EVIDENCE" | "ANSWER_INSTITUTIONAL_REQUEST" | "REMOVE_PARTICIPANT";
+
+async function performFacilitatorAction(action: FacilitatorAction, targetId: string, payload: Record<string, unknown> = {}): Promise<void> {
+  if (!supabase) throw new Error("CLOUD_CONFIGURATION_REQUIRED");
+  const result = await supabase.rpc("perform_futureslab_facilitator_action", {
+    p_action: action,
+    p_target_id: targetId,
+    p_payload: payload,
+  });
   if (result.error) throw result.error;
-  await supabase.from("futureslab_activity_events").insert({ session_id: id, type: "FACILITATOR_SESSION_UPDATE", detail: patch });
+}
+
+export async function updateWorkshopSession(id: string, patch: Record<string, unknown>): Promise<void> {
+  await performFacilitatorAction("UPDATE_SESSION", id, patch);
 }
 
 export async function loadFacilitatorSession(session: WorkshopSession) {
@@ -676,51 +685,23 @@ export async function loadFacilitatorSession(session: WorkshopSession) {
 }
 
 export async function sendGlobalInject(sessionId: string, title: string, body: string): Promise<void> {
-  if (!supabase) return;
-  const result = await supabase.from("futureslab_injects").insert({ session_id: sessionId, title, body });
-  if (result.error) throw result.error;
-  await supabase.from("futureslab_activity_events").insert({ session_id: sessionId, type: "FACILITATOR_INJECT_SENT", detail: { title } });
+  await performFacilitatorAction("SEND_INJECT", sessionId, { title, body });
 }
 
 export async function releaseEvidence(requestId: string): Promise<void> {
-  if (!supabase) return;
-  const result = await supabase.from("futureslab_evidence_requests").update({ released_at: new Date().toISOString() }).eq("id", requestId).select("session_id,evidence_id").single();
-  if (result.error) throw result.error;
-  await supabase.from("futureslab_activity_events").insert({ session_id: result.data.session_id, type: "FACILITATOR_EVIDENCE_RELEASED", detail: { evidenceId: result.data.evidence_id, requestId } });
+  await performFacilitatorAction("RELEASE_EVIDENCE", requestId);
 }
 
 export async function answerInstitutionalRequest(messageId: string, reply: string): Promise<void> {
-  if (!supabase) return;
-  const answeredAt = new Date().toISOString();
-  const result = await supabase.from("futureslab_institutional_messages").update({
-    reply: reply.trim(),
-    status: "ANSWERED",
-    answered_at: answeredAt,
-  }).eq("id", messageId).select("session_id,participant_id,institution").single();
-  if (result.error) throw result.error;
-  await supabase.from("futureslab_activity_events").insert({
-    session_id: result.data.session_id,
-    participant_id: result.data.participant_id,
-    type: "FACILITATOR_INSTITUTIONAL_REPLY",
-    detail: { institution: result.data.institution, messageId },
-  });
+  await performFacilitatorAction("ANSWER_INSTITUTIONAL_REQUEST", messageId, { reply });
 }
 
 export async function removeParticipant(participantId: string): Promise<void> {
-  if (!supabase) return;
-  const participant = await supabase.from("futureslab_participants").select("session_id").eq("id", participantId).single();
-  if (participant.error) throw participant.error;
-  const result = await supabase.from("futureslab_participants").delete().eq("id", participantId);
-  if (result.error) throw result.error;
-  await supabase.from("futureslab_activity_events").insert({
-    session_id: participant.data.session_id,
-    type: "FACILITATOR_PARTICIPANT_REMOVED",
-    detail: { participantId, reason: "INVALID_OR_DUPLICATE_REGISTRATION" },
-  });
+  await performFacilitatorAction("REMOVE_PARTICIPANT", participantId);
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  if (!supabase) return;
-  const result = await supabase.from("futureslab_sessions").delete().eq("id", id);
+  if (!supabase) throw new Error("CLOUD_CONFIGURATION_REQUIRED");
+  const result = await supabase.from("futureslab_sessions").delete().eq("id", id).select("id").single();
   if (result.error) throw result.error;
 }

@@ -429,6 +429,21 @@ describe("reference interface fidelity", () => {
     expect(facilitatorSource).toContain("Ask what participants will transfer to real decision preparation.");
   });
 
+  it("shows explicit facilitator freshness and bounded action results", () => {
+    for (const label of ["Loading facilitator data", "Live", "Refreshing", "Data may be stale", "Last successful refresh", "Retry"]) {
+      expect(facilitatorSource).toContain(label);
+    }
+    expect(facilitatorSource).toContain('document.addEventListener("visibilitychange"');
+    expect(facilitatorSource).toContain("if (pollInFlight.current) return");
+    expect(facilitatorSource).toContain("if (selectedIdRef.current === session.id) selectedIdRef.current = previousId");
+    expect(facilitatorSource).toContain("const actionKey = `reply:${message.id}`");
+    expect(facilitatorSource).toContain("pendingActions.has(actionKey)");
+    expect(facilitatorSource).toContain("if (sent) setDrafts");
+    expect(facilitatorSource).not.toContain("catch(() => undefined)");
+    expect(styles).toContain(".facilitator-sync.stale");
+    expect(productContract).toContain("A failed refresh preserves the last successful dataset");
+  });
+
   it("restores completed or already-started casework without forcing preparation on refresh", () => {
     const restoration = participantSource.slice(
       participantSource.indexOf("const participantId = localStorage.getItem(PARTICIPANT_KEY)"),

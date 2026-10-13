@@ -147,6 +147,10 @@ Delivery timing is approximately **6 minutes for preparation**, **20 minutes for
 
 The facilitator cannot silently edit a participant submission or replace deterministic consequences with an improvised outcome.
 
+The facilitator console exposes one explicit synchronization state. Initial loading, live data, background refreshing, and stale data are visibly distinct. A failed refresh preserves the last successful dataset, labels it **Data may be stale**, keeps the selected session, shows the last successful refresh time, and offers Retry. Returning to a visible browser tab triggers an immediate refresh in addition to the bounded background cadence. Request sequencing prevents a slower response from an earlier session selection from replacing the currently selected session. Routine polling is not announced through a live region.
+
+Facilitator operations use action-specific pending state, so only the matching control is disabled and a repeated click cannot submit the same action twice. Clock changes, stage changes, debrief, injects, evidence release, institutional replies, participant removal, closing, and deletion show bounded success or failure feedback and refresh the current session after confirmed persistence. Failed operations preserve the current view and any unsent inject or reply draft. Audited mutations complete the data change and required activity event in one database RPC transaction; an event-write failure rolls back the mutation and cannot be reported as success. Session deletion is confirmed from the database but is not described as durably audited because deleting the session intentionally cascades its workshop activity records.
+
 ## Data and privacy
 
 - Consent version: `2026-10-13`, produced by the landing handoff and required by the participant consumer.

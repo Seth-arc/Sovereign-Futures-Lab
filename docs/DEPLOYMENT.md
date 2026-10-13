@@ -85,7 +85,7 @@ npx supabase db push --dry-run
 npx supabase db push
 ```
 
-The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. The forward migration `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract. The forward migration `supabase/migrations/202610130001_secure_participant_rejoin.sql` replaces the join RPC so an existing participant can be returned only to its original authenticated anonymous user. Apply all migrations in timestamp order with either `db push` or the Supabase SQL editor, not both. Do not edit or reapply an earlier migration to upgrade an existing project.
+The migration `supabase/migrations/202609280001_futureslab.sql` creates the workshop schema, facilitator policies, participant RPC functions, Realtime publication, and cascade deletion rules. The forward migration `supabase/migrations/202610010001_freeze_submission_context.sql` adds the bounded submission context and replaces the submission RPC with the versioned atomic snapshot contract. The forward migration `supabase/migrations/202610130001_secure_participant_rejoin.sql` replaces the join RPC so an existing participant can be returned only to its original authenticated anonymous user. The forward migration `supabase/migrations/202610130002_atomic_facilitator_actions.sql` adds the scoped facilitator-action RPC so each operational mutation and its required activity event commit or roll back together. Apply all migrations in timestamp order with either `db push` or the Supabase SQL editor, not both. Do not edit or reapply an earlier migration to upgrade an existing project.
 
 For an existing project, export any required workshop reports, test the forward migration against a disposable or rehearsal project, then run the dry run and apply it outside a live workshop window. The migration deliberately leaves pre-existing `context_snapshot` values null; those rows must remain labeled `legacy · current-rule reconstruction`.
 
@@ -104,7 +104,7 @@ select p.proname, pg_get_function_identity_arguments(p.oid) as arguments
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.proname in ('join_futureslab_session', 'submit_futureslab_recommendation')
+  and p.proname in ('join_futureslab_session', 'submit_futureslab_recommendation', 'perform_futureslab_facilitator_action')
 order by p.proname, arguments;
 
 select
@@ -127,7 +127,7 @@ order by submitted_at desc
 limit 5;
 ```
 
-Pass means the nullable `jsonb` column exists, the only join RPC signature is `(text, text, text, text)`, the only submission RPC signature is `(uuid, text, text)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
+Pass means the nullable `jsonb` column exists, the only join RPC signature is `(text, text, text, text)`, the only submission RPC signature is `(uuid, text, text)`, the facilitator-action RPC signature is `(text, uuid, jsonb)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
 
 Run the disposable database tests after reset:
 
@@ -137,6 +137,8 @@ npx supabase migration list
 ```
 
 The participant rejoin test must confirm same-owner resume, one row per session/email, the exact bounded duplicate error, unchanged ownership, and RLS read access for the original owner only. Treat this as a mandatory manual gate when a disposable local Supabase stack is unavailable; a passing source-contract test alone is not sufficient.
+
+The facilitator action database test must confirm that an activity-event failure rolls back its paired mutation and that a non-facilitator cannot invoke the RPC. Do not approve the release from the source-contract test alone when the disposable database gate has not run.
 
 After migration:
 
@@ -403,6 +405,12 @@ Test these cases intentionally in the rehearsal session:
 Local emergency mode is individual and browser-local. It does not provide facilitator monitoring, Realtime synchronization, cloud transcription, or automatic cross-device recovery.
 
 Cloud mode also has no verified cross-device recovery. The anonymous Supabase session in the original browser owns the participant row. Entering the same workshop code and email in a different browser must show the bounded recovery message, must not create a row or transfer ownership, and must not expose any participant record. The participant must return to the original browser or contact the facilitator.
+
+### Facilitator freshness and action-failure gate
+
+The console must show **Loading facilitator data**, **Live**, **Refreshing**, or **Data may be stale** as applicable, plus the last successful refresh time. A refresh failure must leave the last successful data visible and provide Retry; returning to a visible tab must refresh immediately. The sync indicator is intentionally not a polling live region.
+
+Before release, throttle the network and switch quickly from session A to session B; confirm a late session-A response cannot replace B. Take Supabase offline and confirm the current dataset remains visible but stale, then restore connectivity and use Retry. Force clock, stage, debrief, inject, evidence-release, institutional-reply, participant-removal, close, and delete failures once. Confirm each matching control alone shows pending, double-clicks issue one request, failures show a bounded error without changing the current view, and unsent inject/reply drafts remain. After successful audited actions, confirm both the mutation and its activity event exist; neither may exist alone.
 
 ### Participant ownership gate
 
