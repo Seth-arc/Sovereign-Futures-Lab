@@ -14,7 +14,16 @@ import {
   sendGlobalInject,
   updateWorkshopSession,
 } from "./data";
-import { beginDebriefSession, buildAfterActionReport, selectAfterActionReportSubmission } from "./engine";
+import {
+  beginDebriefSession,
+  buildAfterActionReport,
+  caseworkClockActionLabel,
+  debriefConfirmationMessage,
+  nextParticipantStageUnlock,
+  remainingSessionSeconds,
+  selectAfterActionReportSubmission,
+  toggleCaseworkClock,
+} from "./engine";
 import {
   beginFacilitatorRefresh,
   completeFacilitatorRefresh,
@@ -63,11 +72,6 @@ function errorMessage(caught: unknown, fallback: string): string {
   return caught instanceof Error ? caught.message : fallback;
 }
 
-function sessionClock(session: WorkshopSession): number {
-  if (session.status !== "RUNNING" || !session.clockStartedAt) return session.remainingSeconds;
-  return Math.max(0, session.remainingSeconds - Math.floor((Date.now() - new Date(session.clockStartedAt).getTime()) / 1000));
-}
-
 function formatClock(seconds: number): string {
   const safe = Math.max(0, seconds);
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
@@ -98,6 +102,7 @@ export function FacilitatorApp() {
   const [notice, setNotice] = useState("");
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
   const [view, setView] = useState<ConsoleView>("overview");
+  const [cueStageIndex, setCueStageIndex] = useState(0);
   const [, rerender] = useState(0);
   const selectedIdRef = useRef<string | null>(null);
   const requestSequence = useRef(0);
@@ -167,11 +172,15 @@ export function FacilitatorApp() {
     };
   }, [authState]);
 
+  useEffect(() => {
+    if (selected) setCueStageIndex(Math.min(Math.max(selected.currentStage, 0), STAGES.length - 1));
+  }, [selected?.id]);
+
   if (authState !== "AUTHORIZED") return <FacilitatorLogin state={authState} error={error} setError={setError} setState={setAuthState} />;
 
   const reports = selected ? data.participants.map(({ participant, decisions }) => reportFor(participant, decisions, selected, data)) : [];
-  const currentStageIndex = selected ? Math.min(Math.max(selected.currentStage, 0), STAGES.length - 1) : 0;
-  const currentGuide = FACILITATOR_STAGE_GUIDES[currentStageIndex];
+  const unlockedStageIndex = selected ? Math.min(Math.max(selected.currentStage, 0), STAGES.length - 1) : 0;
+  const currentGuide = FACILITATOR_STAGE_GUIDES[cueStageIndex];
 
   const runAction: RunAction = (key, mutate, successMessage, failureMessage) => runFacilitatorAction({
     key,
@@ -214,14 +223,32 @@ export function FacilitatorApp() {
 
   async function toggleClock() {
     if (!selected) return;
-    if (selected.status === "DEBRIEF" || selected.status === "CLOSED") return;
-    if (selected.status === "RUNNING") await patchSession(`clock:${selected.id}`, { status: "PAUSED", remaining_seconds: sessionClock(selected), clock_started_at: null }, "Casework clock paused.");
-    else await patchSession(`clock:${selected.id}`, { status: "RUNNING", clock_started_at: new Date().toISOString() }, "Casework clock started.");
+    const transition = toggleCaseworkClock(selected, new Date());
+    if (transition === selected) return;
+    await patchSession(`clock:${selected.id}`, {
+      status: transition.status,
+      remaining_seconds: transition.remainingSeconds,
+      clock_started_at: transition.clockStartedAt ?? null,
+    }, transition.status === "PAUSED" ? "Casework clock paused." : "Casework clock running.");
   }
 
   async function beginDebrief() {
     if (!selected || selected.status === "DEBRIEF" || selected.status === "CLOSED") return;
-    const confirmed = window.confirm("Begin debrief? This will close submissions, pause the casework clock, and open the participant debrief and transfer view. Submitted versions will remain preserved.");
+    const latestSubmissions = [...data.submissions]
+      .sort((a, b) => b.version - a.version)
+      .filter((submission, index, submissions) => submissions.findIndex((item) => item.participantId === submission.participantId) === index);
+    const confirmed = window.confirm(debriefConfirmationMessage({
+      participantCount: data.participants.length,
+      submittedCount: latestSubmissions.length,
+      notReadyCount: latestSubmissions.filter((submission) => submission.decisions.readiness === "NOT_READY").length,
+      unresolvedCount: latestSubmissions.filter((submission) => submission.decisions.readiness === "READY_WITH_CONDITIONS"
+        || submission.decisions.liquidityBasis === "UNRESOLVED"
+        || submission.decisions.accountClassification === "UNRESOLVED"
+        || submission.decisions.facilityLinkage === "UNRESOLVED"
+        || submission.decisions.treatmentPerimeter === "DEFER"
+        || Boolean(submission.decisions.unresolvedRisks.trim())).length,
+      currentClock: formatClock(remainingSessionSeconds(selected)),
+    }));
     if (!confirmed) return;
     const transition = beginDebriefSession(selected, new Date());
     const updated = await patchSession(`debrief:${selected.id}`, {
@@ -232,6 +259,13 @@ export function FacilitatorApp() {
       clock_started_at: null,
     }, "Debrief opened for participants. Submissions are closed and the casework clock is paused.");
     if (!updated) return;
+  }
+
+  async function unlockNextStage() {
+    if (!selected) return;
+    const nextStage = nextParticipantStageUnlock(selected);
+    if (nextStage === undefined) return;
+    await patchSession(`stage:${selected.id}`, { current_stage: nextStage }, `Stage ${nextStage + 1} - ${STAGES[nextStage].short} unlocked.`);
   }
 
   async function selectSession(session: WorkshopSession) {
@@ -278,6 +312,9 @@ export function FacilitatorApp() {
   const lastRefreshLabel = sync.lastSuccessfulRefreshAt
     ? `Last successful refresh ${new Date(sync.lastSuccessfulRefreshAt).toLocaleTimeString()}`
     : "No successful refresh yet";
+  const clockRemaining = selected ? remainingSessionSeconds(selected) : 0;
+  const timeExpired = Boolean(selected && clockRemaining === 0 && selected.status !== "DEBRIEF" && selected.status !== "CLOSED");
+  const nextStage = selected ? nextParticipantStageUnlock(selected) : undefined;
 
   return <div className="facilitator-shell facilitator-reference">
     <a className="skip-link" href="#facilitator-main">Skip to facilitator controls</a>
@@ -288,20 +325,21 @@ export function FacilitatorApp() {
         <div className={`facilitator-sync ${sync.status.toLowerCase()}`}><span><strong>{syncLabel}</strong><small>{lastRefreshLabel}</small></span>{sync.status === "STALE" && <button type="button" onClick={() => void refreshSessions()}>Retry</button>}</div>
         {sync.error && <div className="error-panel" role="alert">Refresh failed. {sync.error}</div>}
         {!selected ? sync.status === "INITIAL_LOADING" ? <section className="empty-state"><h1>Loading workshop sessions</h1><p>Checking the latest synchronized facilitator data.</p></section> : <section className="empty-state"><h1>No workshop session</h1><p>Create a rehearsal or live session to begin.</p></section> : <>
-          <div className="facilitator-heading"><div><span className="eyebrow">{selected.kind} session</span><h1>{selected.title}</h1><p>Join code <strong className="join-code">{selected.joinCode}</strong> · {data.participants.length} participants</p></div><div className="facilitator-clock"><span>{selected.status}</span><strong>{formatClock(sessionClock(selected))}</strong><button type="button" disabled={pendingActions.has(`clock:${selected.id}`) || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void toggleClock()}>{pendingActions.has(`clock:${selected.id}`) ? "Saving…" : selected.status === "RUNNING" ? "Pause" : selected.status === "DEBRIEF" ? "Debrief in progress" : selected.status === "CLOSED" ? "Session closed" : "Start / resume"}</button></div></div>
+          <div className="facilitator-heading"><div><span className="eyebrow">{selected.kind} session</span><h1>{selected.title}</h1><p>Join code <strong className="join-code">{selected.joinCode}</strong> · {data.participants.length} participants</p></div><div className="facilitator-clock"><span>{timeExpired ? "Time expired" : selected.status}</span><strong>{formatClock(clockRemaining)}</strong><button type="button" disabled={pendingActions.has(`clock:${selected.id}`) || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void toggleClock()}>{pendingActions.has(`clock:${selected.id}`) ? "Saving…" : caseworkClockActionLabel(selected)}</button></div></div>
           {error && <div className="error-panel" role="alert">{error}</div>}{notice && <div className="success-panel" role="status">{notice}</div>}
           {view === "overview" && <>
+            {timeExpired && <section className="console-card time-expired" aria-labelledby="time-expired-title"><div><span className="eyebrow">Facilitator decision required</span><h2 id="time-expired-title">Time expired</h2><p>Submissions remain open. {selected.status === "RUNNING" ? "Pause casework or begin debrief" : "Begin debrief"} when you are ready; expiry does not change the session automatically.</p></div>{selected.status === "RUNNING" && <button type="button" className="secondary-button" disabled={pendingActions.has(`clock:${selected.id}`)} onClick={() => void toggleClock()}>{pendingActions.has(`clock:${selected.id}`) ? "Saving…" : "Pause casework"}</button>}<button type="button" className="secondary-button" disabled={pendingActions.has(`debrief:${selected.id}`)} onClick={() => void beginDebrief()}>{pendingActions.has(`debrief:${selected.id}`) ? "Opening…" : "Begin debrief"}</button></section>}
             <section className="control-strip">
-              <div><small>Stage {currentStageIndex + 1} · {STAGES[currentStageIndex].title}</small><strong>{currentGuide.learningPurpose}</strong></div>
-              <button type="button" disabled={pendingActions.has(`stage:${selected.id}`) || selected.currentStage === 0 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession(`stage:${selected.id}`, { current_stage: selected.currentStage - 1 }, "Previous stage restored.")}>Previous</button>
-              <button type="button" disabled={pendingActions.has(`stage:${selected.id}`) || selected.currentStage === STAGES.length - 1 || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void patchSession(`stage:${selected.id}`, { current_stage: selected.currentStage + 1 }, "Next stage unlocked.")}>{pendingActions.has(`stage:${selected.id}`) ? "Saving…" : "Unlock next stage"}</button>
+              <div><small>Unlocked through · Stage {unlockedStageIndex + 1} · {STAGES[unlockedStageIndex].short}</small><strong>Participants can access this stage and every earlier stage.</strong></div>
+              <button type="button" disabled={pendingActions.has(`stage:${selected.id}`) || nextStage === undefined} onClick={() => void unlockNextStage()}>{pendingActions.has(`stage:${selected.id}`) ? "Saving…" : nextStage === undefined ? "All casework stages unlocked" : `Unlock Stage ${nextStage + 1} - ${STAGES[nextStage].short}`}</button>
               <button type="button" disabled={pendingActions.has(`debrief:${selected.id}`) || selected.status === "DEBRIEF" || selected.status === "CLOSED"} onClick={() => void beginDebrief()}>{pendingActions.has(`debrief:${selected.id}`) ? "Opening…" : selected.status === "DEBRIEF" ? "Debrief begun" : "Begin debrief"}</button>
             </section>
             <section className="console-card facilitator-guide" aria-labelledby="facilitator-guide-title">
               <header>
-                <div><span className="eyebrow">Current stage cue card</span><h2 id="facilitator-guide-title">{STAGES[currentStageIndex].title}</h2></div>
-                <span className="pill">Stage {currentStageIndex + 1} of {STAGES.length}</span>
+                <div><span className="eyebrow">Facilitating now</span><h2 id="facilitator-guide-title">{STAGES[cueStageIndex].title}</h2><p>{currentGuide.learningPurpose}</p></div>
+                <span className="pill">Stage {cueStageIndex + 1} of {STAGES.length}</span>
               </header>
+              <nav className="cue-browser" aria-label="Facilitator cue cards">{STAGES.map((stageDefinition, index) => <button key={stageDefinition.short} type="button" className={index > unlockedStageIndex ? "future" : ""} aria-pressed={cueStageIndex === index} onClick={() => setCueStageIndex(index)}><strong>{index + 1} · {stageDefinition.short}</strong><span>{cueStageIndex === index ? "Facilitating now" : index <= unlockedStageIndex ? "Unlocked" : "Future cue · participants locked"}</span></button>)}</nav>
               <div className="facilitator-guide-grid">
                 <div>
                   <h3>Opening question</h3>
@@ -338,7 +376,7 @@ export function FacilitatorApp() {
           {view === "communications" && <RequestDesk data={data} runAction={runAction} pendingActions={pendingActions} />}
           {view === "injects" && <div className="facilitator-grid"><InjectDesk session={selected} runAction={runAction} pendingActions={pendingActions} /><EvidenceDesk data={data} runAction={runAction} pendingActions={pendingActions} /></div>}
           {view === "analytics" && <ReportDesk reports={reports} />}
-          {view === "replay" && <><ReportDesk reports={reports} /><section className="danger-zone"><div><strong>Session lifecycle</strong><span>Closing preserves records until expiry. Deleting removes the session and all associated records immediately.</span></div><button type="button" disabled={pendingActions.has(`close:${selected.id}`)} onClick={() => void patchSession(`close:${selected.id}`, { status: "CLOSED", submissions_closed: true, clock_started_at: null, remaining_seconds: sessionClock(selected) }, "Session closed. Records remain available until expiry or deletion.")}>{pendingActions.has(`close:${selected.id}`) ? "Closing…" : "Close session"}</button><button type="button" className="danger-button" disabled={pendingActions.has(`delete:${selected.id}`)} onClick={() => { if (confirm("Delete this session and all participant records? This cannot be undone.")) void deleteSelectedSession(); }}>{pendingActions.has(`delete:${selected.id}`) ? "Deleting…" : "Delete now"}</button></section></>}
+          {view === "replay" && <><ReportDesk reports={reports} /><section className="danger-zone"><div><strong>Session lifecycle</strong><span>Closing preserves records until expiry. Deleting removes the session and all associated records immediately.</span></div><button type="button" disabled={pendingActions.has(`close:${selected.id}`)} onClick={() => void patchSession(`close:${selected.id}`, { status: "CLOSED", submissions_closed: true, clock_started_at: null, remaining_seconds: remainingSessionSeconds(selected) }, "Session closed. Records remain available until expiry or deletion.")}>{pendingActions.has(`close:${selected.id}`) ? "Closing…" : "Close session"}</button><button type="button" className="danger-button" disabled={pendingActions.has(`delete:${selected.id}`)} onClick={() => { if (confirm("Delete this session and all participant records? This cannot be undone.")) void deleteSelectedSession(); }}>{pendingActions.has(`delete:${selected.id}`) ? "Deleting…" : "Delete now"}</button></section></>}
         </>}
       </main>
     </div>

@@ -380,7 +380,7 @@ export function ParticipantApp() {
   const clock = remainingFor(bundle, now);
   const caseworkRunning = preparationComplete && bundle.session.status === "RUNNING";
   const displayedClock = preparationComplete ? clock : bundle.session.durationSeconds;
-  const caseworkClockState = bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED" ? "paused for debrief" : caseworkRunning ? "" : "waiting";
+  const caseworkClockState = bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED" ? "paused for debrief" : preparationComplete && clock === 0 ? "time expired" : caseworkRunning ? "" : "waiting";
   const caseworkClockLabel = `Casework · ${formatClock(displayedClock)}${caseworkClockState ? ` · ${caseworkClockState}` : ""}`;
   const availableEvidenceRequests = bundle.evidenceRequests.filter((request) => evidenceIsAvailable(request, new Date(now)));
   const pendingInstitutionalReplies = bundle.messages.filter((message) => message.status === "PENDING").length;

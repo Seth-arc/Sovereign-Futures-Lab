@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { saveTransferReflection, submitRecommendation, type ParticipantBundle } from "./data";
-import { beginDebriefSession, buildAfterActionReport, buildNegotiationPreparationBrief, buildParticipantDebrief, buildSubmissionContextSnapshot, buildSubmissionReplay, CONSEQUENCE_RULE_VERSION, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, participantAvailableStage, participantEntryStage, reviewRecommendation, SCENARIO_VERSION, selectAfterActionReportSubmission, unresolvedRiskList } from "./engine";
+import { beginDebriefSession, buildAfterActionReport, buildNegotiationPreparationBrief, buildParticipantDebrief, buildSubmissionContextSnapshot, buildSubmissionReplay, caseworkClockActionLabel, CONSEQUENCE_RULE_VERSION, debriefConfirmationMessage, deriveConsequences, deriveCounterfactuals, negotiationBriefIsSubmittable, nextParticipantStageUnlock, participantAvailableStage, participantEntryStage, remainingSessionSeconds, reviewRecommendation, SCENARIO_VERSION, selectAfterActionReportSubmission, toggleCaseworkClock, unresolvedRiskList } from "./engine";
 import { afterActionReportHtml, workshopComparisonHtml, workshopCsv } from "./report";
 import type { DecisionState, EvidenceRequest, ParticipantProfile, Submission, WorkshopSession } from "./types";
 
@@ -69,6 +69,54 @@ const runningSession: WorkshopSession = {
   createdAt: "2026-10-14T10:00:00Z",
   expiresAt: "2026-11-13T10:00:00Z",
 };
+
+describe("facilitator lifecycle controls", () => {
+  it("unlocks exactly one next casework stage without mutating or relocking the session", () => {
+    const stageTwo = { ...runningSession, currentStage: 1 };
+    expect(nextParticipantStageUnlock(stageTwo)).toBe(2);
+    expect(stageTwo.currentStage).toBe(1);
+    expect(nextParticipantStageUnlock({ ...runningSession, currentStage: 6 })).toBeUndefined();
+    expect(nextParticipantStageUnlock({ ...runningSession, status: "DEBRIEF", currentStage: 7 })).toBeUndefined();
+  });
+
+  it("uses state-specific clock labels and valid start, pause, and resume transitions", () => {
+    const lobby = { ...runningSession, status: "LOBBY" as const, clockStartedAt: undefined };
+    const started = toggleCaseworkClock(lobby, "2026-10-14T10:00:00Z");
+    const paused = toggleCaseworkClock(started, "2026-10-14T10:03:00Z");
+    const resumed = toggleCaseworkClock(paused, "2026-10-14T10:04:00Z");
+
+    expect(caseworkClockActionLabel(lobby)).toBe("Start casework");
+    expect(caseworkClockActionLabel(started)).toBe("Pause casework");
+    expect(caseworkClockActionLabel(paused)).toBe("Resume casework");
+    expect(caseworkClockActionLabel({ ...paused, status: "DEBRIEF" })).toBe("Debrief in progress");
+    expect(caseworkClockActionLabel({ ...paused, status: "CLOSED" })).toBe("Session closed");
+    expect(started).toMatchObject({ status: "RUNNING", clockStartedAt: "2026-10-14T10:00:00.000Z" });
+    expect(paused).toMatchObject({ status: "PAUSED", remainingSeconds: 1020 });
+    expect(paused.clockStartedAt).toBeUndefined();
+    expect(resumed).toMatchObject({ status: "RUNNING", remainingSeconds: 1020, clockStartedAt: "2026-10-14T10:04:00.000Z" });
+  });
+
+  it("reaches zero without closing submissions or beginning debrief", () => {
+    expect(remainingSessionSeconds(runningSession, "2026-10-14T10:30:00Z")).toBe(0);
+    expect(runningSession.status).toBe("RUNNING");
+    expect(runningSession.submissionsClosed).toBe(false);
+    expect(runningSession.currentStage).toBe(6);
+  });
+
+  it("names counts, clock, exact effects, and non-blocking records before debrief", () => {
+    const message = debriefConfirmationMessage({ participantCount: 4, submittedCount: 3, notReadyCount: 1, unresolvedCount: 2, currentClock: "07:15" });
+    for (const expected of [
+      "Participants: 4",
+      "Submitted: 3",
+      "Unsubmitted: 1",
+      "NOT_READY submissions: 1",
+      "Unresolved or conditional submissions: 2",
+      "Current clock: 07:15",
+      "do not block debrief",
+      "close submissions, pause the casework clock, and open participant debrief",
+    ]) expect(message).toContain(expected);
+  });
+});
 
 describe("participant debrief and transfer", () => {
   it("closes submissions, pauses the clock, and unlocks debrief as one transition", () => {

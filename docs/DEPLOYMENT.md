@@ -335,7 +335,7 @@ Required checks:
 4. A valid join code works and an invalid code fails safely.
 5. An unauthorized facilitator email cannot access workshop records.
 6. The authorized facilitator receives a magic link and can create a rehearsal session.
-7. Starting, pausing, stage unlocking, injects, evidence release, institutional replies, and debrief closure update participants through Realtime.
+7. Starting, pausing, resuming, sequential stage unlocking, injects, evidence release, institutional replies, and debrief closure update participants through Realtime. Browsing any facilitator cue card must not produce a participant update.
 8. Advisor text, microphone transcription, scripted text fallback, and spoken browser playback work.
 9. Individual PDF, HTML, and JSON exports open correctly.
 10. Workshop comparison HTML, roster CSV, and JSON exports open correctly.
@@ -355,7 +355,7 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 5. Verify the top navigation, Glossary, theme control, Exit, Learning Bridge, and all six Case File tabs preserve participant work; confirm light mode uses the neutral-grey canvas and differentiated surfaces without pure-white fields.
 6. Confirm only the Case File dossier content scrolls.
 7. Confirm Communications opens as a full-page workspace without changing the current process stage and shows broadcasts, evidence status, requests, and replies.
-8. Unlock every stage and confirm earlier participant work remains editable.
+8. Browse earlier and future facilitator cue cards and confirm participant access does not change. Then unlock each casework stage sequentially, confirm the button names the exact next stage, and confirm earlier participant work remains editable.
 9. Request every evidence type and release at least one early.
 10. Send every preset inject and answer an exceptional institutional request.
 11. Verify both AI advisors, welcome playback, suggested questions, typed chat, push-to-talk, editable transcripts, spoken replies, and fallback behavior.
@@ -366,7 +366,7 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 16. Ask a question that explicitly relies on `Progress debt treatments_CF.docx`. Confirm the answer reports a source gap, shows no source citation, and the Edge Function log records `advisor_research_boundary_returned` without an outbound model answer.
 17. Inspect an AI-provider request in a controlled rehearsal environment and confirm it contains only selected bounded card fields and short excerpts, never a source file, repository path, PDF, DOCX, or full report body.
 18. Submit version 1 before a delayed evidence item returns, allow it to return, change the working recommendation, and submit version 2. Confirm both remain selectable in the participant debrief and facilitator AAR; version 1 excludes the later evidence and retains its original decisions and consequences, while version 2 reflects its own frozen state.
-19. Begin debrief and confirm further submission is blocked.
+19. Start, pause, and resume casework, then allow the clock to reach `00:00`. Confirm **Time expired** appears while submissions remain open and no debrief or closure happens automatically. Begin debrief with one participant unsubmitted and one `NOT_READY` or unresolved record; confirm the summary names participant and submission counts, current clock, and all three effects before the non-blocking transition. Confirm further submission is blocked only after debrief begins.
 20. Export and open every individual and workshop-level format. Confirm HTML, PDF, CSV, and JSON name the selected submission version, scenario version, consequence-rule version, and either frozen or legacy replay provenance.
 21. Preview the anonymized projected comparison while identified reports remain facilitator-only.
 22. Delete a disposable rehearsal session and confirm related application records disappear.
@@ -411,6 +411,8 @@ Cloud mode also has no verified cross-device recovery. The anonymous Supabase se
 The console must show **Loading facilitator data**, **Live**, **Refreshing**, or **Data may be stale** as applicable, plus the last successful refresh time. A refresh failure must leave the last successful data visible and provide Retry; returning to a visible tab must refresh immediately. The sync indicator is intentionally not a polling live region.
 
 Before release, throttle the network and switch quickly from session A to session B; confirm a late session-A response cannot replace B. Take Supabase offline and confirm the current dataset remains visible but stale, then restore connectivity and use Retry. Force clock, stage, debrief, inject, evidence-release, institutional-reply, participant-removal, close, and delete failures once. Confirm each matching control alone shows pending, double-clicks issue one request, failures show a bounded error without changing the current view, and unsent inject/reply drafts remain. After successful audited actions, confirm both the mutation and its activity event exist; neither may exist alone.
+
+For the facilitator lifecycle gate, join two participant browsers, unlock through Stage 4 while one participant remains in Stage 2, and browse cue cards 1, 3, 5, and 8. Neither participant may gain or lose access. Unlock the remaining casework stages one at a time and confirm each session update reaches both participants through Realtime. Let the clock expire, then deliberately pause or begin debrief; expiry itself must not close submissions. The debrief confirmation must remain available when participants are unsubmitted, `NOT_READY`, unresolved, or conditional.
 
 ### Participant ownership gate
 

@@ -166,18 +166,66 @@ export function evidenceIsAvailable(request: EvidenceRequest, now = new Date()):
   return releasedByReview || new Date(request.availableAt).getTime() <= reviewTime;
 }
 
+export function remainingSessionSeconds(session: WorkshopSession, at: Date | string = new Date()): number {
+  if (session.status !== "RUNNING" || !session.clockStartedAt) return session.remainingSeconds;
+  const currentTime = typeof at === "string" ? new Date(at) : at;
+  const elapsed = Math.floor((currentTime.getTime() - new Date(session.clockStartedAt).getTime()) / 1000);
+  return Math.max(0, session.remainingSeconds - Math.max(0, elapsed));
+}
+
+export function caseworkClockActionLabel(session: WorkshopSession): string {
+  if (session.status === "RUNNING") return "Pause casework";
+  if (session.status === "PAUSED") return "Resume casework";
+  if (session.status === "DEBRIEF") return "Debrief in progress";
+  if (session.status === "CLOSED") return "Session closed";
+  return "Start casework";
+}
+
+export function toggleCaseworkClock(session: WorkshopSession, at: Date | string): WorkshopSession {
+  if (session.status === "DEBRIEF" || session.status === "CLOSED") return session;
+  if (session.status !== "RUNNING") {
+    return { ...session, status: "RUNNING", clockStartedAt: (typeof at === "string" ? new Date(at) : at).toISOString() };
+  }
+  const { clockStartedAt: _clockStartedAt, ...pausedSession } = session;
+  return { ...pausedSession, status: "PAUSED", remainingSeconds: remainingSessionSeconds(session, at) };
+}
+
+export function nextParticipantStageUnlock(session: WorkshopSession): number | undefined {
+  if (session.status === "DEBRIEF" || session.status === "CLOSED" || session.currentStage >= FINAL_STAGE_INDEX - 1) return undefined;
+  return session.currentStage + 1;
+}
+
+export function debriefConfirmationMessage(input: {
+  participantCount: number;
+  submittedCount: number;
+  notReadyCount: number;
+  unresolvedCount: number;
+  currentClock: string;
+}): string {
+  const unsubmittedCount = Math.max(0, input.participantCount - input.submittedCount);
+  return [
+    "Begin debrief?",
+    "",
+    `Participants: ${input.participantCount}`,
+    `Submitted: ${input.submittedCount}`,
+    `Unsubmitted: ${unsubmittedCount}`,
+    `NOT_READY submissions: ${input.notReadyCount}`,
+    `Unresolved or conditional submissions: ${input.unresolvedCount}`,
+    `Current clock: ${input.currentClock}`,
+    "",
+    "Unsubmitted, NOT_READY, and unresolved participants do not block debrief and remain in the workshop record.",
+    "",
+    "This will close submissions, pause the casework clock, and open participant debrief.",
+  ].join("\n");
+}
+
 export function beginDebriefSession(session: WorkshopSession, at: Date | string): WorkshopSession {
-  const transitionTime = typeof at === "string" ? new Date(at) : at;
-  const elapsed = session.status === "RUNNING" && session.clockStartedAt
-    ? Math.floor((transitionTime.getTime() - new Date(session.clockStartedAt).getTime()) / 1000)
-    : 0;
-  const remainingSeconds = Math.max(0, session.remainingSeconds - Math.max(0, elapsed));
   const { clockStartedAt: _clockStartedAt, ...pausedSession } = session;
   return {
     ...pausedSession,
     status: "DEBRIEF",
     currentStage: FINAL_STAGE_INDEX,
-    remainingSeconds,
+    remainingSeconds: remainingSessionSeconds(session, at),
     submissionsClosed: true,
   };
 }

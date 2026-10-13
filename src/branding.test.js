@@ -302,7 +302,7 @@ describe("reference interface fidelity", () => {
     expect(STAGES).toHaveLength(8);
     expect(FACILITATOR_STAGE_GUIDES).toHaveLength(STAGES.length);
     expect(participantSource).toContain("STAGES.map");
-    expect(facilitatorSource).toContain("STAGES[currentStageIndex]");
+    expect(facilitatorSource).toContain("STAGES[cueStageIndex]");
     expect(participantSource).not.toMatch(/const\s+(?:PARTICIPANT_)?STAGES\s*=/);
     expect(facilitatorSource).not.toMatch(/const\s+(?:FACILITATOR_)?STAGES\s*=/);
     for (const key of Object.keys(RECOMMENDATION_CLAIM_LABELS)) {
@@ -363,7 +363,7 @@ describe("reference interface fidelity", () => {
     expect(referenceExperienceSource.match(/About 6 minutes/g)).toHaveLength(1);
     expect(referenceExperienceSource).not.toMatch(/3[–-]4 minutes/i);
     expect(participantSource).toContain("Casework · ${formatClock(displayedClock)}");
-    expect(participantSource).toContain('? "paused for debrief" : caseworkRunning ? "" : "waiting"');
+    expect(participantSource).toContain('preparationComplete && clock === 0 ? "time expired"');
     expect(CASE_FACTS.caseworkDurationSeconds).toBe(1200);
     expect(CASE_FACTS.maturityWeeks).toBe(6);
     expect(CASE_FACTS.imfBoardHorizonWeeks).toBe(11);
@@ -397,12 +397,33 @@ describe("reference interface fidelity", () => {
     expect(preReturnGuidance).not.toMatch(/\b(?:480|240|60)\b|shared (?:revenue )?pool|same RA-01|redacted functional summary|headquarters authorization/i);
   });
 
-  it("shows the current guide and describes participant progress without treating a visited stage as complete", () => {
+  it("browses cue cards locally without changing the participant unlock ceiling", () => {
+    const cueBrowser = facilitatorSource.slice(
+      facilitatorSource.indexOf('className="cue-browser"'),
+      facilitatorSource.indexOf('<div className="facilitator-guide-grid">'),
+    );
+    expect(facilitatorSource).toContain("const [cueStageIndex, setCueStageIndex] = useState(0)");
+    expect(cueBrowser).toContain("setCueStageIndex(index)");
+    expect(cueBrowser).toContain("Facilitating now");
+    expect(cueBrowser).toContain("Future cue · participants locked");
+    expect(cueBrowser).not.toContain("patchSession");
+    expect(facilitatorSource).toContain("Unlocked through · Stage");
+    expect(facilitatorSource).not.toContain("selected.currentStage - 1");
+  });
+
+  it("shows time expiry as a facilitator decision without changing submissions", () => {
+    expect(facilitatorSource).toContain('id="time-expired-title">Time expired');
+    expect(facilitatorSource).toContain("Submissions remain open.");
+    expect(facilitatorSource).toContain("expiry does not change the session automatically");
+    expect(participantSource).toContain('preparationComplete && clock === 0 ? "time expired"');
+  });
+
+  it("shows the selected guide and describes participant progress without treating a visited stage as complete", () => {
     const progressHelper = facilitatorSource.slice(
       facilitatorSource.indexOf("function participantProgressLabel"),
       facilitatorSource.indexOf("export function FacilitatorApp"),
     );
-    expect(facilitatorSource).toContain("FACILITATOR_STAGE_GUIDES[currentStageIndex]");
+    expect(facilitatorSource).toContain("FACILITATOR_STAGE_GUIDES[cueStageIndex]");
     expect(facilitatorSource).toContain("currentGuide.learningPurpose");
     expect(facilitatorSource).toContain("currentGuide.openingQuestion");
     expect(facilitatorSource).not.toContain("Current phase");
@@ -420,9 +441,12 @@ describe("reference interface fidelity", () => {
       facilitatorSource.indexOf("return <div", facilitatorSource.indexOf("async function beginDebrief")),
     );
     expect(beginDebrief).toContain("window.confirm");
-    expect(beginDebrief).toContain("close submissions");
-    expect(beginDebrief).toContain("pause the casework clock");
-    expect(beginDebrief).toContain("open the participant debrief and transfer view");
+    expect(beginDebrief).toContain("debriefConfirmationMessage");
+    expect(beginDebrief).toContain("participantCount");
+    expect(beginDebrief).toContain("submittedCount");
+    expect(beginDebrief).toContain("notReadyCount");
+    expect(beginDebrief).toContain("unresolvedCount");
+    expect(beginDebrief).toContain("currentClock");
     expect(facilitatorSource).toContain("Reconstruct the evidence state at the submitted version.");
     expect(facilitatorSource).toContain("Compare decision pathways without scoring or ranking.");
     expect(facilitatorSource).toContain("Run one counterfactual and name the assumptions held fixed.");
