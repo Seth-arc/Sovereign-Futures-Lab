@@ -25,6 +25,7 @@ import type { AdvisorCitation, AdvisorId, DecisionState, InstitutionRole } from 
 
 const PARTICIPANT_KEY = "futureslab-participant-id";
 const ENTRY_HANDOFF_KEY = "futureslab-entry-handoff-v1";
+const CONSENT_VERSION = "2026-10-13";
 const PREPARATION_KEY_PREFIX = "futureslab-preparation-v1:";
 const DIALOG_FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
 
@@ -107,7 +108,7 @@ function consumeEntryHandoff(): JoinInput | null {
       || typeof value.organization !== "string"
       || typeof value.email !== "string"
       || typeof value.consentedAt !== "string"
-      || value.consentVersion !== "2026-09-28"
+      || value.consentVersion !== CONSENT_VERSION
     ) return null;
     const input = {
       code: value.code.trim().toUpperCase(),

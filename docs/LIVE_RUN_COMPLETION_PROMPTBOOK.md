@@ -66,7 +66,7 @@ The release owner updates this table only after the prompt's full completion gat
 
 | Prompt | Outcome | Status |
 |---|---|---|
-| 1 | Participant rejoin cannot transfer record ownership | Not started |
+| 1 | Participant rejoin cannot transfer record ownership | Completed, tested and committed |
 | 2 | Consent matches stored data and external AI processing | Not started |
 | 3 | Facilitator freshness and action failure are visible | Not started |
 | 4 | Cue browsing cannot relock stages; lifecycle states are explicit | Not started |

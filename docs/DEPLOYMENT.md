@@ -280,15 +280,20 @@ Do not delete a live session early until all required facilitator exports have b
 
 Before collecting participant information, confirm the consent screen states that:
 
-- name, organization, email, decisions, activity, messages, advisor transcripts, and reflections are collected for workshop delivery and debrief;
+- consent version `2026-10-13` is used at both the landing producer and participant consumer;
+- name, organization, and email; decisions, rationales, next institutional handoff, and versioned submissions; evidence requests, activity timestamps, facilitator updates, and institutional messages; advisor questions, answers, citations, and transfer reflection; and bounded replay metadata are retained for workshop delivery and debrief;
 - the facilitator can access identified records and exports;
 - microphone audio is sent to the configured external AI provider for transcription but is not stored by this application;
-- advisor questions, relevant participant-visible scenario context, and selected bounded research cards may be sent to the configured AI provider; the cards contain short verified excerpts and citation metadata, not source documents or full reports;
+- advisor questions, recent advisor conversation, participant-visible scenario and evidence context, filtered working decisions, visible facilitator updates, answered institutional messages, and selected bounded research cards may be sent to the configured AI provider; the cards contain bounded claims, short verified excerpts, scope conditions, prohibited inferences, and citation metadata, not source files or full reports;
 - application records are retained for up to 30 days and may be deleted earlier by the facilitator.
 
 Confirm the selected Supabase region and AI provider terms are acceptable for AidData. Do not claim that all provider or backup copies are deleted in exactly 30 days unless the applicable provider terms guarantee that outcome.
 
 Before production use of research-backed answers, the product owner must also confirm that the configured provider's processing and retention terms, together with each source's applicable rights, permit transfer of the approved bounded cards and short excerpts. Full-document provider processing remains blocked by `SG-005` in the source ledger.
+
+**Current SG-005 status (2026-10-13): APPROVED_FOR_BOUNDED_PROVIDER_PROCESSING.** The product owner approved the configured Groq provider terms and applicable source rights for transferring only the bounded research-card fields and short excerpts defined by `SG-005`. Source files and full reports remain prohibited. This approval clears only the external-transfer gate; all other live-run gates remain independently required.
+
+**Controlled provider gate (2026-10-13): PASSED with synthetic data.** Deployed `advisor-chat` version 6 returned an AI-mode answer with bounded citation metadata after its provider prompt was verified to omit session, participant, and user identifiers. Deployed `transcribe` version 1 returned a transcript for a locally generated synthetic speech sample. The disposable rehearsal session and all cascaded synthetic records were deleted after the checks; the temporary audio and browser artifacts were also removed. No secret values, real participant data, source files, or full report bodies were recorded or transferred.
 
 ## 9. Configure Vercel
 

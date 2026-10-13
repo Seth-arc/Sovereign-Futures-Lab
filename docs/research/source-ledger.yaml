@@ -6,7 +6,7 @@ artifact:
   canonical_home: docs/research/source-ledger.yaml
   owner: Research Governance
   reserved_authority_decision_required: false
-  updated_at: '2026-09-30'
+  updated_at: '2026-10-13'
 source_use_rules:
 - Use original research and official institutional sources for external factual claims only within their evidenced scope.
 - Use the narrowest sufficient source set; broader contextual sources do not override narrower evidence.
@@ -319,6 +319,10 @@ source_gaps:
   impact: BLOCKING_FOR_FULL_DOCUMENT_PROVIDER_PROCESSING
   handling: Never send source files or full report bodies to an AI provider. Before production, the product owner must confirm
     that provider processing of the approved bounded cards and short excerpts is consistent with source rights and provider terms.
+  live_run_status: APPROVED_FOR_BOUNDED_PROVIDER_PROCESSING
+  approval_record: On 2026-10-13, the product owner approved the configured Groq provider terms and applicable source rights
+    for transferring only the bounded research-card fields and short excerpts defined by SG-005. Source files and full reports
+    remain prohibited.
 source_selection_guidance:
   approved_retrieval_artifact: docs/research/research-cards.yaml
   runtime_retrieval:

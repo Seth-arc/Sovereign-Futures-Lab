@@ -34,6 +34,8 @@ const facilitatorEntry = read("../facilitator/index.html");
 const productContract = read("../docs/PRODUCT_CONTRACT.md");
 const migrationSource = read("../supabase/migrations/202609280001_futureslab.sql");
 const privacyNotice = read("../docs/PRIVACY_NOTICE.md");
+const deploymentRunbook = read("../docs/DEPLOYMENT.md");
+const sourceLedger = read("../docs/research/source-ledger.yaml");
 const vercelConfig = read("../vercel.json");
 const participantReference = read("../docs/interface-references/kuvera_debt_management_office.html");
 const runtimeParticipantReferenceUrl = new URL("../public/kuvera_debt_management_office.html", import.meta.url);
@@ -177,6 +179,53 @@ describe("reference interface fidelity", () => {
     expect(referenceExperienceSource).toContain("Practice on parallel cases, not Kuvera");
     expect(privacyNotice).toContain("training delivery, not research or individual performance scoring");
     expect(productContract).toContain("No probabilistic scoring, ranking, or inferred competence");
+  });
+
+  it("discloses the complete retained workshop record at the affirmative landing gate", () => {
+    const consent = landingSource.match(/<span id="consent-copy">([\s\S]*?)<\/span>/)?.[1].replace(/\s+/g, " ") ?? "";
+    for (const phrase of [
+      "name, organization, and email",
+      "decisions, rationales, next institutional handoff, and versioned submissions",
+      "evidence requests, activity timestamps, facilitator updates, and institutional messages",
+      "advisor questions, answers, citations, and transfer reflection",
+      "bounded replay metadata used to reconstruct submissions",
+      "Identified records and exports are available to the facilitator",
+      "retained for up to 30 days",
+    ]) expect(consent).toContain(phrase);
+  });
+
+  it("discloses both external AI payload boundaries without claiming full-report transfer", () => {
+    const consent = landingSource.match(/<span id="consent-copy">([\s\S]*?)<\/span>/)?.[1].replace(/\s+/g, " ") ?? "";
+    for (const phrase of [
+      "Microphone audio is not stored by this application after transcription",
+      "after I activate recording, it is sent to the configured external AI transcription provider",
+      "Advisor questions, scenario and evidence shown to me, visible facilitator and institutional context",
+      "selected bounded research-card fields may be sent to the configured external AI provider",
+      "source files and full reports are not sent",
+    ]) expect(consent).toContain(phrase);
+    expect(privacyNotice).toContain("Source files and full reports are not sent to the provider.");
+    expect(privacyNotice).not.toMatch(/full reports? (?:are|may be) sent/i);
+    expect(privacyNotice).not.toMatch(/provider[^.]{0,80}(?:deleted|deletion) (?:within|after|in) 30 days/i);
+  });
+
+  it("keeps the consent producer and consumer on the same newly minted version", () => {
+    const producerVersion = landingSource.match(/var CONSENT_VERSION = '([^']+)'/)?.[1];
+    const consumerVersion = participantSource.match(/const CONSENT_VERSION = "([^"]+)"/)?.[1];
+    expect(producerVersion).toBe("2026-10-13");
+    expect(consumerVersion).toBe(producerVersion);
+    expect(landingSource).toContain("consentVersion: CONSENT_VERSION");
+    expect(participantSource).toContain("value.consentVersion !== CONSENT_VERSION");
+  });
+
+  it("keeps consent required and unchecked while recording bounded SG-005 approval", () => {
+    const consentInput = landingSource.match(/<input type="checkbox" id="privacy-consent"[^>]*>/)?.[0] ?? "";
+    expect(consentInput).toContain("required");
+    expect(consentInput).not.toMatch(/\bchecked\b/);
+    expect(landingSource).toContain("if (!consentInput.checked)");
+    expect(sourceLedger).toContain("live_run_status: APPROVED_FOR_BOUNDED_PROVIDER_PROCESSING");
+    expect(sourceLedger).toContain("Source files and full reports");
+    expect(sourceLedger).toContain("remain prohibited");
+    expect(deploymentRunbook).toContain("Current SG-005 status (2026-10-13): APPROVED_FOR_BOUNDED_PROVIDER_PROCESSING");
   });
 
   it("uses one participant identity and consent gate without putting PII in the URL", () => {

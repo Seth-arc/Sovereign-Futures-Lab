@@ -194,6 +194,7 @@ describe("advisor research retrieval", () => {
 
   it("sends Groq only bounded cards and short excerpts, never source files or full reports", () => {
     const prompt = researchPrompt(RESEARCH_CARDS);
+    const providerContext = advisorFunctionSource.match(/function instructions[\s\S]*?\nasync function completion/)?.[0] ?? "";
     const boundaryCheck = advisorFunctionSource.indexOf("researchBoundaryResponse(question)");
     const providerCall = advisorFunctionSource.indexOf("await completion(system, messages)");
 
@@ -203,6 +204,8 @@ describe("advisor research retrieval", () => {
     expect(prompt).not.toContain("repository_path");
     expect(prompt.toLowerCase()).not.toContain(".pdf");
     expect(prompt.toLowerCase()).not.toContain(".docx");
+    expect(providerContext).not.toContain("context.session.id");
+    expect(providerContext).not.toContain("session_id:");
     expect(boundaryCheck).toBeGreaterThan(-1);
     expect(providerCall).toBeGreaterThan(boundaryCheck);
   });

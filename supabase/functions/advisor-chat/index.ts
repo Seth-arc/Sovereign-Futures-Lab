@@ -171,7 +171,6 @@ RESEARCH CITATION CONTRACT:
 - Do not discuss or cite any unlisted chronology document or progress DOCX.
 
 LIVE WORKSHOP CONTEXT — rebuilt for this request:
-session_id: ${String(context.session.id ?? "")}
 session_kind: ${String(context.session.kind ?? "")}
 session_status: ${String(context.session.status ?? "")}
 facilitator_stage: ${String(context.session.current_stage ?? "")}
