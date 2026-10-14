@@ -303,7 +303,7 @@ Session deletion cascades through participant records, submissions, evidence req
 
 Before collecting participant information, confirm the consent screen states that:
 
-- consent version `2026-10-13` is used at both the landing producer and participant consumer;
+- consent version `2026-10-14` is used at both the landing producer and participant consumer;
 - name, organization, email, and the first recorded Learning Bridge completion time; decisions, rationales, next institutional handoff, and versioned submissions; evidence requests, activity timestamps, facilitator updates, and institutional messages; advisor questions, answers, citations, and transfer reflection; and bounded replay metadata are retained for workshop delivery and debrief;
 - the facilitator can access identified records and exports;
 - microphone audio is sent to the configured external AI provider for transcription but is not stored by this application;

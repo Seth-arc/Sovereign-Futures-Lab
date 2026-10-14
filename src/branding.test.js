@@ -189,7 +189,7 @@ describe("reference interface fidelity", () => {
   it("discloses the complete retained workshop record at the affirmative landing gate", () => {
     const consent = landingSource.match(/<span id="consent-copy">([\s\S]*?)<\/span>/)?.[1].replace(/\s+/g, " ") ?? "";
     for (const phrase of [
-      "name, organization, and email",
+      "name, organization, email, and first recorded Learning Bridge completion time",
       "decisions, rationales, next institutional handoff, and versioned submissions",
       "evidence requests, activity timestamps, facilitator updates, and institutional messages",
       "advisor questions, answers, citations, and transfer reflection",
@@ -216,7 +216,7 @@ describe("reference interface fidelity", () => {
   it("keeps the consent producer and consumer on the same newly minted version", () => {
     const producerVersion = landingSource.match(/var CONSENT_VERSION = '([^']+)'/)?.[1];
     const consumerVersion = participantSource.match(/const CONSENT_VERSION = "([^"]+)"/)?.[1];
-    expect(producerVersion).toBe("2026-10-13");
+    expect(producerVersion).toBe("2026-10-14");
     expect(consumerVersion).toBe(producerVersion);
     expect(landingSource).toContain("consentVersion: CONSENT_VERSION");
     expect(participantSource).toContain("value.consentVersion !== CONSENT_VERSION");
