@@ -94,6 +94,11 @@ The complete committed migration chain is:
 3. `supabase/migrations/202610130001_secure_participant_rejoin.sql` replaces the join RPC so an existing participant can be returned only to its original authenticated anonymous user.
 4. `supabase/migrations/202610130002_atomic_facilitator_actions.sql` adds the scoped facilitator-action RPC so each operational mutation and its required activity event commit or roll back together.
 5. `supabase/migrations/202610130003_authenticated_table_privileges.sql` grants the authenticated role only the table operations used by participant and facilitator clients; existing RLS policies continue to decide which rows each user may access.
+6. `supabase/migrations/202610140001_retention_cron_jobs.sql` enables `pg_cron` and installs the two documented 30-day retention jobs with their production schedules.
+7. `supabase/migrations/202610140002_retention_cron_rehearsal.sql` temporarily runs marker-scoped retention jobs against one synthetic expired session and one synthetic anonymous user.
+8. `supabase/migrations/202610140003_restore_retention_cron_schedules.sql` immediately restores both jobs to their permanent daily schedules.
+9. `supabase/migrations/202610140004_verify_retention_cron_rehearsal.sql` fails unless both synthetic records were deleted, both Cron runs succeeded, and both daily schedules are active.
+10. `supabase/migrations/202610140005_persist_preparation_completion.sql` adds the nullable preparation-completion fact and its idempotent participant-owned RPC.
 
 For an existing project, never edit or rerun the initial migration or any migration already recorded as applied. Export any required workshop reports, test the unapplied forward migrations against a disposable or rehearsal project, then run the dry run and apply those forward migrations in timestamp order outside a live workshop window. The snapshot migration deliberately leaves pre-existing `context_snapshot` values null; those rows must remain labeled `legacy · current-rule reconstruction`.
 
@@ -108,11 +113,17 @@ where table_schema = 'public'
   and table_name = 'futureslab_submissions'
   and column_name = 'context_snapshot';
 
+select column_name, data_type, is_nullable
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'futureslab_participants'
+  and column_name = 'preparation_completed_at';
+
 select p.proname, pg_get_function_identity_arguments(p.oid) as arguments
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
-  and p.proname in ('join_futureslab_session', 'submit_futureslab_recommendation', 'perform_futureslab_facilitator_action')
+  and p.proname in ('join_futureslab_session', 'submit_futureslab_recommendation', 'perform_futureslab_facilitator_action', 'complete_futureslab_preparation')
 order by p.proname, arguments;
 
 select
@@ -135,7 +146,7 @@ order by submitted_at desc
 limit 5;
 ```
 
-Pass means the nullable `jsonb` column exists, the only join RPC signature is `join_futureslab_session(text, text, text, text)`, the only submission RPC signature is `submit_futureslab_recommendation(uuid, text, text)`, the facilitator-action RPC signature is `perform_futureslab_facilitator_action(text, uuid, jsonb)`, existing rows remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
+Pass means the nullable `jsonb` snapshot column and nullable `timestamptz` preparation column exist; the only join RPC signature is `join_futureslab_session(text, text, text, text)`; the only submission RPC signature is `submit_futureslab_recommendation(uuid, text, text)`; the facilitator-action RPC signature is `perform_futureslab_facilitator_action(text, uuid, jsonb)`; and the preparation RPC signature is `complete_futureslab_preparation(uuid)`. Existing submission snapshots remain null, and a new rehearsal submission has a non-null snapshot whose `submissionVersion`, `submittedAt`, and `decisions` match the containing row.
 
 Run the disposable database tests after reset:
 
@@ -293,7 +304,7 @@ Session deletion cascades through participant records, submissions, evidence req
 Before collecting participant information, confirm the consent screen states that:
 
 - consent version `2026-10-13` is used at both the landing producer and participant consumer;
-- name, organization, and email; decisions, rationales, next institutional handoff, and versioned submissions; evidence requests, activity timestamps, facilitator updates, and institutional messages; advisor questions, answers, citations, and transfer reflection; and bounded replay metadata are retained for workshop delivery and debrief;
+- name, organization, email, and the first recorded Learning Bridge completion time; decisions, rationales, next institutional handoff, and versioned submissions; evidence requests, activity timestamps, facilitator updates, and institutional messages; advisor questions, answers, citations, and transfer reflection; and bounded replay metadata are retained for workshop delivery and debrief;
 - the facilitator can access identified records and exports;
 - microphone audio is sent to the configured external AI provider for transcription but is not stored by this application;
 - advisor questions, recent advisor conversation, participant-visible scenario and evidence context, filtered working decisions, visible facilitator updates, answered institutional messages, and selected bounded research cards may be sent to the configured AI provider; the cards contain bounded claims, short verified excerpts, scope conditions, prohibited inferences, and citation metadata, not source files or full reports;
@@ -362,7 +373,7 @@ Use a distinct `REHEARSAL` session. Never reuse it as the live session.
 
 1. Verify the landing motion, theme switch, About modal, modal keyboard behavior, validation, consent, and workshop transition.
 2. Verify all six About sections and the standalone `/about` route.
-3. Verify Orientation opens automatically over the live room after initial sign-in, uses the same eight-stage process rail as the exercise, and does not reopen on a normal same-browser refresh.
+3. Verify Orientation opens automatically over the live room after initial sign-in. Complete Orientation only and confirm preparation remains **Not reported**; complete the Learning Bridge and confirm the facilitator preflight changes to **Preparation complete**. Replay both surfaces and refresh the participant browser; the first timestamp must remain unchanged. A legacy null remains **Not reported**. Starting casework with any not-reported participant requires acknowledgement but remains possible.
 4. Verify locked stages read `Await facilitator`, and Mandate reopens the role brief.
 5. Verify the top navigation, Glossary, theme control, Exit, Learning Bridge, and all six Case File tabs preserve participant work; confirm light mode uses the neutral-grey canvas and differentiated surfaces without pure-white fields.
 6. Confirm only the Case File dossier content scrolls.
@@ -420,7 +431,7 @@ Cloud mode also has no verified cross-device recovery. The anonymous Supabase se
 
 ### Facilitator freshness and action-failure gate
 
-The console must show **Loading facilitator data**, **Live**, **Refreshing**, or **Data may be stale** as applicable, plus the last successful refresh time. A refresh failure must leave the last successful data visible and provide Retry; returning to a visible tab must refresh immediately. The sync indicator is intentionally not a polling live region.
+The console must show **Loading facilitator data**, **Live**, **Refreshing**, or **Data may be stale** as applicable, plus the last successful refresh time. Selected-session Realtime changes drive operational refresh, with a bounded 30-second reconciliation and an immediate refresh when a hidden tab becomes visible. A refresh failure must leave the last successful data visible and provide Retry. The sync indicator is intentionally not a polling live region. Operational refreshes exclude advisor transcripts and activity-event history; those detailed records and AAR construction occur only when the facilitator opens an AAR or requests an export.
 
 Before release, throttle the network and switch quickly from session A to session B; confirm a late session-A response cannot replace B. Take Supabase offline and confirm the current dataset remains visible but stale, then restore connectivity and use Retry. Force clock, stage, debrief, inject, evidence-release, institutional-reply, participant-removal, close, and delete failures once. Confirm each matching control alone shows pending, double-clicks issue one request, failures show a bounded error without changing the current view, and unsent inject/reply drafts remain. After successful actions described as audited, confirm both the mutation and its activity event exist; neither may exist alone. Deletion is the exception: the confirmed cascade removes the session and its activity events, so no in-platform session audit survives.
 

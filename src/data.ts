@@ -92,6 +92,7 @@ function mapParticipant(row: Record<string, unknown>): ParticipantProfile {
     currentStage: Number(row.current_stage ?? 0),
     lastActiveAt: iso(row.last_active_at),
     consentedAt: iso(row.consented_at),
+    ...(row.preparation_completed_at ? { preparationCompletedAt: String(row.preparation_completed_at) } : {}),
   };
 }
 
@@ -376,6 +377,21 @@ export async function saveDecisions(bundle: ParticipantBundle, decisions: Decisi
 export async function saveTransferReflection(bundle: ParticipantBundle, reflection: string): Promise<ParticipantBundle> {
   const decisions = decisionSnapshot({ ...bundle.decisions, reflection });
   return saveDecisions(bundle, decisions, FINAL_STAGE_INDEX);
+}
+
+export async function completeParticipantPreparation(bundle: ParticipantBundle): Promise<ParticipantBundle> {
+  if (bundle.participant.preparationCompletedAt) return bundle;
+  if (!supabase || isLocalBundle(bundle)) {
+    return saveLocal({
+      ...bundle,
+      participant: { ...bundle.participant, preparationCompletedAt: new Date().toISOString() },
+    });
+  }
+  const result = await supabase.rpc("complete_futureslab_preparation", {
+    p_participant_id: bundle.participant.id,
+  });
+  if (result.error) throw result.error;
+  return { ...bundle, participant: mapParticipant(result.data as Record<string, unknown>) };
 }
 
 export async function requestEvidence(bundle: ParticipantBundle, evidenceId: string): Promise<ParticipantBundle> {
@@ -663,18 +679,20 @@ export async function updateWorkshopSession(id: string, patch: Record<string, un
 
 export async function loadFacilitatorSession(session: WorkshopSession) {
   if (!supabase) return { participants: [], evidence: [], submissions: [], injects: [], messages: [], turns: [], events: [] };
-  const participantsResult = await supabase.from("futureslab_participants").select("*").eq("session_id", session.id).order("joined_at");
+  const participantsResult = await supabase.from("futureslab_participants")
+    .select("id,session_id,name,organization,email,current_stage,last_active_at,consented_at,preparation_completed_at,decisions")
+    .eq("session_id", session.id).order("joined_at").limit(50);
   if (participantsResult.error) throw participantsResult.error;
   const rows = (participantsResult.data ?? []) as Record<string, unknown>[];
   const participantIds = rows.map((row) => String(row.id));
   const empty = { data: [] as Record<string, unknown>[], error: null };
   const [evidence, submissions, injects, messages, turns, events] = await Promise.all([
-    participantIds.length ? supabase.from("futureslab_evidence_requests").select("*").eq("session_id", session.id) : Promise.resolve(empty),
-    participantIds.length ? supabase.from("futureslab_submissions").select("*").eq("session_id", session.id) : Promise.resolve(empty),
-    supabase.from("futureslab_injects").select("*").eq("session_id", session.id).order("sent_at"),
-    participantIds.length ? supabase.from("futureslab_institutional_messages").select("*").eq("session_id", session.id).order("created_at") : Promise.resolve(empty),
-    participantIds.length ? supabase.from("futureslab_advisor_turns").select("*").eq("session_id", session.id) : Promise.resolve(empty),
-    participantIds.length ? supabase.from("futureslab_activity_events").select("*").eq("session_id", session.id).order("created_at") : Promise.resolve(empty),
+    participantIds.length ? supabase.from("futureslab_evidence_requests").select("id,session_id,participant_id,evidence_id,requested_at,available_at,released_at").eq("session_id", session.id).order("requested_at", { ascending: false }).limit(500) : Promise.resolve(empty),
+    participantIds.length ? supabase.from("futureslab_submissions").select("id,session_id,participant_id,version,decisions,submitted_at").eq("session_id", session.id).order("submitted_at", { ascending: false }).limit(250) : Promise.resolve(empty),
+    supabase.from("futureslab_injects").select("id,session_id,title,body,sent_at").eq("session_id", session.id).order("sent_at", { ascending: false }).limit(100),
+    participantIds.length ? supabase.from("futureslab_institutional_messages").select("id,session_id,participant_id,institution,question,reply,status,created_at,answered_at").eq("session_id", session.id).order("created_at", { ascending: false }).limit(250) : Promise.resolve(empty),
+    Promise.resolve(empty),
+    Promise.resolve(empty),
   ]);
   for (const result of [evidence, submissions, injects, messages, turns, events]) if (result.error) throw result.error;
   return {
@@ -686,6 +704,52 @@ export async function loadFacilitatorSession(session: WorkshopSession) {
     turns: (turns.data ?? []).map((row) => mapAdvisorTurn(row as Record<string, unknown>)),
     events: (events.data ?? []).map((row) => mapEvent(row as Record<string, unknown>)),
   };
+}
+
+export async function loadFacilitatorReportData(session: WorkshopSession, participantId?: string) {
+  if (!supabase) return { participants: [], evidence: [], submissions: [], injects: [], messages: [], turns: [], events: [] };
+  let participantsQuery = supabase.from("futureslab_participants").select("*").eq("session_id", session.id).order("joined_at");
+  if (participantId) participantsQuery = participantsQuery.eq("id", participantId);
+  const participantsResult = await participantsQuery;
+  if (participantsResult.error) throw participantsResult.error;
+  const rows = (participantsResult.data ?? []) as Record<string, unknown>[];
+  const empty = { data: [] as Record<string, unknown>[], error: null };
+  const participantFilter = <T extends { eq: (column: string, value: string) => T }>(query: T): T => participantId ? query.eq("participant_id", participantId) : query;
+  const eventsQuery = participantId
+    ? supabase.from("futureslab_activity_events").select("*").eq("session_id", session.id).or(`participant_id.eq.${participantId},participant_id.is.null`).order("created_at")
+    : supabase.from("futureslab_activity_events").select("*").eq("session_id", session.id).order("created_at");
+  const [evidence, submissions, injects, messages, turns, events] = await Promise.all([
+    rows.length ? participantFilter(supabase.from("futureslab_evidence_requests").select("*").eq("session_id", session.id)).order("requested_at") : Promise.resolve(empty),
+    rows.length ? participantFilter(supabase.from("futureslab_submissions").select("*").eq("session_id", session.id)).order("version") : Promise.resolve(empty),
+    supabase.from("futureslab_injects").select("*").eq("session_id", session.id).order("sent_at"),
+    rows.length ? participantFilter(supabase.from("futureslab_institutional_messages").select("*").eq("session_id", session.id)).order("created_at") : Promise.resolve(empty),
+    rows.length ? participantFilter(supabase.from("futureslab_advisor_turns").select("*").eq("session_id", session.id)).order("created_at") : Promise.resolve(empty),
+    rows.length ? eventsQuery : Promise.resolve(empty),
+  ]);
+  for (const result of [evidence, submissions, injects, messages, turns, events]) if (result.error) throw result.error;
+  return {
+    participants: rows.map((row) => ({ participant: mapParticipant(row), decisions: decisionSnapshot(row.decisions as Partial<DecisionState>) })),
+    evidence: (evidence.data ?? []).map((row) => mapEvidence(row as Record<string, unknown>)),
+    submissions: (submissions.data ?? []).map((row) => mapSubmission(row as Record<string, unknown>)),
+    injects: (injects.data ?? []).map((row) => mapInject(row as Record<string, unknown>)),
+    messages: (messages.data ?? []).map((row) => mapMessage(row as Record<string, unknown>)),
+    turns: (turns.data ?? []).map((row) => mapAdvisorTurn(row as Record<string, unknown>)),
+    events: (events.data ?? []).map((row) => mapEvent(row as Record<string, unknown>)),
+  };
+}
+
+export function subscribeToFacilitatorWorkshop(sessionId: string, onChange: () => void): () => void {
+  if (!supabase) return () => undefined;
+  const channel = supabase
+    .channel(`futureslab:facilitator:${sessionId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "futureslab_sessions", filter: `id=eq.${sessionId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "futureslab_participants", filter: `session_id=eq.${sessionId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "futureslab_evidence_requests", filter: `session_id=eq.${sessionId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "futureslab_submissions", filter: `session_id=eq.${sessionId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "futureslab_injects", filter: `session_id=eq.${sessionId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "futureslab_institutional_messages", filter: `session_id=eq.${sessionId}` }, onChange)
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
 }
 
 export async function sendGlobalInject(sessionId: string, title: string, body: string): Promise<void> {

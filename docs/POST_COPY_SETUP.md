@@ -143,6 +143,11 @@ Use the full [deployment and rehearsal runbook](./DEPLOYMENT.md) while completin
   3. `supabase/migrations/202610130001_secure_participant_rejoin.sql`
   4. `supabase/migrations/202610130002_atomic_facilitator_actions.sql`
   5. `supabase/migrations/202610130003_authenticated_table_privileges.sql`
+  6. `supabase/migrations/202610140001_retention_cron_jobs.sql`
+  7. `supabase/migrations/202610140002_retention_cron_rehearsal.sql`
+  8. `supabase/migrations/202610140003_restore_retention_cron_schedules.sql`
+  9. `supabase/migrations/202610140004_verify_retention_cron_rehearsal.sql`
+  10. `supabase/migrations/202610140005_persist_preparation_completion.sql`
 
   For a new project, choose either `npx supabase db push` or the Supabase SQL editor for the complete chain; do not use both. For an existing project, apply only unapplied forward migrations in timestamp order. Never edit or rerun `202609280001_futureslab.sql` as though it were new history.
 - [ ] Run the read-only migration verification queries in [DEPLOYMENT.md](./DEPLOYMENT.md#3-create-and-link-supabase). Confirm that `public.futureslab_submissions.context_snapshot` is a nullable `jsonb` column and that the active submission RPC signature is `submit_futureslab_recommendation(uuid, text, text)`.
@@ -260,7 +265,7 @@ npm run dev
 - [ ] Generate an individual after-action report.
 - [ ] Export PDF, printable HTML, JSON, and participant CSV files.
 - [ ] Confirm that participant reports remain accessible only to the facilitator.
-- [ ] Confirm that the projected comparison view can anonymize participant identities.
+- [ ] Confirm anonymous comparison HTML/PDF omit participant identity and identified facilitator exports require disclosure.
 - [ ] Create a distinct **LIVE** session for October 14, 2026. Do not reuse the rehearsal session.
 
 ## Completion check

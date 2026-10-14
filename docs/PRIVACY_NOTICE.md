@@ -1,5 +1,7 @@
 # Workshop privacy notice
 
+The participant record includes the first successful Learning Bridge completion time. Replaying preparation does not change that timestamp; legacy records without one are reported as **Not reported** rather than inferred as incomplete.
+
 Consent version `2026-10-13` covers the processing described here. Sovereign retains your name, organization, and email; decisions, rationales, next institutional handoff, and versioned submissions; evidence requests, activity timestamps, facilitator updates, and institutional messages; advisor questions, answers, citations, and transfer reflection; and bounded replay metadata used to reconstruct a submitted version. Replay metadata contains version identifiers, bounded evidence-availability timestamps, and relevant facilitator-update and answered-message IDs rather than source documents or conversation bodies. The next institutional handoff is retained with the current decision record and every versioned negotiation-preparation brief. The transfer reflection does not alter a submitted recommendation snapshot.
 
 Microphone audio is sent to the configured external AI transcription provider only after you activate recording by pressing and holding the voice control. Audio is not stored by this application after transcription. You can review and edit the transcript before submitting it to an advisor.

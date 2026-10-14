@@ -35,8 +35,11 @@ const readme = read("../README.md");
 const postCopySetup = read("../docs/POST_COPY_SETUP.md");
 const productContract = read("../docs/PRODUCT_CONTRACT.md");
 const migrationSource = read("../supabase/migrations/202609280001_futureslab.sql");
+const retentionMigration = read("../supabase/migrations/202610140001_retention_cron_jobs.sql");
+const preparationMigration = read("../supabase/migrations/202610140005_persist_preparation_completion.sql");
 const privacyNotice = read("../docs/PRIVACY_NOTICE.md");
 const deploymentRunbook = read("../docs/DEPLOYMENT.md");
+const supabaseConfig = read("../supabase/config.toml");
 const sourceLedger = read("../docs/research/source-ledger.yaml");
 const vercelConfig = read("../vercel.json");
 const participantReference = read("../docs/interface-references/kuvera_debt_management_office.html");
@@ -326,12 +329,13 @@ describe("reference interface fidelity", () => {
     expect(cloudJoin).toContain('setReferenceSurface(complete ? null : "orientation")');
     expect(localJoin).toContain("preparationIsComplete(joined)");
     expect(localJoin).toContain('setReferenceSurface(complete ? null : "orientation")');
-    expect(participantSource).toContain('const PREPARATION_KEY_PREFIX = "futureslab-preparation-v1:"');
+    expect(participantSource).toContain("Boolean(bundle.participant.preparationCompletedAt)");
+    expect(participantSource).not.toContain("PREPARATION_KEY_PREFIX");
   });
 
   it("chains Orientation to the Learning Bridge and hands completed preparation to Mandate", () => {
     const completionHandler = participantSource.slice(
-      participantSource.indexOf("function completePreparationSurface"),
+      participantSource.indexOf("async function completePreparationSurface"),
       participantSource.indexOf("async function exitWorkshop"),
     );
     expect(referenceExperienceSource).toContain('"Continue to Learning Bridge"');
@@ -340,7 +344,9 @@ describe("reference interface fidelity", () => {
     expect(referenceExperienceSource).toContain('replayOnly ? "Return to workshop"');
     expect(participantSource).toContain("preparationComplete={preparationComplete}");
     expect(completionHandler).toContain('setReferenceSurface("bridge")');
-    expect(completionHandler).toContain('localStorage.setItem(preparationKey(bundle.participant.id), "complete")');
+    expect(completionHandler).toContain("await completeParticipantPreparation(bundle)");
+    expect(completionHandler).toContain("Preparation completion was not saved");
+    expect(completionHandler).not.toContain("localStorage.setItem");
     expect(completionHandler).toContain("setStage(0)");
     expect(completionHandler).toContain("setRoleBriefOpen(true)");
     expect(completionHandler.match(/if \(preparationComplete\)/g)).toHaveLength(2);
@@ -483,8 +489,10 @@ describe("reference interface fidelity", () => {
     expect(reportDesk).not.toContain("setAnonymous");
     expect(reportDesk).not.toContain("Anonymize projected comparison");
     expect(reportDesk).toContain("runIdentifiedExport");
-    expect(reportDesk.indexOf("identifiedExportDisclosure")).toBeLessThan(reportDesk.indexOf("downloadWorkshopCsv(reports)"));
-    expect(reportDesk.indexOf("identifiedExportDisclosure")).toBeLessThan(reportDesk.indexOf("downloadWorkshopJson(reports)"));
+    const identifiedExport = reportDesk.slice(reportDesk.indexOf("async function identifiedExport"));
+    expect(identifiedExport.indexOf("identifiedExportDisclosure")).toBeLessThan(identifiedExport.indexOf("startDownload(reports)"));
+    expect(reportDesk).toContain("downloadWorkshopCsv");
+    expect(reportDesk).toContain("downloadWorkshopJson");
   });
 
   it("confirms close effects and preserves the selected session until deletion succeeds", () => {
@@ -521,6 +529,11 @@ describe("reference interface fidelity", () => {
       "202610130001_secure_participant_rejoin.sql",
       "202610130002_atomic_facilitator_actions.sql",
       "202610130003_authenticated_table_privileges.sql",
+      "202610140001_retention_cron_jobs.sql",
+      "202610140002_retention_cron_rehearsal.sql",
+      "202610140003_restore_retention_cron_schedules.sql",
+      "202610140004_verify_retention_cron_rehearsal.sql",
+      "202610140005_persist_preparation_completion.sql",
     ];
 
     for (const document of deploymentDocuments) {
@@ -532,6 +545,12 @@ describe("reference interface fidelity", () => {
     }
 
     expect(readme).toContain("[deployment and rehearsal runbook](docs/DEPLOYMENT.md)");
+    expect(deploymentRunbook).toContain("configure at least 60 joins per hour");
+    expect(supabaseConfig).toMatch(/\[auth\.rate_limit\][\s\S]*anonymous_users\s*=\s*60/);
+    expect(retentionMigration).toContain("futureslab-expired-sessions-daily");
+    expect(retentionMigration).toContain("futureslab-anonymous-users-daily");
+    expect(retentionMigration).toContain("15 3 * * *");
+    expect(retentionMigration).toContain("25 3 * * *");
     const standaloneRootGuidance = "When `package.json` is at the imported repository root, use **Root Directory: leave blank**.";
     const nestedRootGuidance = "Only when this application is the `futureslab` folder inside a larger imported repository, use **Root Directory: `futureslab`**.";
     for (const document of deploymentDocuments) {
@@ -548,7 +567,34 @@ describe("reference interface fidelity", () => {
     expect(restoration).toContain("preparationIsComplete(loaded)");
     expect(restoration).toContain("setPreparationComplete(complete)");
     expect(restoration).not.toContain('setReferenceSurface("orientation")');
-    expect(participantSource).toContain("hasCaseworkData(bundle)");
+    expect(participantSource).toContain("Boolean(bundle.participant.preparationCompletedAt)");
+    expect(participantSource).not.toContain("hasCaseworkData(bundle)");
+  });
+
+  it("uses explicit preparation facts and truthful facilitator preflight labels", () => {
+    expect(typesSource).toContain("preparationCompletedAt?: string");
+    expect(dataSource).toContain("complete_futureslab_preparation");
+    expect(facilitatorSource).toContain('Metric label="Registered participants"');
+    expect(facilitatorSource).toContain('Metric label="Preparation complete"');
+    expect(facilitatorSource).toContain('Metric label="Preparation · Not reported"');
+    expect(facilitatorSource).toContain("Start casework anyway?");
+    expect(facilitatorSource).not.toContain('Metric label="Connected participants"');
+    expect(preparationMigration).toContain("preparation_completed_at = coalesce(preparation_completed_at, now())");
+    expect(preparationMigration).toContain("user_id = auth.uid()");
+  });
+
+  it("bounds operational refreshes and loads report history only on demand", () => {
+    const operationalLoader = dataSource.slice(dataSource.indexOf("export async function loadFacilitatorSession"), dataSource.indexOf("export async function loadFacilitatorReportData"));
+    expect(operationalLoader).toContain('.limit(50)');
+    expect(operationalLoader).toContain('.limit(500)');
+    expect(operationalLoader).toContain("Promise.resolve(empty)");
+    expect(operationalLoader).not.toContain('from("futureslab_advisor_turns")');
+    expect(operationalLoader).not.toContain('from("futureslab_activity_events")');
+    expect(facilitatorSource).toContain("subscribeToFacilitatorWorkshop(sessionId");
+    expect(facilitatorSource).toContain("}, 30000)");
+    expect(facilitatorSource).toContain("await loadFacilitatorReportData(session, participantId)");
+    expect(facilitatorSource).toContain("await loadFacilitatorReportData(session)");
+    expect(facilitatorSource).not.toContain("data.participants.map(({ participant, decisions }) => reportFor");
   });
 
   it("keeps the preparation status and controls inside the process rail", () => {

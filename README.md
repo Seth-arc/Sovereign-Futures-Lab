@@ -54,6 +54,11 @@ The complete committed migration chain is:
 3. `supabase/migrations/202610130001_secure_participant_rejoin.sql`
 4. `supabase/migrations/202610130002_atomic_facilitator_actions.sql`
 5. `supabase/migrations/202610130003_authenticated_table_privileges.sql`
+6. `supabase/migrations/202610140001_retention_cron_jobs.sql`
+7. `supabase/migrations/202610140002_retention_cron_rehearsal.sql`
+8. `supabase/migrations/202610140003_restore_retention_cron_schedules.sql`
+9. `supabase/migrations/202610140004_verify_retention_cron_rehearsal.sql`
+10. `supabase/migrations/202610140005_persist_preparation_completion.sql`
 
 A new Supabase project must apply the complete chain in timestamp order using either `npx supabase db push` or the Supabase SQL editor, never both. An existing project receives only its unapplied forward migrations; never edit or rerun the initial migration as new history. Verify that `futureslab_submissions.context_snapshot` exists and that the active submission RPC is `submit_futureslab_recommendation(uuid, text, text)` as described in the runbook.
 

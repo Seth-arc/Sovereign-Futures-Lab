@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboa
 import {
   activateEmergencyMode,
   askAdvisor,
+  completeParticipantPreparation,
   isLocalBundle,
   joinWorkshop,
   joinLocalWorkshop,
@@ -26,7 +27,6 @@ import type { AdvisorCitation, AdvisorId, DecisionState, InstitutionRole } from 
 const PARTICIPANT_KEY = "futureslab-participant-id";
 const ENTRY_HANDOFF_KEY = "futureslab-entry-handoff-v1";
 const CONSENT_VERSION = "2026-10-13";
-const PREPARATION_KEY_PREFIX = "futureslab-preparation-v1:";
 const DIALOG_FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
 
 type SaveState = "DIRTY" | "SAVING" | "SAVED" | "ERROR";
@@ -164,34 +164,12 @@ function remainingFor(bundle: ParticipantBundle, now: number): number {
   return Math.max(0, bundle.session.remainingSeconds - Math.floor((now - new Date(bundle.session.clockStartedAt).getTime()) / 1000));
 }
 
-function preparationKey(participantId: string): string {
-  return `${PREPARATION_KEY_PREFIX}${participantId}`;
-}
-
 function dismissedInjectKey(participantId: string): string {
   return `futureslab-dismissed-inject-v1:${participantId}`;
 }
 
-function hasCaseworkData(bundle: ParticipantBundle): boolean {
-  const decisions = bundle.decisions;
-  return bundle.participant.currentStage > 0
-    || decisions.mandateConfirmed
-    || decisions.mandateRationale.trim().length > 0
-    || decisions.liquidityRationale.trim().length > 0
-    || decisions.liquidityBasisRationale.trim().length > 0
-    || decisions.linkageRationale.trim().length > 0
-    || decisions.disclosureRationale.trim().length > 0
-    || decisions.unresolvedRisks.trim().length > 0
-    || decisions.nextHandoff.trim().length > 0
-    || decisions.finalRationale.trim().length > 0
-    || decisions.reflection.trim().length > 0
-    || bundle.evidenceRequests.length > 0
-    || bundle.messages.length > 0
-    || bundle.submissions.length > 0;
-}
-
 function preparationIsComplete(bundle: ParticipantBundle): boolean {
-  return localStorage.getItem(preparationKey(bundle.participant.id)) === "complete" || hasCaseworkData(bundle);
+  return Boolean(bundle.participant.preparationCompletedAt);
 }
 
 export function ParticipantApp() {
@@ -236,8 +214,7 @@ export function ParticipantApp() {
     if (participantId) {
       void loadParticipantBundle(participantId)
         .then((loaded) => {
-          const complete = loaded.session.status === "DEBRIEF" || loaded.session.status === "CLOSED" || preparationIsComplete(loaded);
-          if (complete) localStorage.setItem(preparationKey(loaded.participant.id), "complete");
+          const complete = preparationIsComplete(loaded);
           setBundle(loaded);
           seenInjectId.current = loaded.injects.at(-1)?.id ?? null;
           seenSessionStatus.current = loaded.session.status;
@@ -276,8 +253,8 @@ export function ParticipantApp() {
         }
         setBundle(fresh);
         setDecisions(fresh.decisions);
+        setPreparationComplete(preparationIsComplete(fresh));
         if (fresh.session.status === "DEBRIEF" || fresh.session.status === "CLOSED") {
-          setPreparationComplete(true);
           setStage(participantEntryStage(fresh.session, fresh.participant));
           setRoleBriefOpen(false);
           if (debriefJustOpened) {
@@ -328,7 +305,7 @@ export function ParticipantApp() {
     try {
       const joined = await joinWorkshop(input);
       localStorage.setItem(PARTICIPANT_KEY, joined.participant.id);
-      const complete = joined.session.status === "DEBRIEF" || joined.session.status === "CLOSED" || preparationIsComplete(joined);
+      const complete = preparationIsComplete(joined);
       setBundle(joined);
       seenInjectId.current = joined.injects.at(-1)?.id ?? null;
       seenSessionStatus.current = joined.session.status;
@@ -379,7 +356,8 @@ export function ParticipantApp() {
   const latestInject = bundle.injects.at(-1);
   const clock = remainingFor(bundle, now);
   const caseworkRunning = preparationComplete && bundle.session.status === "RUNNING";
-  const displayedClock = preparationComplete ? clock : bundle.session.durationSeconds;
+  const preparationAccess = preparationComplete || bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED";
+  const displayedClock = preparationAccess ? clock : bundle.session.durationSeconds;
   const caseworkClockState = bundle.session.status === "DEBRIEF" || bundle.session.status === "CLOSED" ? "paused for debrief" : preparationComplete && clock === 0 ? "time expired" : caseworkRunning ? "" : "waiting";
   const caseworkClockLabel = `Casework · ${formatClock(displayedClock)}${caseworkClockState ? ` · ${caseworkClockState}` : ""}`;
   const availableEvidenceRequests = bundle.evidenceRequests.filter((request) => evidenceIsAvailable(request, new Date(now)));
@@ -432,7 +410,7 @@ export function ParticipantApp() {
     window.requestAnimationFrame(() => advisorReturnTarget.current?.focus());
   }
 
-  function completePreparationSurface() {
+  async function completePreparationSurface() {
     if (referenceSurface === "orientation") {
       if (preparationComplete) {
         closePreparationSurface();
@@ -446,15 +424,25 @@ export function ParticipantApp() {
       closePreparationSurface();
       return;
     }
-    localStorage.setItem(preparationKey(bundle.participant.id), "complete");
-    if (isLocalBundle(bundle)) {
-      setBundle({ ...bundle, session: { ...bundle.session, status: "RUNNING", remainingSeconds: bundle.session.durationSeconds, clockStartedAt: new Date().toISOString() } });
+    setBusy(true);
+    setError("");
+    try {
+      const completed = await completeParticipantPreparation(bundle);
+      const next = isLocalBundle(completed)
+        ? { ...completed, session: { ...completed.session, status: "RUNNING" as const, remainingSeconds: completed.session.durationSeconds, clockStartedAt: new Date().toISOString() } }
+        : completed;
+      setBundle(next);
+      setPreparationComplete(true);
+      setStage(0);
+      setRoleBriefOpen(true);
+      setReferenceSurface(null);
+      window.requestAnimationFrame(() => (referenceReturnTarget.current ?? mainContent.current)?.focus());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Preparation completion could not be saved. Your completed bridge remains open; retry when the connection is available.");
+      setLiveAnnouncement("Preparation completion was not saved. The Learning Bridge remains open so you can retry.");
+    } finally {
+      setBusy(false);
     }
-    setPreparationComplete(true);
-    setStage(0);
-    setRoleBriefOpen(true);
-    setReferenceSurface(null);
-    window.requestAnimationFrame(() => (referenceReturnTarget.current ?? mainContent.current)?.focus());
   }
 
   function closePreparationSurface() {
@@ -520,7 +508,7 @@ export function ParticipantApp() {
       )}
 
       <div className="orientation-tools" aria-label="Orientation and learning resources">
-        <span className={`preparation-status ${preparationComplete ? "complete" : "incomplete"}`} role="status" aria-live="polite">{preparationComplete ? (caseworkRunning ? "Casework in progress" : "Preparation complete · waiting for facilitator") : "Preparation incomplete · casework waiting"}</span>
+        <span className={`preparation-status ${preparationComplete ? "complete" : "incomplete"}`} role="status" aria-live="polite">{preparationComplete ? (caseworkRunning ? "Casework in progress" : "Preparation complete · waiting for facilitator") : preparationAccess ? "Preparation · Not reported" : "Preparation incomplete · casework waiting"}</span>
         <button type="button" className="secondary-button reference-tool-button" aria-haspopup="dialog" aria-expanded={referenceSurface === "orientation"} onClick={(event) => openReference("orientation", event.currentTarget)}>Orientation</button>
         <button type="button" className="secondary-button reference-tool-button" id="replayBridge" aria-haspopup="dialog" aria-expanded={referenceSurface === "bridge"} onClick={(event) => openReference("bridge", event.currentTarget)}>Learning bridge</button>
         <button type="button" className="secondary-button reference-tool-button" id="openAdvisors" aria-haspopup="dialog" aria-expanded={advisorOpen} onClick={(event) => openAdvisor(event.currentTarget)}>AI advisors</button>
@@ -542,7 +530,7 @@ export function ParticipantApp() {
 
         <main ref={mainContent} className={`workspace ${stage === 0 && roleBriefOpen ? "role-brief-open" : ""}`} id="main-content" tabIndex={-1}>
           <div key={!preparationComplete ? "preparation" : stage === 0 && roleBriefOpen ? "role-brief" : `stage-${stage}`} className="participant-view-transition">
-            {!preparationComplete ? <PreparationState onOrientation={(target) => openReference("orientation", target)} onBridge={(target) => openReference("bridge", target)} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
+            {!preparationAccess ? <PreparationState onOrientation={(target) => openReference("orientation", target)} onBridge={(target) => openReference("bridge", target)} /> : stage === 0 && roleBriefOpen ? <RoleBrief onContinue={() => setRoleBriefOpen(false)} /> : <>
               <div className="stage-head"><div><div className="eyebrow">Current stage · Step {stage + 1} · {STAGES[stage].short}{stage < FINAL_STAGE_INDEX ? " · Working state" : ""}</div><h1>{STAGES[stage].title}</h1><p>{STAGES[stage].objective}</p></div><div className="stage-index">{stage + 1} / {STAGES.length}<span className={`autosave-state save-${saveState.toLowerCase()}`} role="status" aria-live="polite">{saveState === "DIRTY" ? "Unsaved changes" : saveState === "SAVING" ? "Saving…" : saveState === "ERROR" ? "Save failed · changes unsaved" : "Saved"}</span></div></div>
               {error && <div className="error-panel" role="alert"><span>{error}</span>{!isLocalBundle(bundle) && <button type="button" className="secondary-button" onClick={() => { const local = activateEmergencyMode(bundle); localStorage.setItem(PARTICIPANT_KEY, local.participant.id); setBundle(local); setDecisions(local.decisions); setError(""); setNotice("Local emergency mode started. Download the handoff file when you finish."); }}>Continue in local emergency mode</button>}</div>}
               <StageContent stage={stage} decisions={decisions} setDecisions={(value) => { setDecisions(value); setSaveState("DIRTY"); }} bundle={bundle} setBundle={setBundle} setError={setError} setSaveState={setSaveState} now={now} />

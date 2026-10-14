@@ -42,6 +42,7 @@ export interface ParticipantProfile {
   currentStage: number;
   lastActiveAt: string;
   consentedAt: string;
+  preparationCompletedAt?: string;
 }
 
 export interface DecisionState {

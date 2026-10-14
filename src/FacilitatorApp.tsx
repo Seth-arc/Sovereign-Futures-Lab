@@ -8,11 +8,13 @@ import {
   deleteSession,
   facilitatorSignOut,
   listWorkshopSessions,
+  loadFacilitatorReportData,
   loadFacilitatorSession,
   removeParticipant,
   releaseEvidence,
   sendFacilitatorMagicLink,
   sendGlobalInject,
+  subscribeToFacilitatorWorkshop,
   updateWorkshopSession,
 } from "./data";
 import {
@@ -168,7 +170,7 @@ export function FacilitatorApp() {
       if (pollInFlight.current) return;
       pollInFlight.current = true;
       void refreshSessions().finally(() => { pollInFlight.current = false; });
-    }, 3000);
+    }, 30000);
     const refreshWhenVisible = () => { if (document.visibilityState === "visible") void refreshSessions(); };
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
@@ -178,6 +180,22 @@ export function FacilitatorApp() {
   }, [authState]);
 
   useEffect(() => {
+    if (authState !== "AUTHORIZED" || !selected?.id) return;
+    const sessionId = selected.id;
+    let refreshTimer = 0;
+    const unsubscribe = subscribeToFacilitatorWorkshop(sessionId, () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        if (selectedIdRef.current === sessionId && !pollInFlight.current) void refreshSessions(sessionId);
+      }, 250);
+    });
+    return () => {
+      window.clearTimeout(refreshTimer);
+      unsubscribe();
+    };
+  }, [authState, selected?.id]);
+
+  useEffect(() => {
     if (selected) setCueStageIndex(Math.min(Math.max(selected.currentStage, 0), STAGES.length - 1));
     setDeleteConfirmationOpen(false);
     setDeleteConfirmation("");
@@ -185,7 +203,6 @@ export function FacilitatorApp() {
 
   if (authState !== "AUTHORIZED") return <FacilitatorLogin state={authState} error={error} setError={setError} setState={setAuthState} />;
 
-  const reports = selected ? data.participants.map(({ participant, decisions }) => reportFor(participant, decisions, selected, data)) : [];
   const unlockedStageIndex = selected ? Math.min(Math.max(selected.currentStage, 0), STAGES.length - 1) : 0;
   const currentGuide = FACILITATOR_STAGE_GUIDES[cueStageIndex];
 
@@ -232,6 +249,8 @@ export function FacilitatorApp() {
     if (!selected) return;
     const transition = toggleCaseworkClock(selected, new Date());
     if (transition === selected) return;
+    const preparationNotReported = data.participants.filter(({ participant }) => !participant.preparationCompletedAt).length;
+    if (selected.status === "LOBBY" && preparationNotReported > 0 && !window.confirm(`${preparationNotReported} of ${data.participants.length} registered participants have preparation Not reported. Start casework anyway?`)) return;
     await patchSession(`clock:${selected.id}`, {
       status: transition.status,
       remaining_seconds: transition.remainingSeconds,
@@ -392,13 +411,13 @@ export function FacilitatorApp() {
                 <li>Ask what participants will transfer to real decision preparation.</li>
               </ol>
             </section>}
-            <div className="metric-grid"><Metric label="Connected participants" value={data.participants.length} /><Metric label="Active in last 2 min" value={data.participants.filter(({ participant }) => Date.now() - new Date(participant.lastActiveAt).getTime() < 120000).length} /><Metric label="Submitted" value={data.participants.filter(({ participant }) => data.submissions.some((item) => item.participantId === participant.id)).length} /><Metric label="Pending requests" value={data.messages.filter((item) => item.status === "PENDING").length} /></div>
+            <div className="metric-grid"><Metric label="Registered participants" value={data.participants.length} /><Metric label="Preparation complete" value={data.participants.filter(({ participant }) => participant.preparationCompletedAt).length} /><Metric label="Preparation · Not reported" value={data.participants.filter(({ participant }) => !participant.preparationCompletedAt).length} /><Metric label="Submitted" value={data.participants.filter(({ participant }) => data.submissions.some((item) => item.participantId === participant.id)).length} /><Metric label="Active in last 2 min · recorded activity" value={data.participants.filter(({ participant }) => Date.now() - new Date(participant.lastActiveAt).getTime() < 120000).length} /><Metric label="Pending requests" value={data.messages.filter((item) => item.status === "PENDING").length} /></div>
           </>}
-          {view === "participants" && <ParticipantMonitor data={data} reports={reports} session={selected} runAction={runAction} pendingActions={pendingActions} />}
+          {view === "participants" && <ParticipantMonitor data={data} session={selected} runAction={runAction} pendingActions={pendingActions} />}
           {view === "communications" && <RequestDesk data={data} runAction={runAction} pendingActions={pendingActions} />}
           {view === "injects" && <div className="facilitator-grid"><InjectDesk session={selected} runAction={runAction} pendingActions={pendingActions} /><EvidenceDesk data={data} runAction={runAction} pendingActions={pendingActions} /></div>}
-          {view === "analytics" && <ReportDesk reports={reports} />}
-          {view === "replay" && <><ReportDesk reports={reports} /><section className="danger-zone" aria-labelledby="session-lifecycle-title"><div><strong id="session-lifecycle-title">Session lifecycle</strong><span>Closing makes participants read-only and retains records until expiry or deletion. Deleting immediately cascades through every application record, including activity events; no in-platform session audit remains.</span></div><div className="lifecycle-actions"><button type="button" disabled={selected.status === "CLOSED" || pendingActions.has(`close:${selected.id}`)} onClick={() => void closeSelectedSession()}>{selected.status === "CLOSED" ? "Session closed" : pendingActions.has(`close:${selected.id}`) ? "Closing…" : "Close session…"}</button><button type="button" className="danger-button" aria-expanded={deleteConfirmationOpen} aria-controls="delete-session-confirmation" disabled={pendingActions.has(`delete:${selected.id}`)} onClick={() => setDeleteConfirmationOpen(true)}>Delete session…</button></div>{deleteConfirmationOpen && <form id="delete-session-confirmation" className="delete-confirmation" onSubmit={(event) => { event.preventDefault(); void deleteSelectedSession(); }}><p><strong>Delete all application records now?</strong> This permanently removes the session, participants, submissions, transcripts, and activity events. It does not create a surviving in-platform audit entry. Export is optional and is not required for privacy deletion.</p><label>Type join code <code>{selected.joinCode ?? "unavailable"}</code> exactly<input autoFocus autoComplete="off" spellCheck={false} value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} /></label><div><button type="button" onClick={() => { setDeleteConfirmationOpen(false); setDeleteConfirmation(""); }}>Cancel</button><button type="submit" className="danger-button" disabled={!deletionConfirmationMatches(deleteConfirmation, selected.joinCode) || pendingActions.has(`delete:${selected.id}`)}>{pendingActions.has(`delete:${selected.id}`) ? "Deleting…" : "Permanently delete"}</button></div></form>}</section></>}
+          {view === "analytics" && <ReportDesk session={selected} />}
+          {view === "replay" && <><ReportDesk session={selected} /><section className="danger-zone" aria-labelledby="session-lifecycle-title"><div><strong id="session-lifecycle-title">Session lifecycle</strong><span>Closing makes participants read-only and retains records until expiry or deletion. Deleting immediately cascades through every application record, including activity events; no in-platform session audit remains.</span></div><div className="lifecycle-actions"><button type="button" disabled={selected.status === "CLOSED" || pendingActions.has(`close:${selected.id}`)} onClick={() => void closeSelectedSession()}>{selected.status === "CLOSED" ? "Session closed" : pendingActions.has(`close:${selected.id}`) ? "Closing…" : "Close session…"}</button><button type="button" className="danger-button" aria-expanded={deleteConfirmationOpen} aria-controls="delete-session-confirmation" disabled={pendingActions.has(`delete:${selected.id}`)} onClick={() => setDeleteConfirmationOpen(true)}>Delete session…</button></div>{deleteConfirmationOpen && <form id="delete-session-confirmation" className="delete-confirmation" onSubmit={(event) => { event.preventDefault(); void deleteSelectedSession(); }}><p><strong>Delete all application records now?</strong> This permanently removes the session, participants, submissions, transcripts, and activity events. It does not create a surviving in-platform audit entry. Export is optional and is not required for privacy deletion.</p><label>Type join code <code>{selected.joinCode ?? "unavailable"}</code> exactly<input autoFocus autoComplete="off" spellCheck={false} value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} /></label><div><button type="button" onClick={() => { setDeleteConfirmationOpen(false); setDeleteConfirmation(""); }}>Cancel</button><button type="submit" className="danger-button" disabled={!deletionConfirmationMatches(deleteConfirmation, selected.joinCode) || pendingActions.has(`delete:${selected.id}`)}>{pendingActions.has(`delete:${selected.id}`) ? "Deleting…" : "Permanently delete"}</button></div></form>}</section></>}
         </>}
       </main>
     </div>
@@ -413,11 +432,27 @@ function FacilitatorLogin({ state, error, setError, setState }: { state: string;
 
 function Metric({ label, value }: { label: string; value: number }) { return <div className="metric"><strong>{value}</strong><span>{label}</span></div>; }
 
-function ParticipantMonitor({ data, reports, session, runAction, pendingActions }: { data: FacilitatorData; reports: AfterActionReport[]; session: WorkshopSession; runAction: RunAction; pendingActions: Set<string> }) {
+function ParticipantMonitor({ data, session, runAction, pendingActions }: { data: FacilitatorData; session: WorkshopSession; runAction: RunAction; pendingActions: Set<string> }) {
   const [query, setQuery] = useState("");
   const [report, setReport] = useState<AfterActionReport | null>(null);
+  const [reportLoadingId, setReportLoadingId] = useState("");
+  const [reportError, setReportError] = useState("");
   const rows = data.participants.filter(({ participant }) => `${participant.name} ${participant.organization} ${participant.email}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="console-card wide"><header><div><span className="eyebrow">Live operating picture</span><h2>Participant progress</h2></div><label className="compact-label">Search participants<input placeholder="Name, organization, or email" value={query} onChange={(event) => setQuery(event.target.value)} /></label></header><div className="table-wrap"><table><thead><tr><th scope="col">Participant</th><th scope="col">Progress</th><th scope="col">Evidence</th><th scope="col">Liquidity</th><th scope="col">Readiness</th><th scope="col">Open risks</th><th scope="col">Last active</th><th scope="col">Actions</th></tr></thead><tbody>{rows.map(({ participant, decisions }) => { const participantReport = reports.find((item) => item.participant.id === participant.id); const requests = data.evidence.filter((item) => item.participantId === participant.id); const pending = requests.filter((item) => !item.releasedAt && new Date(item.availableAt).getTime() > Date.now()).length; const removalKey = `remove:${participant.id}`; return <tr key={participant.id}><td><strong>{participant.name}</strong><small>{participant.organization}<br />{participant.email}</small></td><td>{participantProgressLabel(participant, decisions, session, data.submissions)}</td><td>{requests.length} requested<small>{pending} pending</small></td><td>{decisions.liquidityBasis?.replaceAll("_", " ") ?? "—"}</td><td>{decisions.readiness?.replaceAll("_", " ") ?? "Not submitted"}</td><td>{participantReport?.unresolvedRisks.length ?? 0}</td><td>{new Date(participant.lastActiveAt).toLocaleTimeString()}</td><td><button type="button" className="text-button" onClick={() => setReport(participantReport ?? null)}>Open AAR</button><button type="button" className="text-button danger-text" disabled={pendingActions.has(removalKey)} onClick={() => { if (confirm(`Remove ${participant.name} and their workshop record as an invalid or duplicate registration?`)) void runAction(removalKey, () => removeParticipant(participant.id), "Participant record removed.", "Unable to remove participant."); }}>{pendingActions.has(removalKey) ? "Removing…" : "Remove"}</button></td></tr>; })}</tbody></table></div>{rows.length === 0 && <p className="empty-copy">No participants match this view.</p>}{report && <ReportModal report={report} onClose={() => setReport(null)} />}</section>;
+  async function openReport(participantId: string) {
+    setReportError("");
+    setReportLoadingId(participantId);
+    try {
+      const detailed = await loadFacilitatorReportData(session, participantId);
+      const row = detailed.participants[0];
+      if (!row) throw new Error("Participant record is no longer available.");
+      setReport(reportFor(row.participant, row.decisions, session, detailed));
+    } catch (caught) {
+      setReportError(errorMessage(caught, "Unable to load this after-action report."));
+    } finally {
+      setReportLoadingId("");
+    }
+  }
+  return <section className="console-card wide"><header><div><span className="eyebrow">Live operating picture</span><h2>Participant progress</h2></div><label className="compact-label">Search participants<input placeholder="Name, organization, or email" value={query} onChange={(event) => setQuery(event.target.value)} /></label></header>{reportError && <p className="error-panel" role="alert">{reportError}</p>}<div className="table-wrap"><table><thead><tr><th scope="col">Participant</th><th scope="col">Progress</th><th scope="col">Evidence</th><th scope="col">Liquidity</th><th scope="col">Readiness</th><th scope="col">Open risks</th><th scope="col">Last active</th><th scope="col">Actions</th></tr></thead><tbody>{rows.map(({ participant, decisions }) => { const requests = data.evidence.filter((item) => item.participantId === participant.id); const pending = requests.filter((item) => !item.releasedAt && new Date(item.availableAt).getTime() > Date.now()).length; const removalKey = `remove:${participant.id}`; return <tr key={participant.id}><td><strong>{participant.name}</strong><small>{participant.organization}<br />{participant.email}</small></td><td>{participantProgressLabel(participant, decisions, session, data.submissions)}</td><td>{requests.length} requested<small>{pending} pending</small></td><td>{decisions.liquidityBasis?.replaceAll("_", " ") ?? "—"}</td><td>{decisions.readiness?.replaceAll("_", " ") ?? "Not submitted"}</td><td>{decisions.unresolvedRisks.trim() ? "Recorded" : "—"}</td><td>{new Date(participant.lastActiveAt).toLocaleTimeString()}</td><td><button type="button" className="text-button" disabled={Boolean(reportLoadingId)} onClick={() => void openReport(participant.id)}>{reportLoadingId === participant.id ? "Loading AAR…" : "Open AAR"}</button><button type="button" className="text-button danger-text" disabled={pendingActions.has(removalKey)} onClick={() => { if (confirm(`Remove ${participant.name} and their workshop record as an invalid or duplicate registration?`)) void runAction(removalKey, () => removeParticipant(participant.id), "Participant record removed.", "Unable to remove participant."); }}>{pendingActions.has(removalKey) ? "Removing…" : "Remove"}</button></td></tr>; })}</tbody></table></div>{rows.length === 0 && <p className="empty-copy">No participants match this view.</p>}{report && <ReportModal report={report} onClose={() => setReport(null)} />}</section>;
 }
 
 function InjectDesk({ session, runAction, pendingActions }: { session: WorkshopSession; runAction: RunAction; pendingActions: Set<string> }) {
@@ -449,15 +484,23 @@ function RequestDesk({ data, runAction, pendingActions }: { data: FacilitatorDat
   return <section className="console-card wide"><span className="eyebrow">Role-play queue</span><h2>Institutional request desk</h2><p>Answer exceptional participant questions as the selected institution. Routine evidence requests remain automated.</p>{messages.length === 0 ? <p className="empty-copy">No exceptional requests have been sent.</p> : <div className="request-queue">{messages.map((message) => { const actionKey = `reply:${message.id}`; return <article key={message.id}><header><span><strong>{participantName(message.participantId)}</strong><small>{message.institution.replaceAll("_", " ")} · {new Date(message.createdAt).toLocaleTimeString()}</small></span><em>{message.status}</em></header><p>{message.question}</p>{message.status === "ANSWERED" ? <div className="institution-reply"><strong>Reply</strong><p>{message.reply}</p></div> : <div className="reply-compose"><label>Reply as {message.institution.replaceAll("_", " ")}<textarea rows={3} maxLength={4000} value={drafts[message.id] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [message.id]: event.target.value }))} /></label><button type="button" className="primary-button" disabled={pendingActions.has(actionKey) || !(drafts[message.id]?.trim())} onClick={() => void answer(message.id)}>{pendingActions.has(actionKey) ? "Sending…" : "Send reply"}</button></div>}</article>; })}</div>}</section>;
 }
 
-function ReportDesk({ reports }: { reports: AfterActionReport[] }) {
+function ReportDesk({ session }: { session: WorkshopSession }) {
   const [exportError, setExportError] = useState("");
   const [exportNotice, setExportNotice] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
   function resetFeedback() { setExportError(""); setExportNotice(""); }
   function fail(caught: unknown, format: string) { setExportError(errorMessage(caught, `Unable to create the ${format} export. Check browser download permissions and try again.`)); }
-  function preview() {
+  async function loadReports(): Promise<AfterActionReport[]> {
+    const detailed = await loadFacilitatorReportData(session);
+    return detailed.participants.map(({ participant, decisions }) => reportFor(participant, decisions, session, detailed));
+  }
+  async function preview() {
     resetFeedback();
     let url = "";
+    setExportLoading(true);
     try {
+      const reports = await loadReports();
+      if (!reports.length) throw new Error("No participant records are available to export.");
       url = URL.createObjectURL(new Blob([workshopComparisonHtml(reports)], { type: "text/html;charset=utf-8" }));
       const popup = window.open(url, "_blank", "noopener,noreferrer");
       if (!popup) throw new Error("The anonymous comparison popup was blocked. Allow popups for this site and try again.");
@@ -466,21 +509,29 @@ function ReportDesk({ reports }: { reports: AfterActionReport[] }) {
     } catch (caught) {
       if (url) URL.revokeObjectURL(url);
       fail(caught, "anonymous HTML preview");
-    }
+    } finally { setExportLoading(false); }
   }
-  async function anonymousExport(format: string, startDownload: () => void | Promise<void>) {
+  async function anonymousExport(format: string, startDownload: (reports: AfterActionReport[]) => void | Promise<void>) {
     resetFeedback();
-    try { await startDownload(); setExportNotice(`Anonymous ${format} download started.`); }
+    setExportLoading(true);
+    try { const reports = await loadReports(); if (!reports.length) throw new Error("No participant records are available to export."); await startDownload(reports); setExportNotice(`Anonymous ${format} download started.`); }
     catch (caught) { fail(caught, `anonymous ${format}`); }
+    finally { setExportLoading(false); }
   }
-  async function identifiedExport(format: string, contents: string, startDownload: () => void | Promise<void>) {
+  async function identifiedExport(format: string, contents: string, startDownload: (reports: AfterActionReport[]) => void | Promise<void>) {
     resetFeedback();
     try {
-      const started = await runIdentifiedExport(() => window.confirm(identifiedExportDisclosure(contents)), startDownload);
+      const started = await runIdentifiedExport(() => window.confirm(identifiedExportDisclosure(contents)), async () => {
+        setExportLoading(true);
+        const reports = await loadReports();
+        if (!reports.length) throw new Error("No participant records are available to export.");
+        await startDownload(reports);
+      });
       if (started) setExportNotice(`Identified ${format} download started.`);
     } catch (caught) { fail(caught, `identified ${format}`); }
+    finally { setExportLoading(false); }
   }
-  return <section className="console-card wide"><header><div><span className="eyebrow">Facilitator exports</span><h2>Workshop records</h2></div></header><p>Every format names its selected submission version and replay provenance. Exports are generated in this browser and are not uploaded back to the platform.</p>{!reports.length && <p className="empty-copy">No participant records are available to export.</p>}<div className="export-groups"><section aria-labelledby="anonymous-export-title"><h3 id="anonymous-export-title">Anonymous group comparison</h3><p>HTML preview, HTML download, and PDF only. These formats use numbered participant labels and exclude participant name, organization, email, and participant ID.</p><div className="export-actions"><button type="button" onClick={preview} disabled={!reports.length}>Preview anonymous HTML</button><button type="button" onClick={() => void anonymousExport("PDF", () => downloadWorkshopPdf(reports))} disabled={!reports.length}>Download anonymous PDF</button><button type="button" onClick={() => void anonymousExport("HTML", () => downloadWorkshopHtml(reports))} disabled={!reports.length}>Download anonymous HTML</button></div></section><section aria-labelledby="identified-export-title"><h3 id="identified-export-title">Identified facilitator-only records</h3><p>Roster CSV and full JSON are always identified. Each download requires a disclosure confirmation; no anonymity setting applies to these formats.</p><div className="export-actions"><button type="button" onClick={() => void identifiedExport("roster CSV", "participant name, organization, email address, participant ID, decisions, selected submission version, and replay provenance", () => downloadWorkshopCsv(reports))} disabled={!reports.length}>Download identified roster CSV</button><button type="button" onClick={() => void identifiedExport("workshop JSON", "participant name, organization, email address, participant ID, decisions, correspondence, advisor transcripts, activity history, selected submission version, and replay provenance", () => downloadWorkshopJson(reports))} disabled={!reports.length}>Download identified workshop JSON</button></div></section></div>{exportError && <p className="error-panel" role="alert">{exportError}</p>}{exportNotice && <p className="success-panel" role="status">{exportNotice}</p>}</section>;
+  return <section className="console-card wide"><header><div><span className="eyebrow">Facilitator exports</span><h2>Workshop records</h2></div></header><p>Every format names its selected submission version and replay provenance. Detailed records load only when you request an export and are generated in this browser without external report storage.</p>{exportLoading && <p className="empty-copy" role="status">Loading detailed workshop records…</p>}<div className="export-groups"><section aria-labelledby="anonymous-export-title"><h3 id="anonymous-export-title">Anonymous group comparison</h3><p>HTML preview, HTML download, and PDF only. These formats use numbered participant labels and exclude participant name, organization, email, and participant ID.</p><div className="export-actions"><button type="button" onClick={() => void preview()} disabled={exportLoading}>Preview anonymous HTML</button><button type="button" onClick={() => void anonymousExport("PDF", downloadWorkshopPdf)} disabled={exportLoading}>Download anonymous PDF</button><button type="button" onClick={() => void anonymousExport("HTML", downloadWorkshopHtml)} disabled={exportLoading}>Download anonymous HTML</button></div></section><section aria-labelledby="identified-export-title"><h3 id="identified-export-title">Identified facilitator-only records</h3><p>Roster CSV and full JSON are always identified. Each download requires a disclosure confirmation; no anonymity setting applies to these formats.</p><div className="export-actions"><button type="button" onClick={() => void identifiedExport("roster CSV", "participant name, organization, email address, participant ID, decisions, selected submission version, and replay provenance", downloadWorkshopCsv)} disabled={exportLoading}>Download identified roster CSV</button><button type="button" onClick={() => void identifiedExport("workshop JSON", "participant name, organization, email address, participant ID, decisions, correspondence, advisor transcripts, activity history, selected submission version, and replay provenance", downloadWorkshopJson)} disabled={exportLoading}>Download identified workshop JSON</button></div></section></div>{exportError && <p className="error-panel" role="alert">{exportError}</p>}{exportNotice && <p className="success-panel" role="status">{exportNotice}</p>}</section>;
 }
 
 function ReportModal({ report, onClose }: { report: AfterActionReport; onClose: () => void }) {
